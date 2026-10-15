@@ -1,0 +1,53 @@
+services:
+  - type: web
+    name: techocean-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./demo/Dockerfile
+    dockerContext: ./demo
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: production
+      - key: CORS_ALLOWED_ORIGIN_PATTERNS
+        value: http://localhost:5173,http://localhost:5174,http://localhost:8080,http://127.0.0.1:5173,http://127.0.0.1:5174,http://127.0.0.1:8080,https://*.lovable.app,https://*.lovable.dev,https://techocean-site.onrender.com
+      - key: DB_HOST
+        fromDatabase:
+          name: techocean-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: techocean-db
+          property: port
+      - key: DB_NAME
+        fromDatabase:
+          name: techocean-db
+          property: database
+      - key: DB_USER
+        fromDatabase:
+          name: techocean-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: techocean-db
+          property: password
+
+  - type: web
+    name: techocean-site
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: node .output/server/index.mjs
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: NITRO_PRESET
+        value: render_com
+      - key: VITE_API_URL
+        value: https://techocean-api.onrender.com
+
+databases:
+  - name: techocean-db
+    plan: free
+    databaseName: techocean
+    user: techocean
