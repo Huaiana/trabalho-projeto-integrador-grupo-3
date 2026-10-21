@@ -1,7 +1,7 @@
 # AGENT_BACKEND: Diretrizes de Desenvolvimento Backend
 
 ## 1. Visão Geral
-O **Agent Backend** rege a arquitetura de microsserviços/APIs, regras de negócio, modelagem de dados e segurança utilizando **Java Spring Boot**, persistência com **PostgreSQL** e padrões corporativos.
+O **Agent Backend** rege a arquitetura de microsserviços/APIs, regras de negócio, modelagem de dados e segurança utilizando **Java Spring Boot**, persistência com **H2** e padrões corporativos.
 
 ## 2. Responsabilidades Principais
 * **Arquitetura de APIs (REST):** Desenvolver endpoints seguros, padronizados e documentados (OpenAPI/Swagger).
