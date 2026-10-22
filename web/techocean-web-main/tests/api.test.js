@@ -4,8 +4,9 @@ import { apiRequest, post, putParams, ApiError, API_BASE_URL, LOCAL_API_URL, PRO
 afterEach(() => vi.unstubAllGlobals());
 
 describe("API client", () => {
-  it("uses localhost in development and the deployed API in production when no override is configured", () => {
+  it("uses the same-origin Vite proxy in development and the deployed API in production by default", () => {
     expect(resolveApiBaseUrl({ DEV: true })).toBe(LOCAL_API_URL);
+    expect(LOCAL_API_URL).toBe("/api");
     expect(resolveApiBaseUrl({ DEV: false })).toBe(PRODUCTION_API_URL);
   });
 
@@ -64,6 +65,6 @@ describe("API client", () => {
   it("surfaces an actionable connection error", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("offline")));
     await expect(apiRequest("/clientes")).rejects.toBeInstanceOf(ApiError);
-    await expect(apiRequest("/clientes")).rejects.toThrow("VITE_API_URL");
+    await expect(apiRequest("/clientes")).rejects.toThrow("localhost:8080");
   });
 });

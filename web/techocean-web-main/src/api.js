@@ -1,4 +1,4 @@
-export const LOCAL_API_URL = "http://localhost:8080";
+export const LOCAL_API_URL = "/api";
 export const PRODUCTION_API_URL = "https://techocean-api.onrender.com";
 
 export function resolveApiBaseUrl(env = import.meta.env) {
@@ -22,7 +22,10 @@ export async function apiRequest(path, options = {}) {
   try {
     response = await fetch(`${API_BASE_URL}${path}`, options);
   } catch {
-    throw new ApiError(`Não foi possível conectar à API em ${API_BASE_URL}. Verifique se o serviço está ativo, a configuração VITE_API_URL e o CORS.`, 0, "SEM_CONEXAO");
+    const guidance = import.meta.env?.DEV
+      ? "Confirme o Spring Boot em localhost:8080 e o proxy /api do Vite."
+      : "Verifique VITE_API_URL, a disponibilidade do serviço e o CORS.";
+    throw new ApiError(`Não foi possível conectar à API (${API_BASE_URL}). ${guidance}`, 0, "SEM_CONEXAO");
   }
 
   const contentType = response.headers.get("content-type") || "";

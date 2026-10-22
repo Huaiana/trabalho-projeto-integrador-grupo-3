@@ -50,14 +50,14 @@ cd demo
 ./mvnw spring-boot:run
 ```
 
-A API Spring Boot fica disponível, por padrão, em `http://localhost:8080`. Essa é também a URL configurada no `.env` do frontend. Se você alterar a porta da API, atualize `VITE_API_URL` em `web/techocean-web-main/.env` e reinicie o Vite. Para iniciar a API em uma porta alternativa, por exemplo `8081`:
+A API Spring Boot fica disponível, por padrão, em `http://localhost:8080`. Em desenvolvimento, o frontend usa o proxy `/api` do Vite, que encaminha as chamadas para a API. Se você alterar a porta da API, atualize o `target` do proxy em `web/techocean-web-main/vite.config.js` e reinicie o Vite. Para iniciar a API em uma porta alternativa, por exemplo `8081`:
 
 ```powershell
 cd demo
 .\mvnw.cmd spring-boot:run "-Dspring-boot.run.arguments=--server.port=8081"
 ```
 
-Nesse caso, configure `VITE_API_URL=http://localhost:8081`. Para confirmar que está acessando a API — e não o servidor do site — teste `http://localhost:8081/clientes`; a resposta esperada é `200`. A raiz `/` não é uma rota da API e pode retornar `404`.
+Nesse caso, configure o target do proxy Vite para `http://127.0.0.1:8081`. Para confirmar que está acessando a API — e não o servidor do site — teste `http://localhost:8081/clientes`; a resposta esperada é `200`. A raiz `/` não é uma rota da API e pode retornar `404`.
 
 ### Site
 
@@ -85,7 +85,7 @@ O Blueprint em `backend/techocean-main/render.yaml` prepara o frontend estático
 
 Os serviços Render usam planos gratuitos para teste. Podem suspender após inatividade e o banco gratuito é temporário; não use essa configuração para dados importantes ou de produção. O banco criado no Render começa vazio: dados gravados apenas no H2 local não são copiados.
 
-Para desenvolvimento local depois da publicação, mantenha `VITE_API_URL` em `web/techocean-web-main/.env` apontando para a URL local da API (`http://localhost:8080` por padrão). O valor definido no ambiente do serviço Render é injetado durante o build e aponta para a API publicada.
+Para desenvolvimento local depois da publicação, mantenha o proxy Vite apontando para a API local (`http://127.0.0.1:8080` por padrão). O valor de `VITE_API_URL` definido no ambiente de build do provedor aponta o frontend publicado para a API remota.
 
 ## API REST
 
