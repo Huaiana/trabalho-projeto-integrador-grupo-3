@@ -1,5 +1,12 @@
-const configuredBase = import.meta.env?.VITE_API_URL || "http://localhost:8080";
-export const API_BASE_URL = configuredBase.replace(/\/+$/, "");
+export const LOCAL_API_URL = "http://localhost:8080";
+export const PRODUCTION_API_URL = "https://techocean-api.onrender.com";
+
+export function resolveApiBaseUrl(env = import.meta.env) {
+  const configuredBase = env?.VITE_API_URL || (env?.DEV ? LOCAL_API_URL : PRODUCTION_API_URL);
+  return configuredBase.replace(/\/+$/, "");
+}
+
+export const API_BASE_URL = resolveApiBaseUrl();
 
 export class ApiError extends Error {
   constructor(message, status, code = "") {
@@ -15,7 +22,7 @@ export async function apiRequest(path, options = {}) {
   try {
     response = await fetch(`${API_BASE_URL}${path}`, options);
   } catch {
-    throw new ApiError("Não foi possível conectar à API. Verifique o servidor e a configuração VITE_API_URL.", 0, "SEM_CONEXAO");
+    throw new ApiError(`Não foi possível conectar à API em ${API_BASE_URL}. Verifique se o serviço está ativo, a configuração VITE_API_URL e o CORS.`, 0, "SEM_CONEXAO");
   }
 
   const contentType = response.headers.get("content-type") || "";

@@ -1,9 +1,18 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { apiRequest, post, putParams, ApiError, API_BASE_URL } from "../src/api.js";
+import { apiRequest, post, putParams, ApiError, API_BASE_URL, LOCAL_API_URL, PRODUCTION_API_URL, resolveApiBaseUrl } from "../src/api.js";
 
 afterEach(() => vi.unstubAllGlobals());
 
 describe("API client", () => {
+  it("uses localhost in development and the deployed API in production when no override is configured", () => {
+    expect(resolveApiBaseUrl({ DEV: true })).toBe(LOCAL_API_URL);
+    expect(resolveApiBaseUrl({ DEV: false })).toBe(PRODUCTION_API_URL);
+  });
+
+  it("prefers VITE_API_URL over environment defaults", () => {
+    expect(resolveApiBaseUrl({ DEV: true, VITE_API_URL: "https://api.example.com/" })).toBe("https://api.example.com");
+  });
+
   it("uses the configurable API origin and requests a JSON resource", async () => {
     const fetchMock = vi.fn().mockResolvedValue(Response.json([{ id: 4 }]));
     vi.stubGlobal("fetch", fetchMock);
