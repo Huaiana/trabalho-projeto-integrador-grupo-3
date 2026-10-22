@@ -4,30 +4,30 @@ Sistema para apresentar serviços de segurança e amarração de cargas e dispon
 
 ## Visão geral
 
-O repositório contém duas aplicações:
+O repositório contém duas aplicações independentes:
 
-- **Site institucional** (raiz do repositório): página inicial com apresentação dos serviços, informações da empresa e contato.
+- **Frontend** (`web/techocean-web-main/`): site institucional, cadastro de clientes e painel administrativo, implementados em HTML, CSS e JavaScript sem framework de interface.
 - **API** (`demo/`): aplicação Spring Boot para clientes e administradores, cargas, serviços, contêineres, solicitações, orçamentos, operações, mensagens e agendamentos de visitas.
 
 O site e a API são executados separadamente. A página institucional atual não depende da API para renderizar seu conteúdo.
 
 ## Tecnologias
 
-- **Site:** React, TypeScript, TanStack Start/Router, Vite e Tailwind CSS.
-- **API:** Java 17, Spring Boot, Spring Web MVC e Spring Data JPA.
+- **Frontend:** HTML, CSS e JavaScript, empacotados pelo Vite.
+- **API:** Java 21, Spring Boot, Spring Web MVC e Spring Data JPA.
 - **Persistência local:** dependência H2 incluída no backend; as configurações da aplicação estão em `demo/src/main/resources/application.properties`.
 
 ## Estrutura
 
 ```text
 .
-├── demo/                 # API Java/Spring Boot e testes
-└── src/                  # Site institucional React
+├── demo/                         # API Java/Spring Boot e testes
+└── ../../web/techocean-web-main/ # Frontend HTML/CSS/JavaScript
 ```
 
 ## Pré-requisitos
 
-- Java 17 ou superior.
+- Java 21 ou superior.
 - Node.js e npm para o site.
 
 O backend usa o Maven Wrapper (`mvnw` / `mvnw.cmd`), portanto não é necessário instalar o Maven globalmente.
@@ -36,39 +36,39 @@ O backend usa o Maven Wrapper (`mvnw` / `mvnw.cmd`), portanto não é necessári
 
 ### API
 
-No Windows, a partir da raiz do repositório:
+No Windows, a partir de `backend/techocean-main/`:
 
 ```powershell
 cd demo
 .\mvnw.cmd spring-boot:run
 ```
 
-No macOS ou Linux:
+No macOS ou Linux, também a partir de `backend/techocean-main/`:
 
 ```bash
 cd demo
 ./mvnw spring-boot:run
 ```
 
-A API Spring Boot fica disponível, por padrão, em `http://localhost:8080`. O Vite usa a porta `5173` por padrão, mas a porta pode ser definida pelo comando que o inicia. Se o Vite já estiver usando `8080`, inicie a API em `8081`:
+A API Spring Boot fica disponível, por padrão, em `http://localhost:8080`. Essa é também a URL configurada no `.env` do frontend. Se você alterar a porta da API, atualize `VITE_API_URL` em `web/techocean-web-main/.env` e reinicie o Vite. Para iniciar a API em uma porta alternativa, por exemplo `8081`:
 
 ```powershell
 cd demo
 .\mvnw.cmd spring-boot:run "-Dspring-boot.run.arguments=--server.port=8081"
 ```
 
-Nesse caso, `VITE_API_URL` deve apontar para `http://localhost:8081` (como configurado neste checkout). Para confirmar que está acessando a API — e não o servidor do site — teste `http://localhost:8081/clientes`; a resposta esperada é `200`. A raiz `/` não é uma rota da API e pode retornar `404`.
+Nesse caso, configure `VITE_API_URL=http://localhost:8081`. Para confirmar que está acessando a API — e não o servidor do site — teste `http://localhost:8081/clientes`; a resposta esperada é `200`. A raiz `/` não é uma rota da API e pode retornar `404`.
 
 ### Site
 
-Em outro terminal:
+Em outro terminal, a partir da pasta `web/techocean-web-main/`:
 
 ```bash
-npm install
+npm ci
 npm run dev
 ```
 
-Use o endereço local informado pelo Vite no terminal para abrir o site. Se usar a porta `8080` para o Vite, mantenha a API em `8081` e `VITE_API_URL=http://localhost:8081`. O Vite pode carregar as variáveis de ambiente ao iniciar; reinicie-o após alterar `.env`. Para gerar e visualizar a versão de produção:
+Use o endereço local informado pelo Vite no terminal para abrir o site. O Vite usa a porta `5173` por padrão, enquanto a API usa `8080`. O Vite pode carregar as variáveis de ambiente ao iniciar; reinicie-o após alterar `.env`. Para gerar e visualizar a versão de produção:
 
 ```bash
 npm run build
@@ -77,15 +77,15 @@ npm run preview
 
 ### Publicar a API no Render
 
-O arquivo `render.yaml` prepara o site, a API Spring Boot e um banco PostgreSQL de teste no Render:
+O Blueprint em `backend/techocean-main/render.yaml` prepara o frontend estático, a API Spring Boot e um banco PostgreSQL de teste no Render. O frontend é compilado a partir de `web/techocean-web-main/` e usa `VITE_API_URL` definido no serviço do Render:
 
-1. No Render, crie ou sincronize o Blueprint do repositório `Huaiana/techocean` e confirme os novos recursos de `render.yaml`.
+1. No Render, crie ou sincronize o Blueprint do repositório `Huaiana/techocean`, apontando o arquivo Blueprint para `backend/techocean-main/render.yaml`, e confirme os recursos definidos nele.
 2. Aguarde `techocean-api` e `techocean-site` ficarem disponíveis. O site será publicado em `https://techocean-site.onrender.com` e usa `https://techocean-api.onrender.com` para as chamadas da API.
-3. O site também pode ser publicado no Lovable: mantenha o projeto conectado à branch `main` do GitHub, sincronize os commits e use **Publish** no projeto. O destino Cloudflare do Lovable é mantido pelo ambiente de build do Lovable; o Render usa o preset Node `render_com`.
+3. O site também pode ser publicado no Lovable: mantenha o projeto conectado à branch `main` do GitHub, sincronize os commits e use **Publish** no projeto.
 
 Os serviços Render usam planos gratuitos para teste. Podem suspender após inatividade e o banco gratuito é temporário; não use essa configuração para dados importantes ou de produção. O banco criado no Render começa vazio: dados gravados apenas no H2 local não são copiados.
 
-Para desenvolvimento local depois da publicação, mantenha `VITE_API_URL` em `.env` apontando para a URL local da API (`http://localhost:8080` ou `http://localhost:8081`, conforme a porta usada). Builds de produção usam `.env.production`; valores de `VITE_API_URL` configurados diretamente no ambiente do provedor têm precedência sobre os arquivos `.env`.
+Para desenvolvimento local depois da publicação, mantenha `VITE_API_URL` em `web/techocean-web-main/.env` apontando para a URL local da API (`http://localhost:8080` por padrão). O valor definido no ambiente do serviço Render é injetado durante o build e aponta para a API publicada.
 
 ## API REST
 

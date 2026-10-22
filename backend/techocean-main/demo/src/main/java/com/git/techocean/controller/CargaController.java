@@ -20,14 +20,9 @@ public class CargaController {
 
     // RF02 - Cadastrar especificações de carga
     @PostMapping
-    public ResponseEntity<Carga> cadastrar(
-            @RequestParam String descricao,
-            @RequestParam Double peso,
-            @RequestParam Double volume,
-            @RequestParam String tipoCarga,
-            @RequestParam String origem,
-            @RequestParam String destino) {
-        Carga carga = cargaService.cadastrar(descricao, peso, volume, tipoCarga, origem, destino);
+    public ResponseEntity<Carga> cadastrar(@RequestBody Carga dados) {
+        Carga carga = cargaService.cadastrar(dados.getDescricao(), dados.getPeso(), dados.getVolume(),
+                dados.getTipoCarga(), dados.getOrigem(), dados.getDestino());
         return new ResponseEntity<>(carga, HttpStatus.CREATED);
     }
 

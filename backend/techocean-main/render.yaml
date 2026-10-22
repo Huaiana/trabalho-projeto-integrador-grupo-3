@@ -3,8 +3,8 @@ services:
     name: techocean-api
     runtime: docker
     plan: free
-    dockerfilePath: ./demo/Dockerfile
-    dockerContext: ./demo
+    dockerfilePath: backend/techocean-main/demo/Dockerfile
+    dockerContext: backend/techocean-main/demo
     healthCheckPath: /actuator/health
     envVars:
       - key: SPRING_PROFILES_ACTIVE
@@ -34,15 +34,16 @@ services:
 
   - type: web
     name: techocean-site
-    runtime: node
+    runtime: static
     plan: free
+    rootDir: web/techocean-web-main
     buildCommand: npm ci && npm run build
-    startCommand: node .output/server/index.mjs
+    staticPublishPath: web/techocean-web-main/dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
     envVars:
-      - key: NODE_VERSION
-        value: 20
-      - key: NITRO_PRESET
-        value: render_com
       - key: VITE_API_URL
         value: https://techocean-api.onrender.com
 
