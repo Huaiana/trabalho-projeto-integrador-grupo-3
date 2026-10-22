@@ -1,0 +1,11 @@
+{
+  "name": "techocean-project",
+  "private": true,
+  "scripts": {
+    "postinstall": "npm ci --prefix web/techocean-web-main",
+    "dev": "npm --prefix web/techocean-web-main run dev",
+    "build": "npm --prefix web/techocean-web-main run build",
+    "test": "npm --prefix web/techocean-web-main test",
+    "lint": "npm --prefix web/techocean-web-main run lint"
+  }
+}

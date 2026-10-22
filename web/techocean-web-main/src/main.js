@@ -2,7 +2,8 @@ import { get, post, postParams, put, putParams, ApiError } from "./api.js";
 import lashingImage from "./assets/lashing.jpg";
 import "./vanilla.css";
 
-const app = document.querySelector("#app");
+const app = globalThis.document?.querySelector?.("#app") ?? null;
+let modalReturnFocus = null;
 const sections = [
   { slug: "carga", name: "Carga", description: "Cadastro e consulta de cargas.", endpoint: "/cargas", columns: ["id", "descricao", "peso", "volume", "tipoCarga", "origem", "destino"] },
   { slug: "cliente", name: "Cliente", description: "Clientes cadastrados.", endpoint: "/clientes", columns: ["id", "nome", "email", "telefone", "cpfcnpj"] },
@@ -82,6 +83,8 @@ function renderDashboard(slug = "") {
   if (slug && !section) { renderNotFound(); return; }
   document.title = `${section?.name || "Visão geral"} — Techocean`;
   app.innerHTML = `<main class="dashboard">${dashboardNav(slug)}<section class="dash-main"><div class="dash-topline"><a href="/" class="site-return">↖ <span>Voltar ao site</span></a><div class="dash-account"><span class="avatar">T</span><span>Área administrativa</span></div></div><div class="dash-content">${section ? `<p class="eyebrow">Painel / ${esc(section.name)}</p><h1>${esc(section.name)}</h1><p class="dash-description">${esc(section.description)}</p><div id="section-content" data-slug="${esc(slug)}"><p class="loading-state">Carregando informações…</p></div>` : `<p class="eyebrow">Espaço de gestão</p><h1>Visão geral</h1><p class="dash-description">Acesse as áreas da operação Techocean.</p><div class="dash-cards">${sections.map((item) => `<a href="/dashboard/${item.slug}" class="dash-card"><span class="dash-card-icon">${item.name.slice(0, 1)}</span><h2>${item.name}<span>↗</span></h2><p>${item.description}</p></a>`).join("")}</div>`}</div></section></main>`;
+  const isMobile = globalThis.window?.matchMedia?.("(max-width: 720px)").matches ?? (globalThis.window?.innerWidth <= 720);
+  scrollActiveChipIntoView(document.querySelector(".mobile-dash-nav"), isMobile);
   if (section) void loadSection(section);
 }
 
@@ -139,9 +142,9 @@ function statusPill(key, value) {
   return rendered;
 }
 
-function renderMessages(records) {
+export function renderMessages(records) {
   if (!records.length) return `<div class="data-panel"><div class="panel-heading"><div><span class="eyebrow">FALE CONOSCO</span><h2>Caixa de entrada <span class="count-pill">0</span></h2></div><button class="button button-outline compact" data-reload>↻ Atualizar</button></div><div class="empty-state"><span>✉</span><strong>Nenhuma mensagem recebida</strong><p>As mensagens enviadas pelo formulário do site aparecerão aqui.</p></div></div>`;
-  return `<div class="message-list">${records.map((message) => `<article class="message-card"><div class="message-heading"><div class="avatar">${esc((message.nome || "?").slice(0, 1).toUpperCase())}</div><div><h2>${valueText(message.nome)}</h2><p>${valueText(message.email)} · ${message.criadoEm ? valueText(new Date(message.criadoEm).toLocaleString("pt-BR")) : "Contato recebido"}</p></div><span class="status-pill">${valueText(message.status || "Recebida")}</span></div><p class="message-content">${valueText(message.conteudo || message.mensagem || message.texto)}</p>${message.resposta ? `<div class="reply-sent"><strong>Resposta enviada</strong><p>${valueText(message.resposta)}</p></div>` : ""}${message.id ? `<form class="inline-reply" data-form="reply" data-message-id="${esc(message.id)}"><label class="sr-only" for="reply-${esc(message.id)}">Resposta</label><input id="reply-${esc(message.id)}" name="resposta" required placeholder="Escreva uma resposta…"><button class="button button-primary compact">Responder ↗</button></form>` : ""}</article>`).join("")}</div>`;
+  return `<div class="data-panel"><div class="panel-heading"><div><span class="eyebrow">FALE CONOSCO</span><h2>Caixa de entrada <span class="count-pill">${records.length}</span></h2></div><button class="button button-outline compact" data-reload>↻ Atualizar</button></div><div class="message-list">${records.map((message) => `<article class="message-card"><div class="message-heading"><div class="avatar">${esc((message.nome || "?").slice(0, 1).toUpperCase())}</div><div><h2>${valueText(message.nome)}</h2><p>${valueText(message.email)} · ${message.criadoEm ? valueText(new Date(message.criadoEm).toLocaleString("pt-BR")) : "Contato recebido"}</p></div><span class="status-pill">${valueText(message.status || "Recebida")}</span></div><p class="message-content">${valueText(message.conteudo || message.mensagem || message.texto)}</p>${message.resposta ? `<div class="reply-sent"><strong>Resposta enviada</strong><p>${valueText(message.resposta)}</p></div>` : ""}${message.id ? `<form class="inline-reply" data-form="reply" data-message-id="${esc(message.id)}"><label class="sr-only" for="reply-${esc(message.id)}">Resposta</label><input id="reply-${esc(message.id)}" name="resposta" required placeholder="Escreva uma resposta…"><button class="button button-primary compact">Responder ↗</button></form>` : ""}</article>`).join("")}</div></div>`;
 }
 
 function renderAppointments(records, slug) {
@@ -156,8 +159,54 @@ function renderBudgets(records) {
 function modal(title, contents) {
   const root = document.querySelector("#modal-root");
   if (!root) return;
+  if (!root.querySelector(".modal-card")) modalReturnFocus = document.activeElement;
   root.innerHTML = `<div class="modal-backdrop" data-close-modal><section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title"><div class="modal-heading"><h2 id="modal-title">${esc(title)}</h2><button class="icon-button" aria-label="Fechar painel" data-close-modal>×</button></div>${contents}</section></div>`;
+  const card = root.querySelector(".modal-card");
+  card?.setAttribute("tabindex", "-1");
   root.querySelector(".icon-button[data-close-modal]")?.focus();
+}
+
+export function clearRegistrationValidation(form) {
+  form.querySelectorAll('[aria-invalid="true"]').forEach((input) => input.removeAttribute("aria-invalid"));
+  form.querySelectorAll(".field-error").forEach((message) => message.remove());
+  const generalError = form.querySelector("#register-error");
+  if (generalError) generalError.textContent = "";
+}
+
+export function scrollActiveChipIntoView(nav, isMobile) {
+  if (!isMobile) return;
+  nav?.querySelector(".mobile-chip.active")?.scrollIntoView?.({ block: "nearest", inline: "nearest", behavior: "smooth" });
+}
+
+export function trapFocusWithinModal(event, modalElement, activeElement) {
+  if (event.key !== "Tab" || !modalElement) return;
+  const focusable = [...modalElement.querySelectorAll('a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])')]
+    .filter((element) => !element.disabled && element.getAttribute("aria-hidden") !== "true" && !element.closest("[hidden], .hidden"));
+  if (!focusable.length) {
+    event.preventDefault();
+    modalElement.focus();
+    return;
+  }
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  const current = activeElement ?? document.activeElement;
+  if (event.shiftKey && (current === first || !modalElement.contains(current))) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && (current === last || !modalElement.contains(current))) {
+    event.preventDefault();
+    first.focus();
+  }
+}
+
+export function closeModal(root, opener) {
+  root?.replaceChildren();
+  if (opener?.isConnected) opener.focus();
+}
+
+function dismissModal() {
+  closeModal(document.querySelector("#modal-root"), modalReturnFocus);
+  modalReturnFocus = null;
 }
 
 function openService(service) {
@@ -266,6 +315,7 @@ async function handleSubmit(event) {
 }
 
 async function submitRegistration(form, fields) {
+  clearRegistrationValidation(form);
   const errors = {};
   if (fields.nome.trim().length < 3) errors.nome = "Informe o nome completo.";
   if (!/^\S+@\S+\.\S+$/.test(fields.email)) errors.email = "E-mail inválido.";
@@ -294,12 +344,12 @@ async function reloadCurrentSection(message = "") {
   }
 }
 
-app.addEventListener("click", async (event) => {
+if (app) app.addEventListener("click", async (event) => {
   const target = event.target.closest("[data-action], [data-service], [data-close-modal], [data-close-form], [data-reload], [data-status-id]");
   if (!target) return;
   if (target.hasAttribute("data-close-modal")) {
     if (target.classList.contains("modal-backdrop") && event.target.closest(".modal-card")) return;
-    document.querySelector("#modal-root")?.replaceChildren();
+    dismissModal();
     return;
   }
   if (target.hasAttribute("data-close-form")) { target.closest("form")?.remove(); return; }
@@ -319,14 +369,14 @@ app.addEventListener("click", async (event) => {
   if (target.dataset.action === "new-budget") void showBudgetForm();
 });
 
-app.addEventListener("submit", (event) => { void handleSubmit(event); });
-app.addEventListener("keydown", (event) => {
-  if (event.key === "Escape" && document.querySelector("#modal-root .modal-card")) {
-    document.querySelector("#modal-root")?.replaceChildren();
-  }
+if (app) app.addEventListener("submit", (event) => { void handleSubmit(event); });
+if (app) app.addEventListener("keydown", (event) => {
+  const activeModal = document.querySelector("#modal-root .modal-card");
+  if (event.key === "Escape" && activeModal) dismissModal();
+  else trapFocusWithinModal(event, activeModal);
 });
 
-window.addEventListener("popstate", () => renderRoute());
+globalThis.window?.addEventListener?.("popstate", () => renderRoute());
 
 function renderRoute() {
   const path = routePath();
@@ -337,4 +387,4 @@ function renderRoute() {
   else renderNotFound();
 }
 
-renderRoute();
+if (app) renderRoute();

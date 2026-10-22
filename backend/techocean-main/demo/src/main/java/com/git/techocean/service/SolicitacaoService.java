@@ -1,6 +1,8 @@
 package com.git.techocean.service;
 
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -16,6 +18,8 @@ import com.git.techocean.repository.SolicitacaoRepository;
 
 @Service
 public class SolicitacaoService {
+
+    private static final Set<String> STATUS_VALIDOS = Set.of("PENDENTE", "CONFIRMADO");
 
     private final SolicitacaoRepository solicitacaoRepository;
     private final ClienteRepository clienteRepository;
@@ -55,8 +59,14 @@ public class SolicitacaoService {
     }
 
     public Solicitacao atualizarStatus(Long id, String status) {
+        String statusNormalizado = status == null ? "" : status.trim().toUpperCase(Locale.ROOT);
+        if (!STATUS_VALIDOS.contains(statusNormalizado)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Status inválido. Use PENDENTE ou CONFIRMADO.");
+        }
+
         Solicitacao solicitacao = buscarPorId(id);
-        solicitacao.setStatus(status);
+        solicitacao.setStatus(statusNormalizado);
         return solicitacaoRepository.save(solicitacao);
     }
 }
