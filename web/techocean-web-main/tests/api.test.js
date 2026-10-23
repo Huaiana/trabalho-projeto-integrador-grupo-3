@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { apiRequest, post, putParams, ApiError, API_BASE_URL, LOCAL_API_URL, PRODUCTION_API_URL, resolveApiBaseUrl } from "../src/api.js";
+import { apiRequest, post, postPublic, postWithHeaders, putParams, ApiError, API_BASE_URL, LOCAL_API_URL, PRODUCTION_API_URL, resolveApiBaseUrl, setAccessToken, clearAccessToken, getAccessToken } from "../src/api.js";
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => { vi.unstubAllGlobals(); clearAccessToken(); });
 
 describe("API client", () => {
   it("uses the same-origin Vite proxy in development and the deployed API in production by default", () => {
@@ -50,6 +50,43 @@ describe("API client", () => {
     await putParams("/agendamentos/9/status", { status: "confirmado" });
     expect(fetchMock.mock.calls[0][0]).toBe(`${API_BASE_URL}/agendamentos/9/status?status=confirmado`);
     expect(fetchMock.mock.calls[0][1]).toEqual({ method: "PUT" });
+  });
+
+  it("adds the in-memory Bearer token to protected API requests", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(Response.json({ id: 11 }));
+    vi.stubGlobal("fetch", fetchMock);
+    setAccessToken("ephemeral-access-token");
+
+    await apiRequest("/admin/me");
+
+    expect(fetchMock.mock.calls[0][1].headers.get("Authorization")).toBe("Bearer ephemeral-access-token");
+    expect(getAccessToken()).toBe("ephemeral-access-token");
+  });
+
+  it("keeps public posts anonymous even when an admin token is in memory", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(Response.json({ id: 12 }));
+    vi.stubGlobal("fetch", fetchMock);
+    setAccessToken("ephemeral-access-token");
+
+    await postPublic("/mensagens/contatos", { nome: "Ana", email: "ana@example.com", conteudo: "Oi" });
+
+    expect(fetchMock.mock.calls[0][1].headers).toEqual({ "Content-Type": "application/json" });
+    expect(JSON.stringify(fetchMock.mock.calls[0][1].headers)).not.toContain("Authorization");
+  });
+
+  it("sends first-admin setup token only as the requested header", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(Response.json({ id: 1 }, { status: 201 }));
+    vi.stubGlobal("fetch", fetchMock);
+    setAccessToken("existing-token");
+    const data = { nome: "Admin", email: "admin@example.com", senha: "Secret123" };
+
+    await postWithHeaders("/admin/setup", data, { "X-Admin-Setup-Token": "one-time-setup-secret" }, { authenticated: false });
+
+    expect(fetchMock.mock.calls[0][1].headers).toEqual({
+      "Content-Type": "application/json",
+      "X-Admin-Setup-Token": "one-time-setup-secret",
+    });
+    expect(fetchMock.mock.calls[0][1].body).toBe(JSON.stringify(data));
   });
 
   it("returns backend messages instead of treating failed writes as success", async () => {

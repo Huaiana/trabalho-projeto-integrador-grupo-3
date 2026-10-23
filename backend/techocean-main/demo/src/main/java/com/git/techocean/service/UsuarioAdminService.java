@@ -29,9 +29,14 @@ public class UsuarioAdminService {
 
     public UsuarioAdmin login(String email, String senha) {
         UsuarioAdmin admin = usuarioAdminRepository.findByEmail(email);
-        if (admin != null && java.util.Arrays.stream(StaffRole.values()).anyMatch(role -> role.name().equals(admin.getCargo()))
-                && matchesAndUpgrade(admin, senha)) {
-            return admin;
+        if (admin != null && matchesAndUpgrade(admin, senha)) {
+            try {
+                String role = normalizeRole(admin.getCargo());
+                if (!role.equals(admin.getCargo())) { admin.setCargo(role); usuarioAdminRepository.save(admin); }
+                return admin;
+            } catch (ResponseStatusException ignored) {
+                // Legacy roles outside the supported set are never implicitly promoted.
+            }
         }
         throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Credenciais inválidas.");
     }
