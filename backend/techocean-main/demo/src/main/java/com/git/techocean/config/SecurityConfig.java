@@ -60,6 +60,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/clientes", "/clientes/login", "/mensagens/contatos", "/agendamentos").permitAll()
                         .requestMatchers(HttpMethod.GET, "/servicos", "/servicos/*").permitAll()
                         .requestMatchers("/actuator/health", "/error").permitAll()
+                        .requestMatchers("/admin/me").hasAnyRole("ADMIN", "SUPERVISOR", "FUNCIONARIO")
+                        .requestMatchers(HttpMethod.POST, "/admin/logout").hasAnyRole("ADMIN", "SUPERVISOR", "FUNCIONARIO")
                         .requestMatchers("/admin/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/clientes/**").hasAnyRole("ADMIN", "SUPERVISOR", "FUNCIONARIO")
                         .requestMatchers(HttpMethod.PUT, "/clientes/**").hasAnyRole("ADMIN", "SUPERVISOR", "FUNCIONARIO")
