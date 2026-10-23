@@ -49,7 +49,7 @@ const resourceDefinitions = {
       { name: "solicitacaoId", label: "Código da solicitação", type: "number", required: true },
       { name: "conteinerId", label: "Código do contêiner", type: "number" },
       { name: "responsavel", label: "Responsável", required: true },
-      { name: "andamento", label: "Andamento" },
+      { name: "andamento", label: "Andamento", editRequired: true },
       { name: "observacoes", label: "Observações", type: "textarea" },
     ],
   },
@@ -263,7 +263,9 @@ function resourceFieldMarkup(fieldDefinition, record, editing) {
     const date = new Date(value);
     if (!Number.isNaN(date.valueOf())) value = new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
   }
-  const required = editing && fieldDefinition.editOptional ? "" : (fieldDefinition.required ? "required" : "");
+  const required = editing
+    ? (fieldDefinition.editRequired && !fieldDefinition.editOptional ? "required" : "")
+    : (fieldDefinition.required ? "required" : "");
   const optionalPassword = editing && fieldDefinition.editOptional ? "<small>Deixe em branco para manter a senha atual.</small>" : "";
   const id = `resource-${fieldDefinition.name}`;
   if (fieldDefinition.type === "select") {
@@ -287,7 +289,7 @@ function renderTable(records, columns, title) {
   return `<div class="table-scroll"><table class="records-table"><thead><tr>${keys.map((key) => `<th>${esc(labelFor(key))}</th>`).join("")}${title === "Agendamento" || title === "Solicitação" ? "<th>Ação</th>" : ""}</tr></thead><tbody>${records.map((item) => `<tr>${keys.map((key) => `<td>${statusPill(key, item[key])}</td>`).join("")}${title === "Agendamento" || title === "Solicitação" ? `<td>${item.id ? `<button class="small-action" data-status-id="${esc(item.id)}" data-status="${String(item.status).toLowerCase() === "true" || String(item.status).toLowerCase() === "confirmado" ? "pendente" : "confirmado"}">${String(item.status).toLowerCase() === "true" || String(item.status).toLowerCase() === "confirmado" ? "Marcar pendente" : "Confirmar"}</button>` : "—"}</td>` : ""}</tr>`).join("")}</tbody></table></div>`;
 }
 
-function labelFor(key) { return ({ id: "Código", cpfcnpj: "CPF / CNPJ", numeroConteiner: "Número do contêiner", tipoCarga: "Tipo de carga", dataHora: "Data e horário", criadoEm: "Recebida em", valorEstimado: "Valor estimado" })[key] || key.replace(/([A-Z])/g, " $1").replace(/^./, (char) => char.toUpperCase()); }
+function labelFor(key) { return ({ id: "Código", cpf: "CPF / CNPJ", cpfcnpj: "CPF / CNPJ", cpfCnpj: "CPF / CNPJ", numeroConteiner: "Número do contêiner", tipoCarga: "Tipo de carga", dataHora: "Data e horário", criadoEm: "Recebida em", valorEstimado: "Valor estimado" })[key] || key.replace(/([A-Z])/g, " $1").replace(/^./, (char) => char.toUpperCase()); }
 
 function statusPill(key, value) {
   const rendered = valueText(value);
