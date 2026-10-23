@@ -4,6 +4,7 @@ import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import com.git.techocean.model.Cliente;
 import com.git.techocean.repository.ClienteRepository;
@@ -15,6 +16,7 @@ public class ClienteService {
     private final ClienteRepository clienteRepository;
     private final PasswordEncoder passwordEncoder;
 
+    @Autowired
     public ClienteService(ClienteRepository clienteRepository, PasswordEncoder passwordEncoder) {
         this.clienteRepository = clienteRepository;
         this.passwordEncoder = passwordEncoder;
