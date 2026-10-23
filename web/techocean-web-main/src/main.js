@@ -101,9 +101,23 @@ const valueText = (value) => {
 function navLink(href, label, className = "") { return `<a class="${className}" href="${href}">${label}</a>`; }
 
 function userRole() { return String(currentUser?.cargo || currentUser?.role || "").toUpperCase(); }
-function isAdmin() { return userRole() === "ADMIN"; }
-function canDeleteOperational() { return ["ADMIN", "SUPERVISOR"].includes(userRole()); }
-function visibleSections() { return sections.filter((section) => !section.adminOnly || isAdmin()); }
+export function roleCapabilities(role) {
+  const normalized = String(role || "").toUpperCase();
+  const recognized = ["ADMIN", "SUPERVISOR", "FUNCIONARIO"].includes(normalized);
+  return {
+    canReadOperational: recognized,
+    canCreateOperational: recognized,
+    canUpdateOperational: recognized,
+    canDeleteOperational: ["ADMIN", "SUPERVISOR"].includes(normalized),
+    canManageStaff: normalized === "ADMIN",
+    canViewAudit: normalized === "ADMIN",
+    canViewSessions: normalized === "ADMIN",
+  };
+}
+function isAdmin() { return roleCapabilities(userRole()).canManageStaff; }
+function canDeleteOperational() { return roleCapabilities(userRole()).canDeleteOperational; }
+export function visibleSectionSlugs(role) { return sections.filter((section) => !section.adminOnly || roleCapabilities(role).canManageStaff).map((section) => section.slug); }
+function visibleSections() { const allowed = new Set(visibleSectionSlugs(userRole())); return sections.filter((section) => allowed.has(section.slug)); }
 
 function renderHome() {
   document.title = "Techocean — Amarração e Segurança de Cargas";
@@ -227,12 +241,13 @@ function renderCrudSection(records, section) {
   return `<section class="data-panel"><div class="panel-heading"><div><span class="eyebrow">GESTÃO / REGISTROS</span><h2>${esc(section.name)}s <span class="count-pill">${records.length}</span></h2></div>${actions}</div><div id="resource-form-slot"></div>${records.length ? renderResourceTable(records, section.slug) : `<div class="empty-state"><span>▱</span><strong>Nenhum registro encontrado</strong><p>Cadastre o primeiro ${esc(definition.singular)} para começar.</p></div>`}</section>`;
 }
 
-function renderResourceTable(records, slug) {
+export function renderResourceTable(records, slug, role = userRole()) {
   const section = sections.find((item) => item.slug === slug);
   const definition = resourceDefinitions[slug];
   const preferred = section.columns?.filter((key) => key in records[0]) || [];
   const columns = (preferred.length ? preferred : Object.keys(records[0])).filter((key) => !["senha", "password"].includes(key.toLowerCase())).slice(0, 7);
-  return `<div class="table-scroll"><table class="records-table"><thead><tr>${columns.map((key) => `<th>${esc(labelFor(key))}</th>`).join("")}<th>Ações</th></tr></thead><tbody>${records.map((record) => `<tr>${columns.map((key) => `<td>${statusPill(key, record[key])}</td>`).join("")}<td><div class="row-actions"><button class="small-action" type="button" data-resource-action="view" data-resource="${slug}" data-id="${esc(record.id)}">Ver</button><button class="small-action" type="button" data-resource-action="edit" data-resource="${slug}" data-id="${esc(record.id)}">Editar</button><button class="small-action" type="button" data-resource-action="print" data-resource="${slug}" data-id="${esc(record.id)}">Imprimir</button>${slug === "agendamento" ? `<button class="small-action" type="button" data-status-id="${esc(record.id)}" data-status="${String(record.status).toLowerCase() === "true" || String(record.status).toLowerCase() === "confirmado" ? "pendente" : "confirmado"}">${String(record.status).toLowerCase() === "true" || String(record.status).toLowerCase() === "confirmado" ? "Marcar pendente" : "Confirmar"}</button>` : ""}${canDeleteOperational() ? `<button class="small-action danger-action" type="button" data-resource-action="delete" data-resource="${slug}" data-id="${esc(record.id)}" data-label="${esc(record[columns[1]] ?? definition.singular)}">Excluir</button>` : ""}</div></td></tr>`).join("")}</tbody></table></div>`;
+  const allowDelete = roleCapabilities(role).canDeleteOperational;
+  return `<div class="table-scroll"><table class="records-table"><thead><tr>${columns.map((key) => `<th>${esc(labelFor(key))}</th>`).join("")}<th>Ações</th></tr></thead><tbody>${records.map((record) => `<tr>${columns.map((key) => `<td>${statusPill(key, record[key])}</td>`).join("")}<td><div class="row-actions"><button class="small-action" type="button" data-resource-action="view" data-resource="${slug}" data-id="${esc(record.id)}">Ver</button><button class="small-action" type="button" data-resource-action="edit" data-resource="${slug}" data-id="${esc(record.id)}">Editar</button><button class="small-action" type="button" data-resource-action="print" data-resource="${slug}" data-id="${esc(record.id)}">Imprimir</button>${slug === "agendamento" ? `<button class="small-action" type="button" data-status-id="${esc(record.id)}" data-status="${String(record.status).toLowerCase() === "true" || String(record.status).toLowerCase() === "confirmado" ? "pendente" : "confirmado"}">${String(record.status).toLowerCase() === "true" || String(record.status).toLowerCase() === "confirmado" ? "Marcar pendente" : "Confirmar"}</button>` : ""}${allowDelete ? `<button class="small-action danger-action" type="button" data-resource-action="delete" data-resource="${slug}" data-id="${esc(record.id)}" data-label="${esc(record[columns[1]] ?? definition.singular)}">Excluir</button>` : ""}</div></td></tr>`).join("")}</tbody></table></div>`;
 }
 
 function renderReadOnlySection(records, title) {
