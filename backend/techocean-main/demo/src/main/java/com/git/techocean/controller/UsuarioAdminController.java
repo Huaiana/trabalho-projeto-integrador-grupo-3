@@ -16,6 +16,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.dao.DataIntegrityViolationException;
+import com.git.techocean.service.AdminBootstrapService;
 
 @RestController
 @RequestMapping("/admin")
@@ -23,19 +25,27 @@ public class UsuarioAdminController {
     private final UsuarioAdminService service;
     private final UsuarioAdminRepository users;
     private final AuthSessionService sessions;
+    private final AdminBootstrapService bootstrap;
     private final String setupToken;
 
     public UsuarioAdminController(UsuarioAdminService service, UsuarioAdminRepository users,
-            AuthSessionService sessions, @Value("${ADMIN_SETUP_TOKEN:}") String setupToken) {
-        this.service = service; this.users = users; this.sessions = sessions; this.setupToken = setupToken;
+            AuthSessionService sessions, AdminBootstrapService bootstrap,
+            @Value("${ADMIN_SETUP_TOKEN:}") String setupToken) {
+        this.service = service; this.users = users; this.sessions = sessions; this.bootstrap = bootstrap;
+        this.setupToken = setupToken;
     }
 
     @PostMapping("/setup")
     public ResponseEntity<UserDto> setup(@RequestHeader(value = "X-Admin-Setup-Token", required = false) String provided,
             @RequestBody StaffRequest request) {
-        if (setupToken.isBlank() || !constantTimeEquals(setupToken, provided) || users.count() != 0)
+        if (setupToken.isBlank() || !constantTimeEquals(setupToken, provided) || users.countAdmins() != 0)
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Setup indisponível.");
-        UsuarioAdmin user = service.cadastrar(request.nome(), request.email(), request.senha(), "ADMIN");
+        try {
+            bootstrap.reserve();
+        } catch (DataIntegrityViolationException alreadyReserved) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Setup indisponível.");
+        }
+        UsuarioAdmin user = service.bootstrap(request.nome(), request.email(), request.senha());
         return ResponseEntity.status(HttpStatus.CREATED).body(UserDto.from(user));
     }
 
@@ -58,19 +68,14 @@ public class UsuarioAdminController {
     @PostMapping("/usuarios") public ResponseEntity<UserDto> createUser(@RequestBody StaffRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(UserDto.from(service.cadastrar(request.nome(), request.email(), request.senha(), request.cargo())));
     }
-    @PutMapping("/usuarios/{id}") public UserDto updateUser(@PathVariable Long id, @RequestBody StaffUpdate request) {
-        UsuarioAdmin user = users.findById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        user.setNome(request.nome()); user.setEmail(request.email().trim().toLowerCase(Locale.ROOT));
-        if (request.senha() != null && !request.senha().isBlank()) user.setSenha(new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder().encode(request.senha()));
-        if (request.cargo() != null) {
-            try { user.setCargo(com.git.techocean.model.StaffRole.valueOf(request.cargo().trim().toUpperCase(Locale.ROOT)).name()); }
-            catch (IllegalArgumentException ex) { throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cargo inválido."); }
-        }
-        return UserDto.from(users.save(user));
+    @PutMapping("/usuarios/{id}") public UserDto updateUser(@PathVariable Long id, @RequestBody StaffUpdate request,
+            @org.springframework.security.core.annotation.AuthenticationPrincipal Jwt actor) {
+        return UserDto.from(service.atualizar(id, request.nome(), request.email(), request.senha(), request.cargo(),
+                Long.valueOf(actor.getSubject())));
     }
-    @DeleteMapping("/usuarios/{id}") public ResponseEntity<Void> deleteUser(@PathVariable Long id) {
-        if (!users.existsById(id)) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
-        users.deleteById(id); return ResponseEntity.noContent().build();
+    @DeleteMapping("/usuarios/{id}") public ResponseEntity<Void> deleteUser(@PathVariable Long id,
+            @org.springframework.security.core.annotation.AuthenticationPrincipal Jwt actor) {
+        service.excluir(id, Long.valueOf(actor.getSubject())); return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/auditoria") public List<AuditEvent> audit() { return sessions.auditEvents(); }

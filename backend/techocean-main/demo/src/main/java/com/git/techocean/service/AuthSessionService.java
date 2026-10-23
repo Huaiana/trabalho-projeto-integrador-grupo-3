@@ -5,6 +5,7 @@ import com.git.techocean.model.AuditEvent;
 import com.git.techocean.model.UsuarioAdmin;
 import com.git.techocean.repository.AuthSessionRepository;
 import com.git.techocean.repository.AuditEventRepository;
+import com.git.techocean.repository.UsuarioAdminRepository;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
@@ -19,11 +20,14 @@ public class AuthSessionService {
     private final AuthSessionRepository sessions;
     private final AuditEventRepository audits;
     private final JwtEncoder encoder;
+    private final UsuarioAdminRepository users;
     private final long timeoutMinutes;
 
     public AuthSessionService(AuthSessionRepository sessions, AuditEventRepository audits, JwtEncoder encoder,
+            UsuarioAdminRepository users,
             @Value("${AUTH_INACTIVITY_TIMEOUT_MINUTES:30}") long timeoutMinutes) {
-        this.sessions = sessions; this.audits = audits; this.encoder = encoder; this.timeoutMinutes = timeoutMinutes;
+        this.sessions = sessions; this.audits = audits; this.encoder = encoder; this.users = users;
+        this.timeoutMinutes = timeoutMinutes;
     }
 
     public String start(UsuarioAdmin user) {
@@ -37,11 +41,17 @@ public class AuthSessionService {
         return encoder.encode(JwtEncoderParameters.from(claims)).getTokenValue();
     }
 
-    public boolean touch(String id) {
+    public boolean touch(String id, Long actorId, String tokenRole) {
         AuthSession session = sessions.findById(id).orElse(null);
         if (session == null || session.getLoggedOutAt() != null) return false;
         Instant now = Instant.now();
         if (session.getLastActivityAt().plus(Duration.ofMinutes(timeoutMinutes)).isBefore(now)) {
+            session.setLoggedOutAt(session.getLastActivityAt().plus(Duration.ofMinutes(timeoutMinutes)));
+            sessions.save(session); return false;
+        }
+        UsuarioAdmin actor = users.findById(actorId).orElse(null);
+        if (actor == null || !normalizedRole(actor.getCargo()).equals(tokenRole)
+                || !session.getRole().equals(tokenRole) || !session.getActorId().equals(actorId)) {
             session.setLoggedOutAt(now); sessions.save(session); return false;
         }
         session.setLastActivityAt(now); sessions.save(session); return true;
@@ -51,6 +61,18 @@ public class AuthSessionService {
         sessions.findById(id).ifPresent(session -> { session.setLoggedOutAt(Instant.now()); sessions.save(session); });
     }
 
-    public java.util.List<AuthSession> allSessions() { return sessions.findAll(); }
+    public java.util.List<AuthSession> allSessions() {
+        Instant now = Instant.now();
+        var all = sessions.findAll();
+        all.stream().filter(s -> s.getLoggedOutAt() == null
+                && s.getLastActivityAt().plus(Duration.ofMinutes(timeoutMinutes)).isBefore(now))
+                .forEach(s -> s.setLoggedOutAt(s.getLastActivityAt().plus(Duration.ofMinutes(timeoutMinutes))));
+        sessions.saveAll(all);
+        return all;
+    }
     public java.util.List<AuditEvent> auditEvents() { return audits.findAll(); }
+
+    private String normalizedRole(String role) {
+        return role == null ? "" : role.trim().toUpperCase(java.util.Locale.ROOT);
+    }
 }

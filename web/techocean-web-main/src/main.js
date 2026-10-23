@@ -91,11 +91,16 @@ const services = [
 ];
 
 const esc = (value = "") => String(value).replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
-const isSensitiveField = (key) => /^(senha|password|token|accesstoken|refreshtoken|secret)$/i.test(key);
+const isSensitiveField = (key) => /(senha|password|token|secret|api.?key)/i.test(key);
 const routePath = () => window.location.pathname.replace(/\/+$/, "") || "/";
+function redactSensitive(value) {
+  if (Array.isArray(value)) return value.map(redactSensitive);
+  if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).filter(([key]) => !isSensitiveField(key)).map(([key, item]) => [key, redactSensitive(item)]));
+  return value;
+}
 const valueText = (value) => {
   if (value == null || value === "") return "—";
-  if (typeof value === "object") return esc(value.nome || value.name || value.descricao || value.id || JSON.stringify(value));
+  if (typeof value === "object") return esc(value.nome || value.name || value.descricao || value.id || JSON.stringify(redactSensitive(value)));
   if (typeof value === "boolean") return value ? "Sim" : "Não";
   return esc(value);
 };

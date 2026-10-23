@@ -28,7 +28,10 @@ public class SessionAuditInterceptor implements HandlerInterceptor {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication instanceof JwtAuthenticationToken jwt) {
             String sid = jwt.getToken().getId();
-            if (sid == null || !sessionService.touch(sid)) {
+            Long actorId;
+            try { actorId = Long.valueOf(jwt.getToken().getSubject()); }
+            catch (RuntimeException invalidSubject) { actorId = null; }
+            if (sid == null || actorId == null || !sessionService.touch(sid, actorId, jwt.getToken().getClaimAsString("role"))) {
                 response.setStatus(HttpServletResponse.SC_UNAUTHORIZED); return false;
             }
             request.setAttribute("authSessionId", sid);
