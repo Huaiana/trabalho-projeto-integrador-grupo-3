@@ -156,6 +156,20 @@ describe("DOM interface helpers", () => {
     expect(markup).not.toContain('name="email"');
   });
 
+  it("fills the CPF/CNPJ field when the Java entity serializes its uppercase property", () => {
+    const markup = renderResourceFormMarkup("cliente", {
+      id: 5,
+      nome: "Cliente",
+      CPFCNPJ: "12345678901",
+      telefone: "11999990000",
+      email: "cliente@example.test",
+    });
+
+    expect(markup).toContain('name="cpf"');
+    expect(markup).toContain('value="12345678901"');
+    expect(markup).toContain("CPF / CNPJ");
+  });
+
   it("shows an explicit empty state instead of an unusable staff appointment form", () => {
     const markup = renderAppointmentAccountsEmpty();
 

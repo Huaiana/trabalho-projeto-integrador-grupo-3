@@ -329,7 +329,7 @@ function renderReadOnlySection(records, title) {
 
 function resourceFieldMarkup(fieldDefinition, record, editing) {
   const aliases = fieldDefinition.name === "cpf"
-    ? ["cpf", "cpfcnpj", "cpfCnpj", "cpfcNPJ"]
+    ? ["cpf", "cpfcnpj", "cpfCnpj", "CPFCNPJ", "cpfcNPJ"]
     : fieldDefinition.name === "confirmado" ? ["confirmado", "status"] : [fieldDefinition.name];
   let value = aliases.map((name) => record?.[name]).find((entry) => entry != null) ?? "";
   if (fieldDefinition.type === "datetime-local" && value) {
@@ -394,7 +394,7 @@ function renderTable(records, columns, title) {
   return `<div class="table-scroll"><table class="records-table"><thead><tr>${keys.map((key) => `<th>${esc(labelFor(key))}</th>`).join("")}${title === "Agendamento" || title === "Solicitação" ? "<th>Ação</th>" : ""}</tr></thead><tbody>${records.map((item) => `<tr>${keys.map((key) => `<td>${statusPill(key, item[key])}</td>`).join("")}${title === "Agendamento" || title === "Solicitação" ? `<td>${item.id ? `<button class="small-action" data-status-id="${esc(item.id)}" data-status="${String(item.status).toLowerCase() === "true" || String(item.status).toLowerCase() === "confirmado" ? "pendente" : "confirmado"}">${String(item.status).toLowerCase() === "true" || String(item.status).toLowerCase() === "confirmado" ? "Marcar pendente" : "Confirmar"}</button>` : "—"}</td>` : ""}</tr>`).join("")}</tbody></table></div>`;
 }
 
-function labelFor(key) { return ({ id: "Código", cpf: "CPF / CNPJ", cpfcnpj: "CPF / CNPJ", cpfCnpj: "CPF / CNPJ", numeroConteiner: "Número do contêiner", tipoCarga: "Tipo de carga", dataHora: "Data e horário", criadoEm: "Recebida em", valorEstimado: "Valor estimado" })[key] || key.replace(/([A-Z])/g, " $1").replace(/^./, (char) => char.toUpperCase()); }
+function labelFor(key) { return ({ id: "Código", cpf: "CPF / CNPJ", cpfcnpj: "CPF / CNPJ", cpfCnpj: "CPF / CNPJ", CPFCNPJ: "CPF / CNPJ", numeroConteiner: "Número do contêiner", tipoCarga: "Tipo de carga", dataHora: "Data e horário", criadoEm: "Recebida em", valorEstimado: "Valor estimado" })[key] || key.replace(/([A-Z])/g, " $1").replace(/^./, (char) => char.toUpperCase()); }
 
 function statusPill(key, value) {
   const rendered = valueText(value);
