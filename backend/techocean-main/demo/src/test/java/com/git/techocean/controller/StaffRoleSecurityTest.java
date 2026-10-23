@@ -3,9 +3,12 @@ package com.git.techocean.controller;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.git.techocean.config.SecurityConfig;
+import com.git.techocean.model.UsuarioAdmin;
 import com.git.techocean.repository.ClienteRepository;
 import com.git.techocean.repository.UsuarioAdminRepository;
 import com.git.techocean.repository.AuthSessionRepository;
@@ -60,6 +63,29 @@ class StaffRoleSecurityTest {
 
     @Test void anonymousCannotReadClientData() throws Exception {
         mvc.perform(get("/clientes")).andExpect(status().isUnauthorized());
+    }
+
+    @Test void funcionarioCanReadOwnProfileButNotStaffList() throws Exception {
+        UsuarioAdmin user = new UsuarioAdmin("Funcionário", "funcionario@example.com", "hash", "FUNCIONARIO");
+        user.setId(7L);
+        org.mockito.Mockito.when(users.findById(7L)).thenReturn(java.util.Optional.of(user));
+        org.mockito.Mockito.when(sessions.touch("test-session", 7L, "FUNCIONARIO")).thenReturn(true);
+        var employeeJwt = jwt().jwt(token -> token.subject("7").claim("jti", "test-session").claim("role", "FUNCIONARIO"))
+                .authorities(new SimpleGrantedAuthority("ROLE_FUNCIONARIO"));
+
+        mvc.perform(get("/admin/me").with(employeeJwt))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.cargo").value("FUNCIONARIO"));
+        mvc.perform(get("/admin/usuarios").with(employeeJwt))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test void funcionarioCanLogoutTheirOwnSession() throws Exception {
+        org.mockito.Mockito.when(sessions.touch("test-session", 7L, "FUNCIONARIO")).thenReturn(true);
+        mvc.perform(post("/admin/logout").with(jwt().jwt(token -> token.subject("7").claim("jti", "test-session").claim("role", "FUNCIONARIO"))
+                        .authorities(new SimpleGrantedAuthority("ROLE_FUNCIONARIO"))))
+                .andExpect(status().isNoContent());
+        org.mockito.Mockito.verify(sessions).logout("test-session");
     }
 
     @Test void publicServiceCatalogRemainsAvailableWithoutLogin() throws Exception {
