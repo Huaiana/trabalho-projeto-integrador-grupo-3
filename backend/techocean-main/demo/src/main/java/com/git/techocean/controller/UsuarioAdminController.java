@@ -76,8 +76,9 @@ public class UsuarioAdminController {
     @GetMapping("/auditoria") public List<AuditEvent> audit() { return sessions.auditEvents(); }
     @GetMapping("/sessoes") public List<SessionDto> activeSessions() {
         Instant now = Instant.now();
-        return sessions.activeSessions().stream().map(s -> new SessionDto(s.getId(), s.getActorId(), s.getActorName(), s.getRole(),
-                s.getStartedAt(), s.getLastActivityAt(), Duration.between(s.getStartedAt(), now).toSeconds())).toList();
+        return sessions.allSessions().stream().map(s -> new SessionDto(s.getId(), s.getActorId(), s.getActorName(), s.getRole(),
+                s.getStartedAt(), s.getLastActivityAt(), s.getLoggedOutAt(),
+                Duration.between(s.getStartedAt(), s.getLoggedOutAt() == null ? now : s.getLoggedOutAt()).toSeconds())).toList();
     }
 
     private static boolean constantTimeEquals(String expected, String actual) {
@@ -91,5 +92,6 @@ public class UsuarioAdminController {
         static UserDto from(UsuarioAdmin user) { return new UserDto(user.getId(), user.getNome(), user.getEmail(), user.getCargo()); }
     }
     public record LoginResponse(String accessToken, UserDto user) { }
-    public record SessionDto(String id, Long actorId, String actorName, String role, Instant startedAt, Instant lastActivityAt, long durationSeconds) { }
+    public record SessionDto(String id, Long actorId, String actorName, String role, Instant startedAt, Instant lastActivityAt,
+            Instant loggedOutAt, long durationSeconds) { }
 }

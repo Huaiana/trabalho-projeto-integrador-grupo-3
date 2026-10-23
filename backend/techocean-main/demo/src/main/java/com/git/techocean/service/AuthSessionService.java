@@ -51,6 +51,6 @@ public class AuthSessionService {
         sessions.findById(id).ifPresent(session -> { session.setLoggedOutAt(Instant.now()); sessions.save(session); });
     }
 
-    public java.util.List<AuthSession> activeSessions() { return sessions.findAllByLoggedOutAtIsNull(); }
+    public java.util.List<AuthSession> allSessions() { return sessions.findAll(); }
     public java.util.List<AuditEvent> auditEvents() { return audits.findAll(); }
 }
