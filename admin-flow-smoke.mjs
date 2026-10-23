@@ -154,7 +154,9 @@ try {
   await goto("/dashboard/acesso-equipe");
   assert(await evaluate(`document.querySelector('form[data-form="admin-login"]')?.dataset.loginPortal === "team"`), "team has a separate login interface inside the dashboard access flow");
   await evaluate(`(() => { const f=document.querySelector('form[data-form="admin-login"]'); f.elements.namedItem("email").value=${JSON.stringify(employeeEmail)}; f.elements.namedItem("senha").value="StaffSmoke123"; f.requestSubmit(); return true; })()`);
-  await waitDom("employee dashboard", `document.querySelector('.dashboard')?.textContent.includes("FUNCIONARIO")`);
+  const employeeLoginState = await waitFor("employee login result", () => evaluate(`(() => { const dashboard=document.querySelector(".dashboard")?.textContent || ""; const error=document.querySelector('form[data-form="admin-login"] .form-feedback')?.textContent || ""; if (dashboard.includes("FUNCIONARIO")) return {ok:true}; if (error.trim()) return {ok:false,error}; return null; })()`), 30000);
+  if (!employeeLoginState.ok) throw new Error(`Employee login UI rejected a valid FUNCIONARIO account: ${employeeLoginState.error}`);
+  console.log("PASS FUNCIONARIO uses the separate team login interface");
   assert(await evaluate(`!!document.querySelector('.sidebar a[href="/dashboard/conteiner"]')`), "employee login opens operational dashboard modules");
   assert(!(await evaluate(`!!document.querySelector('.sidebar a[href="/dashboard/usuario"]')`)), "employee dashboard hides team management");
   await evaluate(`(() => { history.pushState({}, "", "/dashboard/auditoria"); dispatchEvent(new PopStateEvent("popstate")); return true; })()`);
