@@ -53,3 +53,5 @@ Depois do deploy, abra o painel, escolha **Acesso administrativo**, entre na con
 O Render exige um `APP_AUTH_SECRET` estável com pelo menos 32 bytes antes de iniciar a API em produção; configure-o como secret no serviço `techocean-api`. Configure `ADMIN_SETUP_TOKEN` como secret temporário, use-o uma única vez na tela inicial e remova-o do ambiente depois que o administrador for criado. Não coloque nenhum desses valores no Git ou em variáveis `VITE_*`, nem os envie em mensagens.
 
 Localmente, o comando acima define apenas um token temporário no terminal atual; a chave de assinatura fica efêmera no perfil de desenvolvimento. Não reutilize esses valores na produção.
+
+Para ver e copiar o token local gerado no terminal, execute `$env:ADMIN_SETUP_TOKEN` no mesmo PowerShell e cole-o no campo **Token de configuração** da tela inicial. O token não é salvo no frontend.
