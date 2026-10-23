@@ -59,6 +59,7 @@ public class SecurityConfig {
                         .requestMatchers("/admin/setup", "/admin/login").permitAll()
                         .requestMatchers(HttpMethod.POST, "/clientes", "/mensagens/contatos", "/agendamentos").permitAll()
                         .requestMatchers("/actuator/health", "/error").permitAll()
+                        .requestMatchers("/clientes/**").hasRole("ADMIN")
                         .requestMatchers("/admin/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/**").hasAnyRole("ADMIN", "SUPERVISOR")
                         .requestMatchers(HttpMethod.GET, "/**").hasAnyRole("ADMIN", "SUPERVISOR", "FUNCIONARIO")
