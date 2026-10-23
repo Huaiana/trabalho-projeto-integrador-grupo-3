@@ -105,7 +105,13 @@ const valueText = (value) => {
 };
 
 function navLink(href, label, className = "") { return `<a class="${className}" href="${href}">${label}</a>`; }
-export function publicPanelLinkMarkup() { return navLink("/dashboard", "Painel", "text-link staff-login-link"); }
+export function publicHeaderBrandMarkup() { return navLink("/dashboard", "Techocean", "wordmark"); }
+export function publicHomeActionsMarkup() {
+  return `${navLink("/cadastro", "♙ <span>Cadastre-se</span>", "button button-outline signup-link")}<button class="button button-outline" data-action="contact">Fale conosco</button>`;
+}
+export function publicFooterMarkup() {
+  return `<footer class="footer wrap"><span class="wordmark">Techocean</span><p>© 2026 Techocean. Precisão em cada amarração.</p><span>Operações seguras. Destinos certos.</span></footer>`;
+}
 
 function userRole() { return String(currentUser?.cargo || currentUser?.role || "").toUpperCase(); }
 export function panelRoleAllowed(role, portal) {
@@ -147,8 +153,8 @@ function renderHome() {
       <header class="hero">
         <div class="hero-shade"></div>
         <nav class="topbar wrap">
-          ${navLink("/dashboard", "Techocean", "wordmark")}
-          <div class="top-actions">${publicPanelLinkMarkup()}${navLink("/cadastro", "♙ <span>Cadastre-se</span>", "button button-outline signup-link")}<button class="button button-outline" data-action="contact">Fale conosco</button></div>
+          ${publicHeaderBrandMarkup()}
+          <div class="top-actions">${publicHomeActionsMarkup()}</div>
         </nav>
         <div class="hero-copy wrap">
           <p class="eyebrow">Precisão em cada amarração</p>
@@ -162,7 +168,7 @@ function renderHome() {
       <section class="story wrap"><p class="eyebrow">Nossa história</p><div class="story-grid"><h2>Experiência construída no cais, projeto a projeto.</h2><p>Há mais de 15 anos atuamos nos principais portos do país, unindo engenharia e prática operacional para garantir que cada carga chegue intacta ao destino. Nossa equipe acompanha embarques de ponta a ponta, do planejamento da amarração à inspeção final.</p></div></section>
       <section class="services-section" id="servicos"><div class="wrap section-padding"><p class="eyebrow">Serviços</p><h2 class="section-heading">Soluções completas para a sua operação</h2><div class="service-grid">${services.map((service) => `<article class="service-card"><span class="service-icon">${service.icon}</span><span class="service-number">${service.number}</span><h3>${service.title}</h3><p>${service.description}</p><button class="more-link" data-service="${service.number}">Saiba mais <span>↗</span></button></article>`).join("")}</div></div></section>
       <section class="field-section wrap"><div class="field-copy"><p class="eyebrow">Na prática</p><h2>Cada detalhe verificado antes da partida.</h2><p>Do cálculo de tensão das cintas à conferência dos pontos de fixação, nosso time segue protocolos rigorosos em campo. É assim que mantemos zero incidentes de carga em toda a nossa história.</p><button class="button button-outline" data-action="schedule">Agende uma visita técnica <span>↗</span></button></div><figure class="field-image"><img src="${lashingImage}" alt="Trabalhador prendendo uma carga com cinta de segurança" loading="lazy"><figcaption>01 / Segurança em campo</figcaption></figure></section>
-      <footer class="footer wrap"><a href="/dashboard" class="wordmark">Techocean</a><p>© 2026 Techocean. Precisão em cada amarração.</p><span>Operações seguras. Destinos certos.</span></footer>
+      ${publicFooterMarkup()}
       <div id="modal-root"></div>
     </main>`;
 }

@@ -11,7 +11,9 @@ import {
   dashboardGatewayMarkup,
   roleCapabilities,
   panelRoleAllowed,
-  publicPanelLinkMarkup,
+  publicFooterMarkup,
+  publicHeaderBrandMarkup,
+  publicHomeActionsMarkup,
   scrollActiveChipIntoView,
   spaNavigationPath,
   trapFocusWithinModal,
@@ -173,11 +175,22 @@ describe("DOM interface helpers", () => {
     expect(markup).not.toContain("/painel/");
   });
 
-  it("makes the public homepage entry a neutral link into the dashboard gateway", () => {
-    const markup = publicPanelLinkMarkup();
-    expect(markup).toContain('href="/dashboard"');
-    expect(markup).toContain(">Painel</a>");
-    expect(markup).not.toContain("Acesso da equipe");
+  it("keeps the public header brand routed to the dashboard but removes the Panel action", () => {
+    const brand = publicHeaderBrandMarkup();
+    const actions = publicHomeActionsMarkup();
+
+    expect(brand).toContain('href="/dashboard"');
+    expect(brand).toContain("Techocean");
+    expect(actions).not.toContain("Painel");
+    expect(actions).not.toContain('href="/dashboard"');
+    expect(actions).not.toContain("Acesso da equipe");
+  });
+
+  it("renders the public footer wordmark as plain non-interactive text", () => {
+    const footer = publicFooterMarkup();
+
+    expect(footer).toContain('<span class="wordmark">Techocean</span>');
+    expect(footer).not.toContain("<a");
   });
 
   it("renders distinct login copy and exposes first-admin setup only on the admin entry", () => {
