@@ -21,8 +21,14 @@ public class UsuarioAdminService {
     }
 
     public UsuarioAdmin cadastrar(String nome, String email, String senha, String cargo) {
+        if (nome == null || nome.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Nome do usuário é obrigatório.");
+        }
         if (email == null || email.trim().isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "E-mail do administrador é obrigatório.");
+        }
+        if (senha == null || senha.length() < 8) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A senha precisa ter pelo menos 8 caracteres.");
         }
         return usuarioAdminRepository.save(new UsuarioAdmin(nome, email.trim().toLowerCase(), passwordEncoder.encode(senha), normalizeRole(cargo)));
     }

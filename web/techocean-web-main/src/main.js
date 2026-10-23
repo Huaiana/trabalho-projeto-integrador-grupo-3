@@ -32,6 +32,7 @@ const resourceDefinitions = {
       { name: "cpf", label: "CPF / CNPJ", required: true },
       { name: "telefone", label: "Telefone", type: "tel", required: true },
       { name: "email", label: "E-mail", type: "email", required: true },
+      { name: "senha", label: "Senha inicial", type: "password", required: true, editOptional: true },
     ],
   },
   conteiner: {
@@ -43,7 +44,7 @@ const resourceDefinitions = {
     ],
   },
   operacao: {
-    endpoint: "/operacoes", singular: "operação", createMode: "params", updateMode: "andamento",
+    endpoint: "/operacoes", singular: "operação", createMode: "params", updateMode: "andamento", updateFields: ["andamento", "observacoes"],
     fields: [
       { name: "solicitacaoId", label: "Código da solicitação", type: "number", required: true },
       { name: "conteinerId", label: "Código do contêiner", type: "number" },
@@ -273,7 +274,8 @@ function resourceFieldMarkup(fieldDefinition, record, editing) {
 function resourceFormMarkup(slug, record = null) {
   const definition = resourceDefinitions[slug];
   const editing = Boolean(record);
-  return `<form class="inline-form" data-form="resource" data-resource="${slug}" ${editing ? `data-resource-id="${esc(record.id)}"` : ""}><div class="inline-form-title"><div><span class="eyebrow">${editing ? "ATUALIZAÇÃO" : "NOVO REGISTRO"}</span><h3>${editing ? `Editar ${esc(definition.singular)}` : `Novo ${esc(definition.singular)}`}</h3></div><button type="button" class="icon-button" aria-label="Fechar formulário" data-close-form>×</button></div><div class="inline-form-grid">${definition.fields.map((item) => resourceFieldMarkup(item, record, editing)).join("")}</div><p class="form-feedback" role="alert"></p><div class="form-actions"><button class="button button-primary compact">${editing ? "Salvar alterações" : "Criar registro"} <span>↗</span></button><button type="button" class="button button-outline compact" data-close-form>Cancelar</button></div></form>`;
+  const fields = editing && definition.updateFields ? definition.fields.filter((item) => definition.updateFields.includes(item.name)) : definition.fields;
+  return `<form class="inline-form" data-form="resource" data-resource="${slug}" ${editing ? `data-resource-id="${esc(record.id)}"` : ""}><div class="inline-form-title"><div><span class="eyebrow">${editing ? "ATUALIZAÇÃO" : "NOVO REGISTRO"}</span><h3>${editing ? `Editar ${esc(definition.singular)}` : `Novo ${esc(definition.singular)}`}</h3></div><button type="button" class="icon-button" aria-label="Fechar formulário" data-close-form>×</button></div><div class="inline-form-grid">${fields.map((item) => resourceFieldMarkup(item, record, editing)).join("")}</div><p class="form-feedback" role="alert"></p><div class="form-actions"><button class="button button-primary compact">${editing ? "Salvar alterações" : "Criar registro"} <span>↗</span></button><button type="button" class="button button-outline compact" data-close-form>Cancelar</button></div></form>`;
 }
 
 function renderTable(records, columns, title) {
