@@ -35,3 +35,14 @@ npm run lint
 ```
 
 Se a API estiver em outra porta, atualize o `target` do proxy em `web/techocean-web-main/vite.config.js` e reinicie o Vite. `VITE_API_URL` permanece definido para o endpoint remoto no build de produção.
+
+## Primeiro acesso administrativo
+
+O sistema não cria uma conta ou senha padrão. Antes do primeiro deploy com a API protegida, configure no serviço `techocean-api` do Render, como variáveis **secretas**:
+
+- `APP_AUTH_SECRET`: chave aleatória estável de pelo menos 32 bytes. Mantenha o mesmo valor entre reinícios e não a coloque no repositório nem em variáveis `VITE_*`.
+- `ADMIN_SETUP_TOKEN`: token aleatório temporário para criar o primeiro administrador.
+
+Depois do deploy, abra o painel, escolha **Acesso administrativo**, entre na configuração inicial e informe o token junto com nome, e-mail e senha do primeiro administrador. Assim que a conta for criada, remova `ADMIN_SETUP_TOKEN` do serviço do Render e faça novo deploy. O endpoint de configuração também se bloqueia quando já existe um administrador.
+
+Para executar localmente, defina `APP_AUTH_SECRET` e `ADMIN_SETUP_TOKEN` no ambiente do terminal **antes** de iniciar `mvnw`; use valores de teste diferentes dos segredos de produção. Não envie esses valores em mensagens nem os salve no Git.

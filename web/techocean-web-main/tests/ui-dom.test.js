@@ -2,11 +2,15 @@ import { describe, expect, it, vi } from "vitest";
 import {
   clearRegistrationValidation,
   closeModal,
+  enforcePortalRole,
+  loginScreenMarkup,
   renderAppointmentAccountsEmpty,
   renderMessages,
   renderResourceFormMarkup,
   renderResourceTable,
   roleCapabilities,
+  panelPortalMarkup,
+  panelRoleAllowed,
   scrollActiveChipIntoView,
   spaNavigationPath,
   trapFocusWithinModal,
@@ -155,5 +159,45 @@ describe("DOM interface helpers", () => {
     expect(markup).toContain("Nenhuma conta de cliente disponível");
     expect(markup).toContain("/dashboard/cliente");
     expect(markup).not.toContain('data-form="resource"');
+  });
+
+  it("offers separate team and administration entries from the panel portal", () => {
+    const markup = panelPortalMarkup();
+
+    expect(markup).toContain('href="/painel/equipe"');
+    expect(markup).toContain('href="/painel/administracao"');
+    expect(markup).toContain("Equipe");
+    expect(markup).toContain("Administração");
+  });
+
+  it("renders distinct login copy and exposes first-admin setup only on the admin entry", () => {
+    const team = loginScreenMarkup("team");
+    const admin = loginScreenMarkup("admin");
+
+    expect(team).toContain('data-login-portal="team"');
+    expect(team).toContain("supervisor ou funcionário");
+    expect(team).not.toContain("/admin/setup");
+    expect(admin).toContain('data-login-portal="admin"');
+    expect(admin).toContain("gerenciar a equipe, auditoria e controles");
+    expect(admin).toContain("/admin/setup");
+  });
+
+  it("accepts only the portal's expected staff roles", () => {
+    expect(panelRoleAllowed("SUPERVISOR", "team")).toBe(true);
+    expect(panelRoleAllowed("FUNCIONARIO", "team")).toBe(true);
+    expect(panelRoleAllowed("ADMIN", "team")).toBe(false);
+    expect(panelRoleAllowed("ADMIN", "admin")).toBe(true);
+    expect(panelRoleAllowed("SUPERVISOR", "admin")).toBe(false);
+  });
+
+  it("clears an in-memory session and returns a portal mismatch message", async () => {
+    const { setAccessToken, getAccessToken, clearAccessToken } = await import("../src/api.js");
+    setAccessToken("temporary-token");
+
+    const result = enforcePortalRole("ADMIN", "team");
+
+    expect(result).toEqual({ allowed: false, message: expect.stringContaining("Use a entrada Administração") });
+    expect(getAccessToken()).toBeNull();
+    clearAccessToken();
   });
 });

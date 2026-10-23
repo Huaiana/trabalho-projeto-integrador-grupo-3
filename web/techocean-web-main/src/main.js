@@ -2,11 +2,11 @@ import { apiRequest, get, post, postPublic, postWithHeaders, postParams, put, pu
 import lashingImage from "./assets/lashing.jpg";
 import "./vanilla.css";
 import "./admin.css";
+import "./panel.css";
 
 const app = globalThis.document?.querySelector?.("#app") ?? null;
 let modalReturnFocus = null;
 let currentUser = null;
-let pendingDestination = "/dashboard";
 let authNotice = "";
 const cachedRecords = new Map();
 const sections = [
@@ -107,6 +107,12 @@ const valueText = (value) => {
 function navLink(href, label, className = "") { return `<a class="${className}" href="${href}">${label}</a>`; }
 
 function userRole() { return String(currentUser?.cargo || currentUser?.role || "").toUpperCase(); }
+export function panelRoleAllowed(role, portal) {
+  const normalized = String(role || "").toUpperCase();
+  return portal === "team"
+    ? ["SUPERVISOR", "FUNCIONARIO"].includes(normalized)
+    : portal === "admin" && normalized === "ADMIN";
+}
 export function roleCapabilities(role) {
   const normalized = String(role || "").toUpperCase();
   const recognized = ["ADMIN", "SUPERVISOR", "FUNCIONARIO"].includes(normalized);
@@ -141,7 +147,7 @@ function renderHome() {
         <div class="hero-shade"></div>
         <nav class="topbar wrap">
           ${navLink("/dashboard", "Techocean", "wordmark")}
-          <div class="top-actions">${navLink("/admin/login", "Acesso da equipe", "text-link staff-login-link")}${navLink("/cadastro", "♙ <span>Cadastre-se</span>", "button button-outline signup-link")}<button class="button button-outline" data-action="contact">Fale conosco</button></div>
+          <div class="top-actions">${navLink("/dashboard", "Painel", "text-link staff-login-link")}${navLink("/cadastro", "♙ <span>Cadastre-se</span>", "button button-outline signup-link")}<button class="button button-outline" data-action="contact">Fale conosco</button></div>
         </nav>
         <div class="hero-copy wrap">
           <p class="eyebrow">Precisão em cada amarração</p>
@@ -171,14 +177,60 @@ function field(label, name, type = "text", autocomplete = "off", attributes = ""
   return `<label class="field-label" for="field-${name}">${label}<input id="field-${name}" name="${name}" type="${type}" autocomplete="${autocomplete}" ${attributes} required></label>`;
 }
 
-function renderLogin(error = "") {
-  document.title = "Acesso da equipe — Techocean";
-  app.innerHTML = `<main class="auth-page"><section class="auth-card"><a href="/" class="wordmark">Techocean</a><p class="eyebrow">ÁREA RESTRITA</p><h1>Acesso da equipe</h1><p class="muted">Entre com sua conta administrativa para continuar.</p>${authNotice ? `<p class="inline-success" role="status">${esc(authNotice)}</p>` : ""}<form class="form-grid" data-form="admin-login">${field("E-mail", "email", "email", "username")}${field("Senha", "senha", "password", "current-password")}<p class="form-feedback" role="alert">${esc(error)}</p><button class="button button-primary form-submit">Entrar <span>↗</span></button></form><div class="auth-links"><a href="/admin/setup">Configurar primeiro administrador</a><a href="/">Voltar ao site</a></div></section></main>`;
+export function dashboardGatewayMarkup(notice = "") {
+  return `<main class="dashboard-gateway"><header class="portal-header"><a href="/dashboard" class="wordmark">Techocean</a><span class="eyebrow">PAINEL DE ACESSO</span></header><section class="portal-intro"><p class="eyebrow">BEM-VINDO</p><h1>Entre no seu espaço de trabalho.</h1><p>Escolha o acesso adequado ao seu perfil.</p>${notice ? `<p class="portal-notice" role="status">${esc(notice)}</p>` : ""}</section><div class="portal-choices"><a class="portal-choice portal-choice-team" href="/dashboard/acesso-equipe"><span class="portal-choice-icon">↗</span><span class="eyebrow">OPERAÇÃO</span><h2>Equipe</h2><p>Acesso para supervisores e funcionários acompanharem a operação.</p><span class="portal-choice-cta">Entrar como equipe <b>→</b></span></a><a class="portal-choice portal-choice-admin" href="/dashboard/acesso-admin"><span class="portal-choice-icon">◈</span><span class="eyebrow">GESTÃO</span><h2>Administração</h2><p>Gestão da equipe, auditoria e controles administrativos.</p><span class="portal-choice-cta">Entrar como administrador <b>→</b></span></a></div><a href="/" class="portal-back">← Voltar ao site</a></main>`;
+}
+
+function renderDashboardGateway() {
+  document.title = "Painel — Techocean";
+  app.innerHTML = dashboardGatewayMarkup(authNotice);
+}
+
+export function loginScreenMarkup(portal = "admin", error = "", notice = "") {
+  const teamPortal = portal === "team";
+  const title = teamPortal ? "Acesso da equipe" : "Acesso administrativo";
+  const eyebrow = teamPortal ? "OPERAÇÃO" : "GESTÃO";
+  const intro = teamPortal
+    ? "Entre como supervisor ou funcionário para acompanhar e atualizar a operação."
+    : "Entre como administrador para gerenciar a equipe, auditoria e controles.";
+  const returnPortal = `<a href="/dashboard">← Voltar ao painel</a>`;
+  const setupLink = teamPortal ? "" : `<a href="/admin/setup">Configurar primeiro administrador</a>`;
+  return `<main class="auth-page"><section class="auth-card ${teamPortal ? "auth-team" : "auth-admin"}"><a href="/dashboard" class="wordmark">Techocean</a><p class="eyebrow">${eyebrow} · PAINEL</p><h1>${title}</h1><p class="muted">${intro}</p>${notice ? `<p class="inline-success" role="status">${esc(notice)}</p>` : ""}<form class="form-grid" data-form="admin-login" data-login-portal="${teamPortal ? "team" : "admin"}">${field("E-mail", "email", "email", "username")}${field("Senha", "senha", "password", "current-password")}<p class="form-feedback" role="alert">${esc(error)}</p><button class="button button-primary form-submit">Entrar <span>↗</span></button></form><div class="auth-links">${returnPortal}${setupLink}</div></section></main>`;
+}
+
+function renderLogin(portal = "admin", error = "") {
+  document.title = `${portal === "team" ? "Acesso da equipe" : "Acesso administrativo"} — Techocean`;
+  app.innerHTML = loginScreenMarkup(portal, error, authNotice);
+}
+
+function portalRoleMismatchMessage(role, portal) {
+  const otherPortal = portal === "team" ? "Administração" : "Equipe";
+  return `Esta conta tem perfil ${role}. Use a entrada ${otherPortal}.`;
+}
+
+export function enforcePortalRole(role, portal) {
+  if (panelRoleAllowed(role, portal)) return { allowed: true, message: "" };
+  clearAccessToken();
+  currentUser = null;
+  return { allowed: false, message: portalRoleMismatchMessage(role, portal) };
+}
+
+function renderPortalLogin(portal) {
+  if (getAccessToken() && currentUser) {
+    const result = enforcePortalRole(userRole(), portal);
+    if (result.allowed) {
+      navigateTo("/dashboard", { replace: true });
+    } else {
+      renderLogin(portal, result.message);
+    }
+    return;
+  }
+  renderLogin(portal);
 }
 
 function renderSetup(error = "") {
   document.title = "Configuração inicial — Techocean";
-  app.innerHTML = `<main class="auth-page"><section class="auth-card"><a href="/" class="wordmark">Techocean</a><p class="eyebrow">CONFIGURAÇÃO INICIAL</p><h1>Criar primeiro administrador</h1><p class="muted">Use o token de configuração fornecido pelo responsável pelo sistema. Ele será enviado ao servidor, mas não ficará salvo neste navegador.</p><form class="form-grid" data-form="admin-setup"><label class="field-label">Token de configuração<input name="setupToken" type="password" autocomplete="off" required></label>${field("Nome completo", "nome", "text", "name")}${field("E-mail", "email", "email", "email")}${field("Senha", "senha", "password", "new-password", 'minlength="8"')}<p class="form-feedback" role="alert">${esc(error)}</p><button class="button button-primary form-submit">Criar administrador <span>↗</span></button></form><div class="auth-links"><a href="/admin/login">Voltar ao login</a><a href="/">Voltar ao site</a></div></section></main>`;
+  app.innerHTML = `<main class="auth-page"><section class="auth-card auth-admin"><a href="/dashboard" class="wordmark">Techocean</a><p class="eyebrow">CONFIGURAÇÃO INICIAL</p><h1>Criar primeiro administrador</h1><p class="muted">Use o token de configuração fornecido pelo responsável pelo sistema. Ele será enviado ao servidor, mas não ficará salvo neste navegador.</p><form class="form-grid" data-form="admin-setup"><label class="field-label">Token de configuração<input name="setupToken" type="password" autocomplete="off" required></label>${field("Nome completo", "nome", "text", "name")}${field("E-mail", "email", "email", "email")}${field("Senha", "senha", "password", "new-password", 'minlength="8"')}<p class="form-feedback" role="alert">${esc(error)}</p><button class="button button-primary form-submit">Criar administrador <span>↗</span></button></form><div class="auth-links"><a href="/dashboard/acesso-admin">Voltar ao login administrativo</a><a href="/dashboard">Voltar ao painel</a></div></section></main>`;
 }
 
 function normalizeAdminUser(payload) {
@@ -189,7 +241,7 @@ function normalizeAdminUser(payload) {
 
 function dashboardNav(slug = "") {
   const links = visibleSections();
-  return `<aside class="sidebar"><a class="wordmark sidebar-brand" href="/">Techocean</a><span class="nav-caption">ESPAÇO DE GESTÃO</span><nav>${navLink("/dashboard", "▦&nbsp;&nbsp; Visão geral", `side-link ${slug === "" ? "active" : ""}`)}${links.map((section) => navLink(`/dashboard/${section.slug}`, `<span class="nav-symbol">${section.name.slice(0, 1)}</span>${section.name}`, `side-link ${section.slug === slug ? "active" : ""}`)).join("")}</nav><div class="sidebar-bottom"><span class="status-dot"></span> Techocean · Operações</div></aside>
+  return `<aside class="sidebar"><a class="wordmark sidebar-brand" href="/dashboard">Techocean</a><span class="nav-caption">ESPAÇO DE GESTÃO</span><nav>${navLink("/dashboard", "▦&nbsp;&nbsp; Visão geral", `side-link ${slug === "" ? "active" : ""}`)}${links.map((section) => navLink(`/dashboard/${section.slug}`, `<span class="nav-symbol">${section.name.slice(0, 1)}</span>${section.name}`, `side-link ${section.slug === slug ? "active" : ""}`)).join("")}</nav><div class="sidebar-bottom"><span class="status-dot"></span> Techocean · Operações</div></aside>
     <div class="mobile-dash-nav">${navLink("/dashboard", "Início", `mobile-chip ${slug === "" ? "active" : ""}`)}${links.map((section) => navLink(`/dashboard/${section.slug}`, section.name, `mobile-chip ${section.slug === slug ? "active" : ""}`)).join("")}</div>`;
 }
 
@@ -555,6 +607,7 @@ async function handleSubmit(event) {
   try {
     switch (form.dataset.form) {
       case "admin-login": {
+        const portal = form.dataset.loginPortal || "admin";
         const result = await postPublic("/admin/login", { email: fields.email.trim(), senha: fields.senha });
         const token = result?.accessToken || result?.data?.accessToken;
         if (!token) throw new Error("O servidor não retornou um token de acesso.");
@@ -563,15 +616,20 @@ async function handleSubmit(event) {
         const verifiedUser = normalizeAdminUser(await get("/admin/me"));
         currentUser = verifiedUser || loginUser;
         if (!["ADMIN", "SUPERVISOR", "FUNCIONARIO"].includes(userRole())) throw new Error("O perfil retornado não tem acesso ao painel.");
+        const roleGate = enforcePortalRole(userRole(), portal);
+        if (!roleGate.allowed) {
+          renderLogin(portal, roleGate.message);
+          break;
+        }
         authNotice = "";
-        navigateTo(pendingDestination || "/dashboard", { replace: true });
+        navigateTo("/dashboard", { replace: true });
         break;
       }
       case "admin-setup": {
         const { setupToken, ...adminData } = fields;
         await postWithHeaders("/admin/setup", adminData, { "X-Admin-Setup-Token": setupToken }, { authenticated: false });
         authNotice = "Administrador criado. Entre usando o e-mail e a senha definidos.";
-        navigateTo("/admin/login", { replace: true });
+        navigateTo("/dashboard/acesso-admin", { replace: true });
         break;
       }
       case "register": await submitRegistration(form, fields); break;
@@ -673,8 +731,7 @@ async function logoutAdmin() {
   clearAccessToken();
   currentUser = null;
   authNotice = "Você saiu da área administrativa.";
-  pendingDestination = "/dashboard";
-  navigateTo("/admin/login", { replace: true });
+  navigateTo("/dashboard", { replace: true });
 }
 
 function navigateTo(path, { replace = false } = {}) {
@@ -763,16 +820,16 @@ function renderRoute() {
   const path = routePath();
   if (path === "/") renderHome();
   else if (path === "/cadastro") renderCadastro();
-  else if (path === "/admin/login") {
-    if (getAccessToken() && currentUser) navigateTo("/dashboard", { replace: true });
-    else renderLogin();
-  }
+  else if (path === "/dashboard/acesso-admin") renderPortalLogin("admin");
+  else if (path === "/dashboard/acesso-equipe") renderPortalLogin("team");
+  else if (path === "/admin/login") navigateTo("/dashboard/acesso-admin", { replace: true });
+  else if (path === "/painel") navigateTo("/dashboard", { replace: true });
   else if (path === "/admin/setup") renderSetup();
   else if (path === "/dashboard" || path === "/dashboard/index" || path.startsWith("/dashboard/")) {
     if (!getAccessToken()) {
-      pendingDestination = path;
       currentUser = null;
-      renderLogin();
+      if (path !== "/dashboard") navigateTo("/dashboard", { replace: true });
+      else renderDashboardGateway();
     } else if (!currentUser) {
       app.innerHTML = `<main class="auth-page"><section class="auth-card"><p class="loading-state">Verificando sessão…</p></section></main>`;
       void get("/admin/me").then((payload) => {
@@ -782,8 +839,8 @@ function renderRoute() {
       }).catch((error) => {
         clearAccessToken();
         currentUser = null;
-        pendingDestination = path;
-        renderLogin(error.message);
+        authNotice = error.message;
+        renderDashboardGateway();
       });
     } else {
       renderDashboard(path === "/dashboard" || path === "/dashboard/index" ? "" : path.slice("/dashboard/".length));

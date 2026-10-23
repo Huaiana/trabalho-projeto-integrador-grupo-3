@@ -114,6 +114,19 @@ describe("API client", () => {
     expect(JSON.stringify(fetchMock.mock.calls[0][1].headers)).not.toContain("Authorization");
   });
 
+  it("uses the shared admin login endpoint anonymously for both panel entry screens", async () => {
+    const credentials = { email: "staff@example.com", senha: "Secret123" };
+    const fetchMock = vi.fn().mockResolvedValue(Response.json({ accessToken: "temporary", user: { cargo: "SUPERVISOR" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    setAccessToken("stale-token");
+
+    await postPublic("/admin/login", credentials);
+
+    expect(fetchMock.mock.calls[0][0]).toBe(`${API_BASE_URL}/admin/login`);
+    expect(fetchMock.mock.calls[0][1].headers).toEqual({ "Content-Type": "application/json" });
+    expect(fetchMock.mock.calls[0][1].body).toBe(JSON.stringify(credentials));
+  });
+
   it("keeps the public appointment guest flow anonymous on the original route", async () => {
     const payload = { nome: "Visitante", email: "visitante@example.com", telefone: "13999990000", cpf: "12345678900", senha: "Secret123", dataHora: "2026-10-25T10:30:00", confirmacao: true };
     const fetchMock = vi.fn().mockResolvedValue(Response.json({ id: 13 }, { status: 201 }));

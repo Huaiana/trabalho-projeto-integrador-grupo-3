@@ -13,6 +13,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
+import org.springframework.security.oauth2.jose.jws.JwsHeader;
+import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -38,7 +40,8 @@ public class AuthSessionService {
         JwtClaimsSet claims = JwtClaimsSet.builder().issuer("techocean").issuedAt(now)
                 .expiresAt(now.plus(Duration.ofHours(12))).subject(user.getId().toString())
                 .id(id).claim("name", user.getNome()).claim("role", user.getCargo()).build();
-        return encoder.encode(JwtEncoderParameters.from(claims)).getTokenValue();
+        return encoder.encode(JwtEncoderParameters.from(
+                JwsHeader.with(MacAlgorithm.HS256).build(), claims)).getTokenValue();
     }
 
     public boolean touch(String id, Long actorId, String tokenRole) {
