@@ -105,6 +105,7 @@ const valueText = (value) => {
 };
 
 function navLink(href, label, className = "") { return `<a class="${className}" href="${href}">${label}</a>`; }
+export function publicPanelLinkMarkup() { return navLink("/dashboard", "Painel", "text-link staff-login-link"); }
 
 function userRole() { return String(currentUser?.cargo || currentUser?.role || "").toUpperCase(); }
 export function panelRoleAllowed(role, portal) {
@@ -147,7 +148,7 @@ function renderHome() {
         <div class="hero-shade"></div>
         <nav class="topbar wrap">
           ${navLink("/dashboard", "Techocean", "wordmark")}
-          <div class="top-actions">${navLink("/dashboard", "Painel", "text-link staff-login-link")}${navLink("/cadastro", "♙ <span>Cadastre-se</span>", "button button-outline signup-link")}<button class="button button-outline" data-action="contact">Fale conosco</button></div>
+          <div class="top-actions">${publicPanelLinkMarkup()}${navLink("/cadastro", "♙ <span>Cadastre-se</span>", "button button-outline signup-link")}<button class="button button-outline" data-action="contact">Fale conosco</button></div>
         </nav>
         <div class="hero-copy wrap">
           <p class="eyebrow">Precisão em cada amarração</p>

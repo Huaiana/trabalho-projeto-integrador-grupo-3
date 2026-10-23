@@ -8,9 +8,10 @@ import {
   renderMessages,
   renderResourceFormMarkup,
   renderResourceTable,
+  dashboardGatewayMarkup,
   roleCapabilities,
-  panelPortalMarkup,
   panelRoleAllowed,
+  publicPanelLinkMarkup,
   scrollActiveChipIntoView,
   spaNavigationPath,
   trapFocusWithinModal,
@@ -161,13 +162,22 @@ describe("DOM interface helpers", () => {
     expect(markup).not.toContain('data-form="resource"');
   });
 
-  it("offers separate team and administration entries from the panel portal", () => {
-    const markup = panelPortalMarkup();
+  it("offers separate team and administration entries from the unauthenticated dashboard gateway", () => {
+    const markup = dashboardGatewayMarkup();
 
-    expect(markup).toContain('href="/painel/equipe"');
-    expect(markup).toContain('href="/painel/administracao"');
+    expect(markup).toContain('class="dashboard-gateway"');
+    expect(markup).toContain('href="/dashboard/acesso-equipe"');
+    expect(markup).toContain('href="/dashboard/acesso-admin"');
     expect(markup).toContain("Equipe");
     expect(markup).toContain("Administração");
+    expect(markup).not.toContain("/painel/");
+  });
+
+  it("makes the public homepage entry a neutral link into the dashboard gateway", () => {
+    const markup = publicPanelLinkMarkup();
+    expect(markup).toContain('href="/dashboard"');
+    expect(markup).toContain(">Painel</a>");
+    expect(markup).not.toContain("Acesso da equipe");
   });
 
   it("renders distinct login copy and exposes first-admin setup only on the admin entry", () => {
