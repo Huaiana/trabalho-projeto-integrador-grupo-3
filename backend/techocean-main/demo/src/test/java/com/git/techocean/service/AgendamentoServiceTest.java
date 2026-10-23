@@ -42,8 +42,7 @@ class AgendamentoServiceTest {
 
         assertEquals("CADASTRO_NECESSARIO", exception.getCode());
         verify(agendamentoRepository, never()).save(any(Agendamento.class));
-        verify(usuarioRepository).save(any(Usuario.class)); // legacy plaintext is upgraded at successful login
-        org.junit.jupiter.api.Assertions.assertNotEquals("senha-existente", usuario.getSenha());
+        verify(usuarioRepository, never()).save(any(Usuario.class));
     }
 
     @Test
@@ -73,7 +72,8 @@ class AgendamentoServiceTest {
                 request(null, "senha-existente", null));
 
         assertEquals(usuario, agendamento.getUsuario());
-        verify(usuarioRepository, never()).save(any(Usuario.class));
+        verify(usuarioRepository).save(any(Usuario.class)); // legacy plaintext is upgraded at successful login
+        org.junit.jupiter.api.Assertions.assertNotEquals("senha-existente", usuario.getSenha());
         verify(agendamentoRepository).save(any(Agendamento.class));
     }
 
