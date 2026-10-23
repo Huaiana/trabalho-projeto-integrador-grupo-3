@@ -150,6 +150,15 @@ try {
   if (!audit.ok) throw new Error(`Admin audit request failed with HTTP ${audit.status}`);
   const events = await audit.json();
   assert(Array.isArray(events) && events.some((event) => event.actorName === "Admin Smoke"), "admin audit endpoint records the actor and actions");
+
+  await goto("/dashboard/acesso-equipe");
+  assert(await evaluate(`document.querySelector('form[data-form="admin-login"]')?.dataset.loginPortal === "team"`), "team has a separate login interface inside the dashboard access flow");
+  await evaluate(`(() => { const f=document.querySelector('form[data-form="admin-login"]'); f.elements.namedItem("email").value=${JSON.stringify(employeeEmail)}; f.elements.namedItem("senha").value="StaffSmoke123"; f.requestSubmit(); return true; })()`);
+  await waitDom("employee dashboard", `document.querySelector('.dashboard')?.textContent.includes("FUNCIONARIO")`);
+  assert(await evaluate(`!!document.querySelector('.sidebar a[href="/dashboard/conteiner"]')`), "employee login opens operational dashboard modules");
+  assert(!(await evaluate(`!!document.querySelector('.sidebar a[href="/dashboard/usuario"]')`)), "employee dashboard hides team management");
+  await evaluate(`(() => { history.pushState({}, "", "/dashboard/auditoria"); dispatchEvent(new PopStateEvent("popstate")); return true; })()`);
+  assert(await waitDom("employee audit restriction", `document.body.textContent.includes("Acesso restrito")`), "employee cannot open admin audit section through dashboard navigation");
   console.log("Local auth/RBAC/audit browser smoke completed.");
 } catch (error) {
   console.error(error.stack || error);
