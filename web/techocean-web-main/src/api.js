@@ -100,6 +100,18 @@ export function del(path) {
   return apiRequest(path, { method: "DELETE" });
 }
 
+export function getAppointmentAccounts() {
+  return get("/agendamentos/usuarios");
+}
+
+export function createManagedAppointment(data) {
+  return post("/agendamentos/gerenciamento", data);
+}
+
+export function updateManagedAppointment(id, data) {
+  return put(`/agendamentos/${encodeURIComponent(id)}`, data);
+}
+
 export function postParams(path, values) {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(values)) {

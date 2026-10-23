@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { apiRequest, post, postPublic, postWithHeaders, putParams, ApiError, API_BASE_URL, LOCAL_API_URL, PRODUCTION_API_URL, resolveApiBaseUrl, setAccessToken, clearAccessToken, getAccessToken } from "../src/api.js";
+import { apiRequest, getAppointmentAccounts, createManagedAppointment, updateManagedAppointment, post, postPublic, postWithHeaders, putParams, ApiError, API_BASE_URL, LOCAL_API_URL, PRODUCTION_API_URL, resolveApiBaseUrl, setAccessToken, clearAccessToken, getAccessToken } from "../src/api.js";
 
 afterEach(() => { vi.unstubAllGlobals(); clearAccessToken(); });
 
@@ -52,6 +52,44 @@ describe("API client", () => {
     expect(fetchMock.mock.calls[0][1]).toEqual({ method: "PUT" });
   });
 
+  it("loads appointment accounts through the authenticated account-list route", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(Response.json([{ id: 21, nome: "Marina", email: "marina@example.com" }]));
+    vi.stubGlobal("fetch", fetchMock);
+    setAccessToken("staff-token");
+
+    await expect(getAppointmentAccounts()).resolves.toEqual([{ id: 21, nome: "Marina", email: "marina@example.com" }]);
+    expect(fetchMock.mock.calls[0][0]).toBe(`${API_BASE_URL}/agendamentos/usuarios`);
+    expect(fetchMock.mock.calls[0][1].headers.get("Authorization")).toBe("Bearer staff-token");
+  });
+
+  it("posts staff-managed appointments with the management route and DTO fields", async () => {
+    const payload = { usuarioId: 21, telefone: "13999990000", dataHora: "2026-10-25T10:30:00", confirmado: true };
+    const fetchMock = vi.fn().mockResolvedValue(Response.json({ id: 4, ...payload }, { status: 201 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await createManagedAppointment(payload);
+
+    expect(fetchMock).toHaveBeenCalledWith(`${API_BASE_URL}/agendamentos/gerenciamento`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  });
+
+  it("updates managed appointments with PUT /agendamentos/{id} and the same DTO", async () => {
+    const payload = { usuarioId: 21, telefone: "13999990000", dataHora: "2026-10-25T10:30:00", confirmado: false };
+    const fetchMock = vi.fn().mockResolvedValue(Response.json({ id: 4, ...payload }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await updateManagedAppointment("4/5", payload);
+
+    expect(fetchMock).toHaveBeenCalledWith(`${API_BASE_URL}/agendamentos/4%2F5`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  });
+
   it("adds the in-memory Bearer token to protected API requests", async () => {
     const fetchMock = vi.fn().mockResolvedValue(Response.json({ id: 11 }));
     vi.stubGlobal("fetch", fetchMock);
@@ -72,6 +110,19 @@ describe("API client", () => {
 
     expect(fetchMock.mock.calls[0][1].headers).toEqual({ "Content-Type": "application/json" });
     expect(JSON.stringify(fetchMock.mock.calls[0][1].headers)).not.toContain("Authorization");
+  });
+
+  it("keeps the public appointment guest flow anonymous on the original route", async () => {
+    const payload = { nome: "Visitante", email: "visitante@example.com", telefone: "13999990000", cpf: "12345678900", senha: "Secret123", dataHora: "2026-10-25T10:30:00", confirmacao: true };
+    const fetchMock = vi.fn().mockResolvedValue(Response.json({ id: 13 }, { status: 201 }));
+    vi.stubGlobal("fetch", fetchMock);
+    setAccessToken("staff-token");
+
+    await postPublic("/agendamentos", payload);
+
+    expect(fetchMock.mock.calls[0][0]).toBe(`${API_BASE_URL}/agendamentos`);
+    expect(fetchMock.mock.calls[0][1].headers).toEqual({ "Content-Type": "application/json" });
+    expect(fetchMock.mock.calls[0][1].body).toBe(JSON.stringify(payload));
   });
 
   it("sends first-admin setup token only as the requested header", async () => {

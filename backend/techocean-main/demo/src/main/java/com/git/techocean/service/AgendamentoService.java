@@ -7,6 +7,7 @@ import com.git.techocean.repository.UsuarioRepository;
 import java.time.LocalDateTime;
 import java.util.Objects;
 import java.util.List;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,6 +20,7 @@ public class AgendamentoService {
     private final UsuarioRepository usuarioRepository;
     private final PasswordEncoder passwordEncoder;
 
+    @Autowired
     public AgendamentoService(
             AgendamentoRepository agendamentoRepository,
             UsuarioRepository usuarioRepository,
@@ -99,6 +101,10 @@ public class AgendamentoService {
         return agendamentoRepository.findAll();
     }
 
+    public List<Usuario> listarUsuariosParaAgendamento() {
+        return usuarioRepository.findAll();
+    }
+
     public List<Agendamento> listarPorCliente(Long clienteId) {
         return agendamentoRepository.findByUsuarioId(clienteId);
     }
@@ -127,6 +133,53 @@ public class AgendamentoService {
         Agendamento agendamento = buscarPorId(id);
         agendamento.setStatus(confirmado);
         return agendamentoRepository.save(agendamento);
+    }
+
+    @Transactional
+    public Agendamento criarPelaEquipe(Long usuarioId, String telefone, LocalDateTime dataHora, Boolean confirmado) {
+        if (usuarioId == null || usuarioId <= 0) {
+            throw new AgendamentoException("USUARIO_INVALIDO", "Selecione um cliente cadastrado.", HttpStatus.BAD_REQUEST);
+        }
+        if (isBlank(telefone) || dataHora == null || confirmado == null) {
+            throw new AgendamentoException("DADOS_INVALIDOS", "Preencha cliente, telefone, data, horário e status.", HttpStatus.BAD_REQUEST);
+        }
+        if (!dataHora.isAfter(LocalDateTime.now())) {
+            throw new AgendamentoException("DATA_INVALIDA", "A data e o horário devem ser futuros.", HttpStatus.BAD_REQUEST);
+        }
+        Usuario usuario = usuarioRepository.findById(usuarioId)
+                .orElseThrow(() -> new AgendamentoException("CLIENTE_NAO_ENCONTRADO", "Cliente não encontrado.", HttpStatus.NOT_FOUND));
+        Agendamento agendamento = new Agendamento();
+        agendamento.setUsuario(usuario);
+        agendamento.setNome(usuario.getNome());
+        agendamento.setEmail(usuario.getEmail());
+        agendamento.setTelefone(telefone.trim());
+        agendamento.setDataHora(dataHora);
+        agendamento.setStatus(confirmado);
+        return agendamentoRepository.save(agendamento);
+    }
+
+    @Transactional
+    public Agendamento atualizarPelaEquipe(Long id, Long usuarioId, String telefone, LocalDateTime dataHora, Boolean confirmado) {
+        Agendamento agendamento = buscarPorId(id);
+        if (usuarioId != null) {
+            Usuario usuario = usuarioRepository.findById(usuarioId)
+                    .orElseThrow(() -> new AgendamentoException("CLIENTE_NAO_ENCONTRADO", "Cliente não encontrado.", HttpStatus.NOT_FOUND));
+            agendamento.setUsuario(usuario);
+            agendamento.setNome(usuario.getNome());
+            agendamento.setEmail(usuario.getEmail());
+        }
+        if (isBlank(telefone) || dataHora == null || confirmado == null) {
+            throw new AgendamentoException("DADOS_INVALIDOS", "Preencha cliente, telefone, data, horário e status.", HttpStatus.BAD_REQUEST);
+        }
+        agendamento.setTelefone(telefone.trim());
+        agendamento.setDataHora(dataHora);
+        agendamento.setStatus(confirmado);
+        return agendamentoRepository.save(agendamento);
+    }
+
+    @Transactional
+    public void excluir(Long id) {
+        agendamentoRepository.delete(buscarPorId(id));
     }
 
     private boolean isBlank(String value) {

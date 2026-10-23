@@ -2,7 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 import {
   clearRegistrationValidation,
   closeModal,
+  renderAppointmentAccountsEmpty,
   renderMessages,
+  renderResourceFormMarkup,
   renderResourceTable,
   roleCapabilities,
   scrollActiveChipIntoView,
@@ -123,5 +125,35 @@ describe("DOM interface helpers", () => {
     expect(supervisorMarkup).toContain('data-resource-action="delete"');
     expect(staffMarkup).not.toContain('<img src=x');
     expect(staffMarkup).toContain("&lt;img");
+  });
+
+  it("builds staff appointment forms from existing account choices and the DTO contract", () => {
+    const accounts = [
+      { id: 31, nome: "Ana Cliente", email: "ana@example.com" },
+      { id: 32, nome: "João Cliente", email: "joao@example.com" },
+    ];
+    const markup = renderResourceFormMarkup("agendamento", {
+      id: 8,
+      usuarioId: 32,
+      telefone: "13999990000",
+      dataHora: "2026-10-25T10:30:00",
+      status: true,
+    }, accounts);
+
+    expect(markup).toContain('name="usuarioId"');
+    expect(markup).toContain('value="31" >Ana Cliente · ana@example.com');
+    expect(markup).toContain('value="32" selected>João Cliente · joao@example.com');
+    expect(markup).toContain('name="confirmado"');
+    expect(markup).not.toContain('name="confirmacao"');
+    expect(markup).not.toContain('name="nome"');
+    expect(markup).not.toContain('name="email"');
+  });
+
+  it("shows an explicit empty state instead of an unusable staff appointment form", () => {
+    const markup = renderAppointmentAccountsEmpty();
+
+    expect(markup).toContain("Nenhuma conta de cliente disponível");
+    expect(markup).toContain("/dashboard/cliente");
+    expect(markup).not.toContain('data-form="resource"');
   });
 });

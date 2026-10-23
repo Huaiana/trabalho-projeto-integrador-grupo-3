@@ -1,4 +1,4 @@
-import { apiRequest, get, post, postPublic, postWithHeaders, postParams, put, putParams, del, setAccessToken, clearAccessToken, getAccessToken, ApiError } from "./api.js";
+import { apiRequest, get, post, postPublic, postWithHeaders, postParams, put, putParams, del, getAppointmentAccounts, createManagedAppointment, updateManagedAppointment, setAccessToken, clearAccessToken, getAccessToken, ApiError } from "./api.js";
 import lashingImage from "./assets/lashing.jpg";
 import "./vanilla.css";
 import "./admin.css";
@@ -63,13 +63,12 @@ const resourceDefinitions = {
     ],
   },
   agendamento: {
-    endpoint: "/agendamentos", singular: "agendamento", createMode: "json",
+    endpoint: "/agendamentos", createPath: "/agendamentos/gerenciamento", singular: "agendamento", createMode: "json",
     fields: [
-      { name: "nome", label: "Nome do cliente", required: true },
+      { name: "usuarioId", label: "Conta do cliente", type: "account", required: true, valueName: "id" },
       { name: "telefone", label: "Telefone", type: "tel", required: true },
-      { name: "email", label: "E-mail", type: "email", required: true },
       { name: "dataHora", label: "Data e horário", type: "datetime-local", required: true },
-      { name: "confirmacao", label: "Solicitação confirmada", type: "select", options: [["true", "Sim"], ["false", "Não"]] },
+      { name: "confirmado", label: "Confirmado", type: "select", options: [["true", "Sim"], ["false", "Não"]] },
     ],
   },
   usuario: {
@@ -270,7 +269,9 @@ function renderReadOnlySection(records, title) {
 }
 
 function resourceFieldMarkup(fieldDefinition, record, editing) {
-  const aliases = fieldDefinition.name === "cpf" ? ["cpf", "cpfcnpj", "cpfCnpj", "cpfcNPJ"] : [fieldDefinition.name];
+  const aliases = fieldDefinition.name === "cpf"
+    ? ["cpf", "cpfcnpj", "cpfCnpj", "cpfcNPJ"]
+    : fieldDefinition.name === "confirmado" ? ["confirmado", "status"] : [fieldDefinition.name];
   let value = aliases.map((name) => record?.[name]).find((entry) => entry != null) ?? "";
   if (fieldDefinition.type === "datetime-local" && value) {
     const date = new Date(value);
@@ -284,15 +285,47 @@ function resourceFieldMarkup(fieldDefinition, record, editing) {
   if (fieldDefinition.type === "select") {
     return `<label class="field-label" for="${id}">${esc(fieldDefinition.label)}<select id="${id}" name="${fieldDefinition.name}" ${required}>${fieldDefinition.options.map(([optionValue, label]) => `<option value="${esc(optionValue)}" ${String(value) === optionValue ? "selected" : ""}>${esc(label)}</option>`).join("")}</select></label>`;
   }
+  if (fieldDefinition.type === "account") {
+    const selectedId = value ?? record?.usuarioId ?? record?.usuario?.id ?? "";
+    return `<label class="field-label" for="${id}">${esc(fieldDefinition.label)}<select id="${id}" name="${fieldDefinition.name}" ${required}><option value="">Selecione uma conta</option>${(record?.appointmentAccounts || []).map((account) => `<option value="${esc(account.id)}" ${String(selectedId) === String(account.id) ? "selected" : ""}>${esc(account.nome)} · ${esc(account.email)}</option>`).join("")}</select></label>`;
+  }
   if (fieldDefinition.type === "textarea") return `<label class="field-label" for="${id}">${esc(fieldDefinition.label)}<textarea id="${id}" name="${fieldDefinition.name}" rows="3" ${required}>${esc(value)}</textarea></label>`;
   return `<label class="field-label" for="${id}">${esc(fieldDefinition.label)}<input id="${id}" name="${fieldDefinition.name}" type="${fieldDefinition.type || "text"}" value="${fieldDefinition.type === "password" ? "" : esc(value)}" ${required}>${optionalPassword}</label>`;
 }
 
-function resourceFormMarkup(slug, record = null) {
+export function renderResourceFormMarkup(slug, record = null, appointmentAccounts = []) {
   const definition = resourceDefinitions[slug];
   const editing = Boolean(record);
   const fields = editing && definition.updateFields ? definition.fields.filter((item) => definition.updateFields.includes(item.name)) : definition.fields;
-  return `<form class="inline-form" data-form="resource" data-resource="${slug}" ${editing ? `data-resource-id="${esc(record.id)}"` : ""}><div class="inline-form-title"><div><span class="eyebrow">${editing ? "ATUALIZAÇÃO" : "NOVO REGISTRO"}</span><h3>${editing ? `Editar ${esc(definition.singular)}` : `Novo ${esc(definition.singular)}`}</h3></div><button type="button" class="icon-button" aria-label="Fechar formulário" data-close-form>×</button></div><div class="inline-form-grid">${fields.map((item) => resourceFieldMarkup(item, record, editing)).join("")}</div><p class="form-feedback" role="alert"></p><div class="form-actions"><button class="button button-primary compact">${editing ? "Salvar alterações" : "Criar registro"} <span>↗</span></button><button type="button" class="button button-outline compact" data-close-form>Cancelar</button></div></form>`;
+  const formRecord = slug === "agendamento" ? { ...record, appointmentAccounts } : record;
+  return `<form class="inline-form" data-form="resource" data-resource="${slug}" ${editing ? `data-resource-id="${esc(record.id)}"` : ""}><div class="inline-form-title"><div><span class="eyebrow">${editing ? "ATUALIZAÇÃO" : "NOVO REGISTRO"}</span><h3>${editing ? `Editar ${esc(definition.singular)}` : `Novo ${esc(definition.singular)}`}</h3></div><button type="button" class="icon-button" aria-label="Fechar formulário" data-close-form>×</button></div><div class="inline-form-grid">${fields.map((item) => resourceFieldMarkup(item, formRecord, editing)).join("")}</div><p class="form-feedback" role="alert"></p><div class="form-actions"><button class="button button-primary compact">${editing ? "Salvar alterações" : "Criar registro"} <span>↗</span></button><button type="button" class="button button-outline compact" data-close-form>Cancelar</button></div></form>`;
+}
+
+export function renderAppointmentAccountsEmpty() {
+  return `<div class="empty-state appointment-account-empty" role="status"><span>i</span><strong>Nenhuma conta de cliente disponível</strong><p>Cadastre uma conta de cliente antes de criar ou editar um agendamento.</p><a class="button button-outline compact" href="/dashboard/cliente">Ir para Clientes</a></div>`;
+}
+
+async function openResourceForm(slug, record = null) {
+  const slot = document.querySelector("#resource-form-slot");
+  if (!slot) return;
+  if (slug !== "agendamento") {
+    slot.innerHTML = renderResourceFormMarkup(slug, record);
+    slot.querySelector("input, select, textarea")?.focus();
+    return;
+  }
+  slot.innerHTML = `<p class="loading-state" role="status">Carregando contas de clientes…</p>`;
+  try {
+    const accounts = collectionFrom(await getAppointmentAccounts());
+    if (!slot.isConnected) return;
+    if (!accounts.length) {
+      slot.innerHTML = renderAppointmentAccountsEmpty();
+      return;
+    }
+    slot.innerHTML = renderResourceFormMarkup(slug, record, accounts);
+    slot.querySelector("input, select, textarea")?.focus();
+  } catch (error) {
+    if (slot.isConnected) slot.innerHTML = `<div class="load-error" role="alert">${esc(error.message)}<br>Não foi possível carregar as contas de clientes para este agendamento.</div>`;
+  }
 }
 
 function renderTable(records, columns, title) {
@@ -416,8 +449,7 @@ async function handleResourceAction(action, slug, id, label = "") {
       if (!printRecord(record, `${sections.find((item) => item.slug === slug)?.name || definition.singular} ${record.id || id}`)) showSectionError("Permita a abertura da janela de impressão para continuar.");
     } else if (action === "edit") {
       if (document.querySelector("#modal-root .modal-card")) dismissModal();
-      document.querySelector("#resource-form-slot").innerHTML = resourceFormMarkup(slug, record);
-      document.querySelector("#resource-form-slot input, #resource-form-slot select, #resource-form-slot textarea")?.focus();
+      await openResourceForm(slug, record);
     } else {
       const sectionTitle = sections.find((item) => item.slug === slug)?.name || definition.singular;
       modal(`${sectionTitle} · ${record.id ?? id}`, `<div class="detail-modal-content">${recordDetailsMarkup(record)}<div class="form-actions"><button class="button button-outline compact" type="button" data-resource-action="print" data-resource="${slug}" data-id="${esc(record.id ?? id)}">Imprimir ficha</button><button class="button button-primary compact" type="button" data-resource-action="edit" data-resource="${slug}" data-id="${esc(record.id ?? id)}">Editar</button></div></div>`);
@@ -441,11 +473,11 @@ function coerceResourceForm(form, slug) {
       if (fieldDefinition.required) result[fieldDefinition.name] = "";
       continue;
     }
-    if (fieldDefinition.type === "number") value = Number(value);
+    if (fieldDefinition.type === "number" || fieldDefinition.type === "account") value = Number(value);
     if (fieldDefinition.type === "select" && ["true", "false"].includes(value)) value = value === "true";
     result[fieldDefinition.name] = typeof value === "string" ? value.trim() : value;
   }
-  if (slug === "agendamento" && result.confirmacao === undefined) result.confirmacao = true;
+  if (slug === "agendamento" && result.confirmado === undefined) result.confirmado = true;
   return result;
 }
 
@@ -454,7 +486,10 @@ async function saveResource(form) {
   const definition = resourceDefinitions[slug];
   const id = form.dataset.resourceId;
   const payload = coerceResourceForm(form, slug);
-  if (id) {
+  if (slug === "agendamento") {
+    if (id) await updateManagedAppointment(id, payload);
+    else await createManagedAppointment(payload);
+  } else if (id) {
     if (definition.updateMode === "andamento") {
       await putParams(`${definition.endpoint}/${encodeURIComponent(id)}/andamento`, { andamento: payload.andamento, observacoes: payload.observacoes });
     } else {
@@ -683,15 +718,28 @@ if (app) app.addEventListener("click", async (event) => {
   if (target.hasAttribute("data-reload")) { await reloadCurrentSection(); return; }
   if (target.dataset.action === "logout") { await logoutAdmin(); return; }
   if (target.dataset.action === "new-resource") {
-    const slot = document.querySelector("#resource-form-slot");
-    if (slot) { slot.innerHTML = resourceFormMarkup(target.dataset.resource); slot.querySelector("input, select, textarea")?.focus(); }
+    await openResourceForm(target.dataset.resource);
     return;
   }
   if (target.hasAttribute("data-status-id")) {
     const next = target.dataset.status;
     const slug = document.querySelector("#section-content")?.dataset.slug;
     const endpoint = slug === "solicitacao" ? "solicitacoes" : "agendamentos";
-    try { await putParams(`/${endpoint}/${encodeURIComponent(target.dataset.statusId)}/status`, { status: next }); await reloadCurrentSection("Status atualizado."); }
+    try {
+      if (slug === "agendamento") {
+        const appointment = (cachedRecords.get(slug) || []).find((item) => String(item.id) === String(target.dataset.statusId));
+        if (!appointment) throw new Error("Atualize a lista antes de alterar este agendamento.");
+        await updateManagedAppointment(target.dataset.statusId, {
+          usuarioId: Number(appointment.usuarioId),
+          telefone: appointment.telefone,
+          dataHora: appointment.dataHora,
+          confirmado: next === "confirmado",
+        });
+      } else {
+        await putParams(`/${endpoint}/${encodeURIComponent(target.dataset.statusId)}/status`, { status: next });
+      }
+      await reloadCurrentSection("Status atualizado.");
+    }
     catch (error) { target.insertAdjacentHTML("afterend", `<span class="field-error">${esc(error.message)}</span>`); }
     return;
   }
