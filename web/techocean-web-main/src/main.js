@@ -1,21 +1,86 @@
-import { get, post, postParams, put, putParams, ApiError } from "./api.js";
+import { apiRequest, get, post, postPublic, postWithHeaders, postParams, put, putParams, del, setAccessToken, clearAccessToken, getAccessToken, ApiError } from "./api.js";
 import lashingImage from "./assets/lashing.jpg";
 import "./vanilla.css";
+import "./admin.css";
 
 const app = globalThis.document?.querySelector?.("#app") ?? null;
 let modalReturnFocus = null;
+let currentUser = null;
+let pendingDestination = "/dashboard";
+let authNotice = "";
+const cachedRecords = new Map();
 const sections = [
   { slug: "carga", name: "Carga", description: "Cadastro e consulta de cargas.", endpoint: "/cargas", columns: ["id", "descricao", "peso", "volume", "tipoCarga", "origem", "destino"] },
-  { slug: "cliente", name: "Cliente", description: "Clientes cadastrados.", endpoint: "/clientes", columns: ["id", "nome", "email", "telefone", "cpfcnpj"] },
-  { slug: "conteiner", name: "Contêiner", description: "Contêineres em operação.", endpoint: "/conteineres", columns: ["id", "numeroConteiner", "tipo", "situacao"] },
+  { slug: "cliente", name: "Cliente", description: "Clientes cadastrados.", endpoint: "/clientes", columns: ["id", "nome", "email", "telefone", "cpfcnpj"], resource: true },
+  { slug: "conteiner", name: "Contêiner", description: "Contêineres em operação.", endpoint: "/conteineres", columns: ["id", "numeroConteiner", "tipo", "situacao"], resource: true },
   { slug: "mensagens", name: "Mensagens", description: "Mensagens recebidas pelo Fale conosco.", endpoint: "/mensagens/contatos" },
-  { slug: "operacao", name: "Operação", description: "Operações em andamento.", endpoint: "/operacoes", columns: ["id", "solicitacao", "conteiner", "responsavel", "andamento", "observacoes"] },
+  { slug: "operacao", name: "Operação", description: "Operações em andamento.", endpoint: "/operacoes", columns: ["id", "solicitacao", "conteiner", "responsavel", "andamento", "observacoes"], resource: true },
   { slug: "orcamento", name: "Orçamento", description: "Orçamentos e solicitações comerciais.", endpoint: "/orcamentos", columns: ["id", "cliente", "carga", "servico", "valorEstimado", "status"] },
-  { slug: "usuario", name: "Usuário", description: "Acesso administrativo de usuários.", endpoint: null, columns: ["nome", "email", "perfil"] },
-  { slug: "servico", name: "Serviço", description: "Serviços oferecidos.", endpoint: "/servicos", columns: ["id", "nome", "descricao", "categoria", "disponivel"] },
+  { slug: "usuario", name: "Equipe", description: "Contas e permissões da equipe.", endpoint: "/admin/usuarios", columns: ["id", "nome", "email", "cargo"], resource: true, adminOnly: true },
+  { slug: "auditoria", name: "Auditoria", description: "Registro de atividades administrativas.", endpoint: "/admin/auditoria", adminOnly: true },
+  { slug: "sessoes", name: "Sessões", description: "Sessões administrativas ativas e recentes.", endpoint: "/admin/sessoes", adminOnly: true },
+  { slug: "servico", name: "Serviço", description: "Serviços oferecidos.", endpoint: "/servicos", columns: ["id", "nome", "descricao", "categoria", "disponivel"], resource: true },
   { slug: "solicitacao", name: "Solicitação", description: "Solicitações recebidas.", endpoint: "/solicitacoes", columns: ["id", "cliente", "carga", "servico", "status"] },
-  { slug: "agendamento", name: "Agendamento", description: "Solicitações de visita técnica.", endpoint: "/agendamentos", columns: ["id", "nome", "email", "telefone", "dataHora", "status"] },
+  { slug: "agendamento", name: "Agendamento", description: "Solicitações de visita técnica.", endpoint: "/agendamentos", columns: ["id", "nome", "email", "telefone", "dataHora", "status"], resource: true },
 ];
+
+const resourceDefinitions = {
+  cliente: {
+    endpoint: "/clientes", singular: "cliente", createMode: "json",
+    fields: [
+      { name: "nome", label: "Nome completo", required: true },
+      { name: "cpf", label: "CPF / CNPJ", required: true },
+      { name: "telefone", label: "Telefone", type: "tel", required: true },
+      { name: "email", label: "E-mail", type: "email", required: true },
+    ],
+  },
+  conteiner: {
+    endpoint: "/conteineres", singular: "contêiner", createMode: "params",
+    fields: [
+      { name: "numeroConteiner", label: "Número do contêiner", required: true },
+      { name: "tipo", label: "Tipo", required: true },
+      { name: "situacao", label: "Situação", required: true },
+    ],
+  },
+  operacao: {
+    endpoint: "/operacoes", singular: "operação", createMode: "params", updateMode: "andamento",
+    fields: [
+      { name: "solicitacaoId", label: "Código da solicitação", type: "number", required: true },
+      { name: "conteinerId", label: "Código do contêiner", type: "number" },
+      { name: "responsavel", label: "Responsável", required: true },
+      { name: "andamento", label: "Andamento" },
+      { name: "observacoes", label: "Observações", type: "textarea" },
+    ],
+  },
+  servico: {
+    endpoint: "/servicos", singular: "serviço", createMode: "params",
+    fields: [
+      { name: "nome", label: "Nome do serviço", required: true },
+      { name: "descricao", label: "Descrição", type: "textarea", required: true },
+      { name: "categoria", label: "Categoria", required: true },
+      { name: "disponivel", label: "Disponível", type: "select", options: [["true", "Sim"], ["false", "Não"]] },
+    ],
+  },
+  agendamento: {
+    endpoint: "/agendamentos", singular: "agendamento", createMode: "json",
+    fields: [
+      { name: "nome", label: "Nome do cliente", required: true },
+      { name: "telefone", label: "Telefone", type: "tel", required: true },
+      { name: "email", label: "E-mail", type: "email", required: true },
+      { name: "dataHora", label: "Data e horário", type: "datetime-local", required: true },
+      { name: "confirmacao", label: "Solicitação confirmada", type: "select", options: [["true", "Sim"], ["false", "Não"]] },
+    ],
+  },
+  usuario: {
+    endpoint: "/admin/usuarios", singular: "usuário", createMode: "json",
+    fields: [
+      { name: "nome", label: "Nome completo", required: true },
+      { name: "email", label: "E-mail", type: "email", required: true },
+      { name: "cargo", label: "Perfil", type: "select", required: true, options: [["ADMIN", "Administrador"], ["SUPERVISOR", "Supervisor"], ["FUNCIONARIO", "Funcionário"]] },
+      { name: "senha", label: "Senha", type: "password", required: true, editOptional: true },
+    ],
+  },
+};
 
 const services = [
   { number: "01", icon: "⌖", title: "Consultoria operacional", description: "Planejamento técnico para operações mais seguras, eficientes e previsíveis.", details: "Analisamos sua operação portuária para identificar riscos e oportunidades. Nossa equipe elabora planos sob medida, com cronogramas realistas e protocolos claros para cada etapa do embarque.", topics: ["Análise de riscos da operação e da carga", "Plano de embarque com cronograma e responsáveis", "Treinamento das equipes de cais e bordo", "Acompanhamento técnico durante a operação"] },
@@ -35,6 +100,11 @@ const valueText = (value) => {
 
 function navLink(href, label, className = "") { return `<a class="${className}" href="${href}">${label}</a>`; }
 
+function userRole() { return String(currentUser?.cargo || currentUser?.role || "").toUpperCase(); }
+function isAdmin() { return userRole() === "ADMIN"; }
+function canDeleteOperational() { return ["ADMIN", "SUPERVISOR"].includes(userRole()); }
+function visibleSections() { return sections.filter((section) => !section.adminOnly || isAdmin()); }
+
 function renderHome() {
   document.title = "Techocean — Amarração e Segurança de Cargas";
   app.innerHTML = `
@@ -43,7 +113,7 @@ function renderHome() {
         <div class="hero-shade"></div>
         <nav class="topbar wrap">
           ${navLink("/dashboard", "Techocean", "wordmark")}
-          <div class="top-actions">${navLink("/cadastro", "♙ <span>Cadastre-se</span>", "button button-outline signup-link")}<button class="button button-outline" data-action="contact">Fale conosco</button></div>
+          <div class="top-actions">${navLink("/admin/login", "Acesso da equipe", "text-link staff-login-link")}${navLink("/cadastro", "♙ <span>Cadastre-se</span>", "button button-outline signup-link")}<button class="button button-outline" data-action="contact">Fale conosco</button></div>
         </nav>
         <div class="hero-copy wrap">
           <p class="eyebrow">Precisão em cada amarração</p>
@@ -73,16 +143,38 @@ function field(label, name, type = "text", autocomplete = "off", attributes = ""
   return `<label class="field-label" for="field-${name}">${label}<input id="field-${name}" name="${name}" type="${type}" autocomplete="${autocomplete}" ${attributes} required></label>`;
 }
 
+function renderLogin(error = "") {
+  document.title = "Acesso da equipe — Techocean";
+  app.innerHTML = `<main class="auth-page"><section class="auth-card"><a href="/" class="wordmark">Techocean</a><p class="eyebrow">ÁREA RESTRITA</p><h1>Acesso da equipe</h1><p class="muted">Entre com sua conta administrativa para continuar.</p>${authNotice ? `<p class="inline-success" role="status">${esc(authNotice)}</p>` : ""}<form class="form-grid" data-form="admin-login">${field("E-mail", "email", "email", "username")}${field("Senha", "senha", "password", "current-password")}<p class="form-feedback" role="alert">${esc(error)}</p><button class="button button-primary form-submit">Entrar <span>↗</span></button></form><div class="auth-links"><a href="/admin/setup">Configurar primeiro administrador</a><a href="/">Voltar ao site</a></div></section></main>`;
+}
+
+function renderSetup(error = "") {
+  document.title = "Configuração inicial — Techocean";
+  app.innerHTML = `<main class="auth-page"><section class="auth-card"><a href="/" class="wordmark">Techocean</a><p class="eyebrow">CONFIGURAÇÃO INICIAL</p><h1>Criar primeiro administrador</h1><p class="muted">Use o token de configuração fornecido pelo responsável pelo sistema. Ele será enviado ao servidor, mas não ficará salvo neste navegador.</p><form class="form-grid" data-form="admin-setup"><label class="field-label">Token de configuração<input name="setupToken" type="password" autocomplete="off" required></label>${field("Nome completo", "nome", "text", "name")}${field("E-mail", "email", "email", "email")}${field("Senha", "senha", "password", "new-password", 'minlength="8"')}<p class="form-feedback" role="alert">${esc(error)}</p><button class="button button-primary form-submit">Criar administrador <span>↗</span></button></form><div class="auth-links"><a href="/admin/login">Voltar ao login</a><a href="/">Voltar ao site</a></div></section></main>`;
+}
+
+function normalizeAdminUser(payload) {
+  const user = payload?.user || payload?.data?.user || payload?.data || payload;
+  if (!user || typeof user !== "object") return null;
+  return { id: user.id, nome: user.nome || user.name || user.email || "Equipe", email: user.email || "", cargo: String(user.cargo || user.role || "").toUpperCase() };
+}
+
 function dashboardNav(slug = "") {
-  return `<aside class="sidebar"><a class="wordmark sidebar-brand" href="/">Techocean</a><span class="nav-caption">ESPAÇO DE GESTÃO</span><nav>${navLink("/dashboard", "▦&nbsp;&nbsp; Visão geral", `side-link ${slug === "" ? "active" : ""}`)}${sections.map((section) => navLink(`/dashboard/${section.slug}`, `<span class="nav-symbol">${section.name.slice(0, 1)}</span>${section.name}`, `side-link ${section.slug === slug ? "active" : ""}`)).join("")}</nav><div class="sidebar-bottom"><span class="status-dot"></span> Techocean · Operações</div></aside>
-    <div class="mobile-dash-nav">${navLink("/dashboard", "Início", `mobile-chip ${slug === "" ? "active" : ""}`)}${sections.map((section) => navLink(`/dashboard/${section.slug}`, section.name, `mobile-chip ${section.slug === slug ? "active" : ""}`)).join("")}</div>`;
+  const links = visibleSections();
+  return `<aside class="sidebar"><a class="wordmark sidebar-brand" href="/">Techocean</a><span class="nav-caption">ESPAÇO DE GESTÃO</span><nav>${navLink("/dashboard", "▦&nbsp;&nbsp; Visão geral", `side-link ${slug === "" ? "active" : ""}`)}${links.map((section) => navLink(`/dashboard/${section.slug}`, `<span class="nav-symbol">${section.name.slice(0, 1)}</span>${section.name}`, `side-link ${section.slug === slug ? "active" : ""}`)).join("")}</nav><div class="sidebar-bottom"><span class="status-dot"></span> Techocean · Operações</div></aside>
+    <div class="mobile-dash-nav">${navLink("/dashboard", "Início", `mobile-chip ${slug === "" ? "active" : ""}`)}${links.map((section) => navLink(`/dashboard/${section.slug}`, section.name, `mobile-chip ${section.slug === slug ? "active" : ""}`)).join("")}</div>`;
 }
 
 function renderDashboard(slug = "") {
   const section = sections.find((item) => item.slug === slug);
   if (slug && !section) { renderNotFound(); return; }
+  if (section?.adminOnly && !isAdmin()) {
+    document.title = "Acesso restrito — Techocean";
+    app.innerHTML = `<main class="dashboard">${dashboardNav(slug)}<section class="dash-main"><div class="dash-topline">${navLink("/", "↖ <span>Voltar ao site</span>", "site-return")}<button class="button button-outline compact" data-action="logout">Sair</button></div><div class="dash-content"><div class="notice-panel"><span class="notice-mark">!</span><div><strong>Acesso restrito</strong><p>Esta área está disponível apenas para ADMIN.</p>${navLink("/dashboard", "Voltar à visão geral", "back-link")}</div></div></div></section></main>`;
+    return;
+  }
   document.title = `${section?.name || "Visão geral"} — Techocean`;
-  app.innerHTML = `<main class="dashboard">${dashboardNav(slug)}<section class="dash-main"><div class="dash-topline"><a href="/" class="site-return">↖ <span>Voltar ao site</span></a><div class="dash-account"><span class="avatar">T</span><span>Área administrativa</span></div></div><div class="dash-content">${section ? `<p class="eyebrow">Painel / ${esc(section.name)}</p><h1>${esc(section.name)}</h1><p class="dash-description">${esc(section.description)}</p><div id="section-content" data-slug="${esc(slug)}"><p class="loading-state">Carregando informações…</p></div>` : `<p class="eyebrow">Espaço de gestão</p><h1>Visão geral</h1><p class="dash-description">Acesse as áreas da operação Techocean.</p><div class="dash-cards">${sections.map((item) => `<a href="/dashboard/${item.slug}" class="dash-card"><span class="dash-card-icon">${item.name.slice(0, 1)}</span><h2>${item.name}<span>↗</span></h2><p>${item.description}</p></a>`).join("")}</div>`}</div></section></main>`;
+  app.innerHTML = `<main class="dashboard">${dashboardNav(slug)}<section class="dash-main"><div class="dash-topline">${navLink("/", "↖ <span>Voltar ao site</span>", "site-return")}<div class="dash-user-tools"><div class="dash-account"><span class="avatar">${esc((currentUser?.nome || "T").slice(0, 1).toUpperCase())}</span><span>${esc(currentUser?.nome || "Equipe")} · ${esc(userRole())}</span></div><button class="button button-outline compact" data-action="logout">Sair</button></div></div><div class="dash-content">${section ? `<p class="eyebrow">Painel / ${esc(section.name)}</p><h1>${esc(section.name)}</h1><p class="dash-description">${esc(section.description)}</p><div id="section-content" data-slug="${esc(slug)}"><p class="loading-state">Carregando informações…</p></div>` : `<p class="eyebrow">Espaço de gestão</p><h1>Visão geral</h1><p class="dash-description">Acesse as áreas da operação Techocean.</p><div class="dash-cards">${visibleSections().map((item) => `<a href="/dashboard/${item.slug}" class="dash-card"><span class="dash-card-icon">${item.name.slice(0, 1)}</span><h2>${item.name}<span>↗</span></h2><p>${item.description}</p></a>`).join("")}</div>`}</div></section><div id="modal-root"></div></main>`;
   const isMobile = globalThis.window?.matchMedia?.("(max-width: 720px)").matches ?? (globalThis.window?.innerWidth <= 720);
   scrollActiveChipIntoView(document.querySelector(".mobile-dash-nav"), isMobile);
   if (section) void loadSection(section);
@@ -110,10 +202,13 @@ async function loadSection(section) {
   try {
     const records = collectionFrom(await get(section.endpoint));
     if (!host.isConnected) return;
-    if (section.slug === "carga") host.innerHTML = renderCargas(records);
+    cachedRecords.set(section.slug, records);
+    if (section.resource) host.innerHTML = renderCrudSection(records, section);
+    else if (section.slug === "carga") host.innerHTML = renderCargas(records);
     else if (section.slug === "mensagens") host.innerHTML = renderMessages(records);
     else if (section.slug === "orcamento") host.innerHTML = renderBudgets(records);
     else if (section.slug === "agendamento" || section.slug === "solicitacao") host.innerHTML = renderAppointments(records, section.slug);
+    else if (["auditoria", "sessoes"].includes(section.slug)) host.innerHTML = renderReadOnlySection(records, section.name);
     else host.innerHTML = renderTable(records, section.columns, section.name);
   } catch (error) {
     if (host.isConnected) host.innerHTML = `<div class="load-error" role="alert"><p>${esc(error.message)}</p><button class="button button-outline" data-reload>Atualizar</button></div>`;
@@ -124,6 +219,46 @@ const chargeFields = [["descricao", "Descrição", "text"], ["peso", "Peso (t)",
 
 function renderCargas(records) {
   return `<section class="data-panel"><div class="panel-heading"><div><span class="eyebrow">OPERAÇÕES / REGISTROS</span><h2>Cargas cadastradas <span class="count-pill">${records.length}</span></h2></div><div class="panel-actions"><button class="button button-outline compact" data-reload>↻ <span>Atualizar</span></button><button class="button button-primary compact" data-action="new-charge">＋ Nova carga</button></div></div><div id="charge-form-slot"></div>${records.length ? renderTable(records, ["id", ...chargeFields.map(([name]) => name)], "cargas") : `<div class="empty-state"><span>▱</span><strong>Nenhuma carga cadastrada</strong><p>Cadastre uma carga para começar a acompanhar as especificações.</p></div>`}</section>`;
+}
+
+function renderCrudSection(records, section) {
+  const definition = resourceDefinitions[section.slug];
+  const actions = `<div class="panel-actions"><button class="button button-outline compact" data-reload>↻ <span>Atualizar</span></button><button class="button button-primary compact" data-action="new-resource" data-resource="${section.slug}">＋ Novo ${esc(definition.singular)}</button></div>`;
+  return `<section class="data-panel"><div class="panel-heading"><div><span class="eyebrow">GESTÃO / REGISTROS</span><h2>${esc(section.name)}s <span class="count-pill">${records.length}</span></h2></div>${actions}</div><div id="resource-form-slot"></div>${records.length ? renderResourceTable(records, section.slug) : `<div class="empty-state"><span>▱</span><strong>Nenhum registro encontrado</strong><p>Cadastre o primeiro ${esc(definition.singular)} para começar.</p></div>`}</section>`;
+}
+
+function renderResourceTable(records, slug) {
+  const section = sections.find((item) => item.slug === slug);
+  const definition = resourceDefinitions[slug];
+  const preferred = section.columns?.filter((key) => key in records[0]) || [];
+  const columns = (preferred.length ? preferred : Object.keys(records[0])).filter((key) => !["senha", "password"].includes(key.toLowerCase())).slice(0, 7);
+  return `<div class="table-scroll"><table class="records-table"><thead><tr>${columns.map((key) => `<th>${esc(labelFor(key))}</th>`).join("")}<th>Ações</th></tr></thead><tbody>${records.map((record) => `<tr>${columns.map((key) => `<td>${statusPill(key, record[key])}</td>`).join("")}<td><div class="row-actions"><button class="small-action" type="button" data-resource-action="view" data-resource="${slug}" data-id="${esc(record.id)}">Ver</button><button class="small-action" type="button" data-resource-action="edit" data-resource="${slug}" data-id="${esc(record.id)}">Editar</button><button class="small-action" type="button" data-resource-action="print" data-resource="${slug}" data-id="${esc(record.id)}">Imprimir</button>${canDeleteOperational() ? `<button class="small-action danger-action" type="button" data-resource-action="delete" data-resource="${slug}" data-id="${esc(record.id)}" data-label="${esc(record[columns[1]] ?? definition.singular)}">Excluir</button>` : ""}</div></td></tr>`).join("")}</tbody></table></div>`;
+}
+
+function renderReadOnlySection(records, title) {
+  return `<section class="data-panel"><div class="panel-heading"><div><span class="eyebrow">ADMINISTRAÇÃO</span><h2>${esc(title)} <span class="count-pill">${records.length}</span></h2></div><button class="button button-outline compact" data-reload>↻ Atualizar</button></div>${renderTable(records, null, title)}</section>`;
+}
+
+function resourceFieldMarkup(fieldDefinition, record, editing) {
+  let value = record?.[fieldDefinition.name] ?? "";
+  if (fieldDefinition.type === "datetime-local" && value) {
+    const date = new Date(value);
+    if (!Number.isNaN(date.valueOf())) value = new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  }
+  const required = editing && fieldDefinition.editOptional ? "" : (fieldDefinition.required ? "required" : "");
+  const optionalPassword = editing && fieldDefinition.editOptional ? "<small>Deixe em branco para manter a senha atual.</small>" : "";
+  const id = `resource-${fieldDefinition.name}`;
+  if (fieldDefinition.type === "select") {
+    return `<label class="field-label" for="${id}">${esc(fieldDefinition.label)}<select id="${id}" name="${fieldDefinition.name}" ${required}>${fieldDefinition.options.map(([optionValue, label]) => `<option value="${esc(optionValue)}" ${String(value) === optionValue ? "selected" : ""}>${esc(label)}</option>`).join("")}</select></label>`;
+  }
+  if (fieldDefinition.type === "textarea") return `<label class="field-label" for="${id}">${esc(fieldDefinition.label)}<textarea id="${id}" name="${fieldDefinition.name}" rows="3" ${required}>${esc(value)}</textarea></label>`;
+  return `<label class="field-label" for="${id}">${esc(fieldDefinition.label)}<input id="${id}" name="${fieldDefinition.name}" type="${fieldDefinition.type || "text"}" value="${fieldDefinition.type === "password" ? "" : esc(value)}" ${required}>${optionalPassword}</label>`;
+}
+
+function resourceFormMarkup(slug, record = null) {
+  const definition = resourceDefinitions[slug];
+  const editing = Boolean(record);
+  return `<form class="inline-form" data-form="resource" data-resource="${slug}" ${editing ? `data-resource-id="${esc(record.id)}"` : ""}><div class="inline-form-title"><div><span class="eyebrow">${editing ? "ATUALIZAÇÃO" : "NOVO REGISTRO"}</span><h3>${editing ? `Editar ${esc(definition.singular)}` : `Novo ${esc(definition.singular)}`}</h3></div><button type="button" class="icon-button" aria-label="Fechar formulário" data-close-form>×</button></div><div class="inline-form-grid">${definition.fields.map((item) => resourceFieldMarkup(item, record, editing)).join("")}</div><p class="form-feedback" role="alert"></p><div class="form-actions"><button class="button button-primary compact">${editing ? "Salvar alterações" : "Criar registro"} <span>↗</span></button><button type="button" class="button button-outline compact" data-close-form>Cancelar</button></div></form>`;
 }
 
 function renderTable(records, columns, title) {
@@ -209,6 +344,96 @@ function dismissModal() {
   modalReturnFocus = null;
 }
 
+function recordDetailsMarkup(record) {
+  return `<dl class="record-details">${Object.entries(record).filter(([key]) => !["senha", "password"].includes(key.toLowerCase())).map(([key, value]) => `<div><dt>${esc(labelFor(key))}</dt><dd>${valueText(value)}</dd></div>`).join("")}</dl>`;
+}
+
+function printRecord(record, title) {
+  const popup = window.open("", "_blank", "width=800,height=700");
+  if (!popup) return false;
+  popup.opener = null;
+  popup.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${esc(title)}</title><style>body{font:16px Arial,sans-serif;color:#15242b;padding:32px}h1{font-size:24px}dl{display:grid;grid-template-columns:180px 1fr;gap:10px}dt{font-weight:bold}dd{margin:0;white-space:pre-wrap}</style></head><body><h1>${esc(title)}</h1>${recordDetailsMarkup(record)}</body></html>`);
+  popup.document.close();
+  popup.focus();
+  popup.print();
+  return true;
+}
+
+async function handleResourceAction(action, slug, id, label = "") {
+  const definition = resourceDefinitions[slug];
+  const sectionHost = document.querySelector("#section-content");
+  if (!definition || !sectionHost) return;
+  if (slug === "usuario" && !isAdmin()) return;
+  if (action === "delete" && !canDeleteOperational()) return;
+  const records = cachedRecords.get(slug) || [];
+  let record = records.find((item) => String(item.id) === String(id));
+  if (action === "delete") {
+    if (!window.confirm(`Excluir ${definition.singular}${label ? ` “${label}”` : ""}? Esta ação não pode ser desfeita.`)) return;
+    try {
+      await del(`${definition.endpoint}/${encodeURIComponent(id)}`);
+      await reloadCurrentSection(`${definition.singular[0].toUpperCase()}${definition.singular.slice(1)} excluído com sucesso.`);
+    } catch (error) { showSectionError(error.message); }
+    return;
+  }
+  try {
+    if (action !== "print" || !record) record = await get(`${definition.endpoint}/${encodeURIComponent(id)}`);
+    record = record?.data || record;
+    if (action === "print") {
+      if (!printRecord(record, `${sections.find((item) => item.slug === slug)?.name || definition.singular} ${record.id || id}`)) showSectionError("Permita a abertura da janela de impressão para continuar.");
+    } else if (action === "edit") {
+      if (document.querySelector("#modal-root .modal-card")) dismissModal();
+      document.querySelector("#resource-form-slot").innerHTML = resourceFormMarkup(slug, record);
+      document.querySelector("#resource-form-slot input, #resource-form-slot select, #resource-form-slot textarea")?.focus();
+    } else {
+      const sectionTitle = sections.find((item) => item.slug === slug)?.name || definition.singular;
+      modal(`${sectionTitle} · ${record.id ?? id}`, `<div class="detail-modal-content">${recordDetailsMarkup(record)}<div class="form-actions"><button class="button button-outline compact" type="button" data-resource-action="print" data-resource="${slug}" data-id="${esc(record.id ?? id)}">Imprimir ficha</button><button class="button button-primary compact" type="button" data-resource-action="edit" data-resource="${slug}" data-id="${esc(record.id ?? id)}">Editar</button></div></div>`);
+    }
+  } catch (error) { showSectionError(error.message); }
+}
+
+function showSectionError(message) {
+  const host = document.querySelector("#section-content");
+  if (host) host.insertAdjacentHTML("afterbegin", `<p class="inline-error" role="alert">${esc(message)}</p>`);
+}
+
+function coerceResourceForm(form, slug) {
+  const data = new FormData(form);
+  const definition = resourceDefinitions[slug];
+  const result = {};
+  for (const fieldDefinition of definition.fields) {
+    let value = data.get(fieldDefinition.name);
+    if (value == null || value === "") {
+      if (fieldDefinition.type === "password" && form.dataset.resourceId) continue;
+      if (fieldDefinition.required) result[fieldDefinition.name] = "";
+      continue;
+    }
+    if (fieldDefinition.type === "number") value = Number(value);
+    if (fieldDefinition.type === "select" && ["true", "false"].includes(value)) value = value === "true";
+    result[fieldDefinition.name] = typeof value === "string" ? value.trim() : value;
+  }
+  if (slug === "agendamento" && result.confirmacao === undefined) result.confirmacao = true;
+  return result;
+}
+
+async function saveResource(form) {
+  const slug = form.dataset.resource;
+  const definition = resourceDefinitions[slug];
+  const id = form.dataset.resourceId;
+  const payload = coerceResourceForm(form, slug);
+  if (id) {
+    if (definition.updateMode === "andamento") {
+      await putParams(`${definition.endpoint}/${encodeURIComponent(id)}/andamento`, { andamento: payload.andamento, observacoes: payload.observacoes });
+    } else {
+      await put(`${definition.endpoint}/${encodeURIComponent(id)}`, payload);
+    }
+  } else if (definition.createMode === "params") {
+    await postParams(definition.endpoint, payload);
+  } else {
+    await post(definition.endpoint, payload);
+  }
+  await reloadCurrentSection(id ? `${sections.find((item) => item.slug === slug)?.name} atualizado com sucesso.` : `${sections.find((item) => item.slug === slug)?.name} criado com sucesso.`);
+}
+
 function openService(service) {
   modal(service.title, `<p class="modal-lede">${esc(service.details)}</p><ul class="topic-list">${service.topics.map((topic) => `<li><span>✓</span>${esc(topic)}</li>`).join("")}</ul><button class="button button-primary" data-action="schedule">Agendar visita técnica <span>↗</span></button>`);
 }
@@ -260,16 +485,36 @@ async function handleSubmit(event) {
   if (button) { button.disabled = true; button.dataset.original = button.textContent; button.textContent = "Enviando…"; }
   try {
     switch (form.dataset.form) {
+      case "admin-login": {
+        const result = await postPublic("/admin/login", { email: fields.email.trim(), senha: fields.senha });
+        const token = result?.accessToken || result?.data?.accessToken;
+        if (!token) throw new Error("O servidor não retornou um token de acesso.");
+        setAccessToken(token);
+        const loginUser = normalizeAdminUser(result);
+        const verifiedUser = normalizeAdminUser(await get("/admin/me"));
+        currentUser = verifiedUser || loginUser;
+        if (!["ADMIN", "SUPERVISOR", "FUNCIONARIO"].includes(userRole())) throw new Error("O perfil retornado não tem acesso ao painel.");
+        authNotice = "";
+        navigateTo(pendingDestination || "/dashboard", { replace: true });
+        break;
+      }
+      case "admin-setup": {
+        const { setupToken, ...adminData } = fields;
+        await postWithHeaders("/admin/setup", adminData, { "X-Admin-Setup-Token": setupToken }, { authenticated: false });
+        authNotice = "Administrador criado. Entre usando o e-mail e a senha definidos.";
+        navigateTo("/admin/login", { replace: true });
+        break;
+      }
       case "register": await submitRegistration(form, fields); break;
       case "contact":
-        await post("/mensagens/contatos", fields);
+        await postPublic("/mensagens/contatos", fields);
         setFeedback(form, "Mensagem enviada. Em breve entraremos em contato.", true);
         form.reset();
         break;
       case "schedule": {
         const payload = { ...fields, confirmacao: form.elements.confirmacao.checked };
         try {
-          await post("/agendamentos", payload);
+          await postPublic("/agendamentos", payload);
           form.innerHTML = `<p class="success-message" role="status">Solicitação enviada. Nossa equipe entrará em contato para confirmar a visita.</p>`;
         } catch (error) {
           if (error instanceof ApiError && error.code === "CADASTRO_NECESSARIO") {
@@ -297,13 +542,22 @@ async function handleSubmit(event) {
         await reloadCurrentSection("Orçamento criado com sucesso.");
         break;
       }
+      case "resource":
+        await saveResource(form);
+        break;
       case "reply":
         await put(`/mensagens/contatos/${form.dataset.messageId}/resposta`, { resposta: fields.resposta });
         await reloadCurrentSection("Resposta enviada com sucesso.");
         break;
     }
   } catch (error) {
-    if (form.dataset.form === "register") {
+    if (form.dataset.form === "admin-login" || form.dataset.form === "admin-setup") {
+      setFeedback(form, error.message);
+      if (form.dataset.form === "admin-setup") form.elements.setupToken.value = "";
+      if (form.dataset.form === "admin-login") { clearAccessToken(); currentUser = null; }
+    } else if (form.dataset.form === "resource") {
+      setFeedback(form, error.message);
+    } else if (form.dataset.form === "register") {
       const message = document.querySelector("#register-error");
       if (message) message.textContent = error.message;
     } else {
@@ -330,7 +584,7 @@ async function submitRegistration(form, fields) {
     error.textContent = message;
   }
   if (Object.keys(errors).length) return;
-  await post("/clientes", { ...fields, cpf: fields.cpf.replace(/\D/g, ""), telefone: fields.telefone.replace(/\D/g, "") });
+  await postPublic("/clientes", { ...fields, cpf: fields.cpf.replace(/\D/g, ""), telefone: fields.telefone.replace(/\D/g, "") });
   document.querySelector("#registration-content").innerHTML = `<div class="success-register"><p class="eyebrow">Cadastro confirmado</p><span class="success-check">✓</span><h1>Cadastro criado!</h1><p>Seu cadastro foi realizado com sucesso. Nossa equipe entrará em contato pelos dados informados.</p><a class="button button-primary" href="/">Voltar ao site</a></div>`;
 }
 
@@ -344,8 +598,41 @@ async function reloadCurrentSection(message = "") {
   }
 }
 
+async function logoutAdmin() {
+  try { await apiRequest("/admin/logout", { method: "POST" }); }
+  catch { /* A sessão local será encerrada mesmo se o servidor já estiver indisponível. */ }
+  clearAccessToken();
+  currentUser = null;
+  authNotice = "Você saiu da área administrativa.";
+  pendingDestination = "/dashboard";
+  navigateTo("/admin/login", { replace: true });
+}
+
+function navigateTo(path, { replace = false } = {}) {
+  const url = new URL(path, window.location.href);
+  const stateUrl = `${url.pathname}${url.search}${url.hash}`;
+  if (replace) window.history.replaceState({}, "", stateUrl);
+  else window.history.pushState({}, "", stateUrl);
+  renderRoute();
+  if (url.hash) window.requestAnimationFrame(() => document.querySelector(url.hash)?.scrollIntoView({ behavior: "smooth" }));
+}
+
 if (app) app.addEventListener("click", async (event) => {
+  const anchor = event.target.closest("a[href]");
+  if (anchor && !event.defaultPrevented && event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey && !anchor.target) {
+    const destination = new URL(anchor.href, window.location.href);
+    if (destination.origin === window.location.origin && !(destination.pathname === window.location.pathname && destination.hash)) {
+      event.preventDefault();
+      navigateTo(`${destination.pathname}${destination.search}${destination.hash}`);
+      return;
+    }
+  }
   const target = event.target.closest("[data-action], [data-service], [data-close-modal], [data-close-form], [data-reload], [data-status-id]");
+  const resourceAction = event.target.closest("[data-resource-action]");
+  if (resourceAction) {
+    await handleResourceAction(resourceAction.dataset.resourceAction, resourceAction.dataset.resource, resourceAction.dataset.id, resourceAction.dataset.label);
+    return;
+  }
   if (!target) return;
   if (target.hasAttribute("data-close-modal")) {
     if (target.classList.contains("modal-backdrop") && event.target.closest(".modal-card")) return;
@@ -354,6 +641,12 @@ if (app) app.addEventListener("click", async (event) => {
   }
   if (target.hasAttribute("data-close-form")) { target.closest("form")?.remove(); return; }
   if (target.hasAttribute("data-reload")) { await reloadCurrentSection(); return; }
+  if (target.dataset.action === "logout") { await logoutAdmin(); return; }
+  if (target.dataset.action === "new-resource") {
+    const slot = document.querySelector("#resource-form-slot");
+    if (slot) { slot.innerHTML = resourceFormMarkup(target.dataset.resource); slot.querySelector("input, select, textarea")?.focus(); }
+    return;
+  }
   if (target.hasAttribute("data-status-id")) {
     const next = target.dataset.status;
     const slug = document.querySelector("#section-content")?.dataset.slug;
@@ -382,8 +675,32 @@ function renderRoute() {
   const path = routePath();
   if (path === "/") renderHome();
   else if (path === "/cadastro") renderCadastro();
-  else if (path === "/dashboard" || path === "/dashboard/index") renderDashboard();
-  else if (path.startsWith("/dashboard/")) renderDashboard(path.slice("/dashboard/".length));
+  else if (path === "/admin/login") {
+    if (getAccessToken() && currentUser) navigateTo("/dashboard", { replace: true });
+    else renderLogin();
+  }
+  else if (path === "/admin/setup") renderSetup();
+  else if (path === "/dashboard" || path === "/dashboard/index" || path.startsWith("/dashboard/")) {
+    if (!getAccessToken()) {
+      pendingDestination = path;
+      currentUser = null;
+      renderLogin();
+    } else if (!currentUser) {
+      app.innerHTML = `<main class="auth-page"><section class="auth-card"><p class="loading-state">Verificando sessão…</p></section></main>`;
+      void get("/admin/me").then((payload) => {
+        currentUser = normalizeAdminUser(payload);
+        if (!currentUser) throw new Error("O perfil da sessão não foi retornado.");
+        renderRoute();
+      }).catch((error) => {
+        clearAccessToken();
+        currentUser = null;
+        pendingDestination = path;
+        renderLogin(error.message);
+      });
+    } else {
+      renderDashboard(path === "/dashboard" || path === "/dashboard/index" ? "" : path.slice("/dashboard/".length));
+    }
+  }
   else renderNotFound();
 }
 

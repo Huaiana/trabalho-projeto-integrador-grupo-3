@@ -7,14 +7,21 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.git.techocean.model.Cliente;
 import com.git.techocean.repository.ClienteRepository;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 @Service
 public class ClienteService {
 
     private final ClienteRepository clienteRepository;
+    private final PasswordEncoder passwordEncoder;
+
+    public ClienteService(ClienteRepository clienteRepository, PasswordEncoder passwordEncoder) {
+        this.clienteRepository = clienteRepository;
+        this.passwordEncoder = passwordEncoder;
+    }
 
     public ClienteService(ClienteRepository clienteRepository) {
-        this.clienteRepository = clienteRepository;
+        this(clienteRepository, new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder());
     }
 
     public Cliente cadastrar(String nome, String cpfCnpj, String telefone, String email, String senha) {
@@ -24,7 +31,17 @@ public class ClienteService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "E-mail já cadastrado");
         }
 
-        return clienteRepository.save(new Cliente(nome, cpfCnpj, telefone, email, senha));
+        return clienteRepository.save(new Cliente(nome, cpfCnpj, telefone, email, passwordEncoder.encode(senha)));
+    }
+
+    public Cliente autenticar(String email, String senha) {
+        Cliente cliente = clienteRepository.findByEmail(email);
+        if (cliente == null || senha == null || cliente.getSenha() == null) return null;
+        if (cliente.getSenha().startsWith("$2")) return passwordEncoder.matches(senha, cliente.getSenha()) ? cliente : null;
+        if (cliente.getSenha().equals(senha)) {
+            cliente.setSenha(passwordEncoder.encode(senha)); return clienteRepository.save(cliente);
+        }
+        return null;
     }
 
     public List<Cliente> listar() {

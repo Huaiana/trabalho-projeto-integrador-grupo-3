@@ -7,9 +7,13 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+import org.springframework.beans.factory.annotation.Autowired;
 
 @Configuration
 public class CorsConfig implements WebMvcConfigurer {
+
+    @Autowired(required = false)
+    private SessionAuditInterceptor sessionAuditInterceptor;
 
     private static final Set<String> BASE_ALLOWED_ORIGINS = Set.of(
             "http://localhost:5173",
@@ -40,5 +44,9 @@ public class CorsConfig implements WebMvcConfigurer {
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS")
                 .allowedHeaders("*")
                 .allowCredentials(true);
+    }
+
+    @Override public void addInterceptors(org.springframework.web.servlet.config.annotation.InterceptorRegistry registry) {
+        if (sessionAuditInterceptor != null) registry.addInterceptor(sessionAuditInterceptor);
     }
 }

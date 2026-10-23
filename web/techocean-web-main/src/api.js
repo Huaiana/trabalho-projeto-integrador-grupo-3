@@ -7,6 +7,19 @@ export function resolveApiBaseUrl(env = import.meta.env) {
 }
 
 export const API_BASE_URL = resolveApiBaseUrl();
+let accessToken = null;
+
+export function setAccessToken(token) {
+  accessToken = typeof token === "string" && token.trim() ? token : null;
+}
+
+export function clearAccessToken() {
+  accessToken = null;
+}
+
+export function getAccessToken() {
+  return accessToken;
+}
 
 export class ApiError extends Error {
   constructor(message, status, code = "") {
@@ -17,10 +30,16 @@ export class ApiError extends Error {
   }
 }
 
-export async function apiRequest(path, options = {}) {
+export async function apiRequest(path, options = {}, { authenticated = true } = {}) {
+  let requestOptions = options;
+  if (authenticated && accessToken) {
+    const headers = new Headers(options.headers || {});
+    headers.set("Authorization", `Bearer ${accessToken}`);
+    requestOptions = { ...options, headers };
+  }
   let response;
   try {
-    response = await fetch(`${API_BASE_URL}${path}`, options);
+    response = await fetch(`${API_BASE_URL}${path}`, requestOptions);
   } catch {
     const guidance = import.meta.env?.DEV
       ? "Confirme o Spring Boot em localhost:8080 e o proxy /api do Vite."
@@ -53,12 +72,32 @@ export function post(path, data) {
   });
 }
 
+export function postPublic(path, data) {
+  return apiRequest(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  }, { authenticated: false });
+}
+
+export function postWithHeaders(path, data, headers = {}, { authenticated = true } = {}) {
+  return apiRequest(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...headers },
+    body: JSON.stringify(data),
+  }, { authenticated });
+}
+
 export function put(path, data) {
   return apiRequest(path, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
   });
+}
+
+export function del(path) {
+  return apiRequest(path, { method: "DELETE" });
 }
 
 export function postParams(path, values) {

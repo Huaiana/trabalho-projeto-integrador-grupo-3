@@ -29,6 +29,24 @@ public class OperacaoController {
         return new ResponseEntity<>(operacao, HttpStatus.CREATED);
     }
 
+    public record OperacaoRequest(Long solicitacaoId, Long conteinerId, String responsavel, String andamento, String observacoes) {}
+
+    @PostMapping(consumes = "application/json")
+    public ResponseEntity<Operacao> iniciarJson(@RequestBody OperacaoRequest request) {
+        return new ResponseEntity<>(operacaoService.iniciarOperacao(request.solicitacaoId(), request.conteinerId(), request.responsavel(), request.observacoes()), HttpStatus.CREATED);
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<Operacao> buscarPorId(@PathVariable Long id) { return ResponseEntity.ok(operacaoService.buscarPorId(id)); }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<Operacao> atualizar(@PathVariable Long id, @RequestBody OperacaoRequest request) {
+        return ResponseEntity.ok(operacaoService.atualizar(id, request.solicitacaoId(), request.conteinerId(), request.responsavel(), request.andamento(), request.observacoes()));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> excluir(@PathVariable Long id) { operacaoService.excluir(id); return ResponseEntity.noContent().build(); }
+
     // RF09 - Acompanhamento da operação
     @GetMapping
     public ResponseEntity<List<Operacao>> listarOperacoes() {

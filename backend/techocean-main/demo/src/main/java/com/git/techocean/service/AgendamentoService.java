@@ -10,18 +10,26 @@ import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 @Service
 public class AgendamentoService {
 
     private final AgendamentoRepository agendamentoRepository;
     private final UsuarioRepository usuarioRepository;
+    private final PasswordEncoder passwordEncoder;
 
     public AgendamentoService(
             AgendamentoRepository agendamentoRepository,
-            UsuarioRepository usuarioRepository) {
+            UsuarioRepository usuarioRepository,
+            PasswordEncoder passwordEncoder) {
         this.agendamentoRepository = agendamentoRepository;
         this.usuarioRepository = usuarioRepository;
+        this.passwordEncoder = passwordEncoder;
+    }
+
+    public AgendamentoService(AgendamentoRepository agendamentoRepository, UsuarioRepository usuarioRepository) {
+        this(agendamentoRepository, usuarioRepository, new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder());
     }
 
     @Transactional
@@ -66,14 +74,14 @@ public class AgendamentoService {
             usuario.setNome(request.getNome().trim());
             usuario.setCPFCNPJ(request.getCpf().trim());
             usuario.setEmail(email);
-            usuario.setSenha(request.getSenha());
+            usuario.setSenha(passwordEncoder.encode(request.getSenha()));
             usuario = usuarioRepository.save(usuario);
         } else if (isBlank(request.getSenha())) {
             throw new AgendamentoException(
                     "SENHA_NECESSARIA",
                     "Informe sua senha de usuário para confirmar o agendamento.",
                     HttpStatus.UNAUTHORIZED);
-        } else if (!Objects.equals(usuario.getSenha(), request.getSenha())) {
+        } else if (!senhaValida(usuario, request.getSenha())) {
             throw new AgendamentoException(
                     "SENHA_INVALIDA",
                     "A senha não corresponde ao cadastro deste e-mail.",
@@ -123,5 +131,12 @@ public class AgendamentoService {
 
     private boolean isBlank(String value) {
         return value == null || value.isBlank();
+    }
+
+    private boolean senhaValida(Usuario usuario, String raw) {
+        if (usuario.getSenha() == null) return false;
+        if (usuario.getSenha().startsWith("$2")) return passwordEncoder.matches(raw, usuario.getSenha());
+        if (!Objects.equals(usuario.getSenha(), raw)) return false;
+        usuario.setSenha(passwordEncoder.encode(raw)); usuarioRepository.save(usuario); return true;
     }
 }

@@ -44,8 +44,8 @@ public class ClienteController {
     // RF02 - Login de cliente
     @PostMapping("/login")
     public ResponseEntity<Cliente> loginCliente(@RequestBody Cliente cliente) {
-        Cliente clienteEncontrado = clienteRepository.findByEmail(cliente.getEmail());
-        if (clienteEncontrado != null && clienteEncontrado.getSenha().equals(cliente.getSenha())) {
+        Cliente clienteEncontrado = clienteService.autenticar(cliente.getEmail(), cliente.getSenha());
+        if (clienteEncontrado != null) {
             return new ResponseEntity<>(clienteEncontrado, HttpStatus.OK);
         }
         return new ResponseEntity<>(HttpStatus.UNAUTHORIZED);

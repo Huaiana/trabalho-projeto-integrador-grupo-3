@@ -38,4 +38,22 @@ public class ServicoController {
         Servico servico = servicoService.cadastrar(nome, descricao, categoria, disponivel);
         return new ResponseEntity<>(servico, HttpStatus.CREATED);
     }
+
+    public record ServicoRequest(String nome, String descricao, String categoria, Boolean disponivel) {}
+
+    @PostMapping(consumes = "application/json")
+    public ResponseEntity<Servico> cadastrarJson(@RequestBody ServicoRequest request) {
+        return new ResponseEntity<>(servicoService.cadastrar(request.nome(), request.descricao(), request.categoria(), request.disponivel()), HttpStatus.CREATED);
+    }
+
+    @GetMapping("/todos")
+    public ResponseEntity<List<Servico>> listarTodos() { return ResponseEntity.ok(servicoService.listarTodos()); }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<Servico> atualizar(@PathVariable Long id, @RequestBody ServicoRequest request) {
+        return ResponseEntity.ok(servicoService.atualizar(id, request.nome(), request.descricao(), request.categoria(), request.disponivel()));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> excluir(@PathVariable Long id) { servicoService.excluir(id); return ResponseEntity.noContent().build(); }
 }

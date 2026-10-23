@@ -18,9 +18,7 @@ public class ConteinerService {
     }
 
     public Conteiner cadastrar(String numeroConteiner, String tipo, String situacao) {
-        if (numeroConteiner == null || numeroConteiner.trim().isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Número do contêiner é obrigatório.");
-        }
+        validarObrigatorios(numeroConteiner, tipo, situacao);
         return conteinerRepository.save(new Conteiner(numeroConteiner, tipo, situacao));
     }
 
@@ -29,7 +27,32 @@ public class ConteinerService {
     }
 
     public Conteiner buscarPorId(Long id) {
+        validarId(id);
         return conteinerRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Contêiner não encontrado."));
+    }
+
+    public Conteiner atualizar(Long id, String numeroConteiner, String tipo, String situacao) {
+        validarObrigatorios(numeroConteiner, tipo, situacao);
+        Conteiner conteiner = buscarPorId(id);
+        conteiner.setNumeroConteiner(numeroConteiner.trim());
+        conteiner.setTipo(tipo.trim());
+        conteiner.setSituacao(situacao.trim());
+        return conteinerRepository.save(conteiner);
+    }
+
+    public void excluir(Long id) {
+        conteinerRepository.delete(buscarPorId(id));
+    }
+
+    private void validarObrigatorios(String numeroConteiner, String tipo, String situacao) {
+        if (numeroConteiner == null || numeroConteiner.trim().isEmpty() || tipo == null || tipo.trim().isEmpty()
+                || situacao == null || situacao.trim().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Número, tipo e situação são obrigatórios.");
+        }
+    }
+
+    private void validarId(Long id) {
+        if (id == null || id <= 0) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "ID inválido.");
     }
 }

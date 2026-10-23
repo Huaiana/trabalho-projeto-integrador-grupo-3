@@ -27,6 +27,21 @@ public class ConteinerController {
         return new ResponseEntity<>(conteiner, HttpStatus.CREATED);
     }
 
+    public record ConteinerRequest(String numeroConteiner, String tipo, String situacao) {}
+
+    @PostMapping(consumes = "application/json")
+    public ResponseEntity<Conteiner> cadastrarJson(@RequestBody ConteinerRequest request) {
+        return new ResponseEntity<>(conteinerService.cadastrar(request.numeroConteiner(), request.tipo(), request.situacao()), HttpStatus.CREATED);
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<Conteiner> atualizar(@PathVariable Long id, @RequestBody ConteinerRequest request) {
+        return ResponseEntity.ok(conteinerService.atualizar(id, request.numeroConteiner(), request.tipo(), request.situacao()));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> excluir(@PathVariable Long id) { conteinerService.excluir(id); return ResponseEntity.noContent().build(); }
+
     @GetMapping
     public ResponseEntity<List<Conteiner>> listarConteineres() {
         return new ResponseEntity<>(conteinerService.listar(), HttpStatus.OK);
