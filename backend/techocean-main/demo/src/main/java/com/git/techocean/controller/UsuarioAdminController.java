@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.dao.DataIntegrityViolationException;
 import com.git.techocean.service.AdminBootstrapService;
+import org.springframework.transaction.annotation.Transactional;
 
 @RestController
 @RequestMapping("/admin")
@@ -36,6 +37,7 @@ public class UsuarioAdminController {
     }
 
     @PostMapping("/setup")
+    @Transactional
     public ResponseEntity<UserDto> setup(@RequestHeader(value = "X-Admin-Setup-Token", required = false) String provided,
             @RequestBody StaffRequest request) {
         if (setupToken.isBlank() || !constantTimeEquals(setupToken, provided) || users.countAdmins() != 0)

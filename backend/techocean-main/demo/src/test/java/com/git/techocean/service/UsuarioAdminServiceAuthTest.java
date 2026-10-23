@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 import com.git.techocean.model.UsuarioAdmin;
+import com.git.techocean.repository.AuthSessionRepository;
 import com.git.techocean.repository.UsuarioAdminRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -12,8 +13,9 @@ import org.springframework.web.server.ResponseStatusException;
 
 class UsuarioAdminServiceAuthTest {
     private final UsuarioAdminRepository repository = mock(UsuarioAdminRepository.class);
+    private final AuthSessionRepository sessions = mock(AuthSessionRepository.class);
     private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
-    private final UsuarioAdminService service = new UsuarioAdminService(repository, encoder);
+    private final UsuarioAdminService service = new UsuarioAdminService(repository, encoder, sessions);
 
     @Test void hashesNewStaffPasswordsAndAcceptsSupportedRoles() {
         when(repository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
