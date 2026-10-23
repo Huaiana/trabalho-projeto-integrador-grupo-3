@@ -7,6 +7,11 @@ Abra dois terminais na pasta raiz deste repositório.
 ### Terminal 1 — API Spring Boot
 
 ```powershell
+# Gere um token temporário local para configurar o primeiro administrador.
+$bytes = New-Object byte[] 32
+[System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
+$env:ADMIN_SETUP_TOKEN = [Convert]::ToBase64String($bytes)
+
 cd backend\techocean-main\demo
 .\mvnw.cmd spring-boot:run
 ```
@@ -45,4 +50,6 @@ O sistema não cria uma conta ou senha padrão. Antes do primeiro deploy com a A
 
 Depois do deploy, abra o painel, escolha **Acesso administrativo**, entre na configuração inicial e informe o token junto com nome, e-mail e senha do primeiro administrador. Assim que a conta for criada, remova `ADMIN_SETUP_TOKEN` do serviço do Render e faça novo deploy. O endpoint de configuração também se bloqueia quando já existe um administrador.
 
-Para executar localmente, defina `APP_AUTH_SECRET` e `ADMIN_SETUP_TOKEN` no ambiente do terminal **antes** de iniciar `mvnw`; use valores de teste diferentes dos segredos de produção. Não envie esses valores em mensagens nem os salve no Git.
+O Render exige um `APP_AUTH_SECRET` estável com pelo menos 32 bytes antes de iniciar a API em produção; configure-o como secret no serviço `techocean-api`. Configure `ADMIN_SETUP_TOKEN` como secret temporário, use-o uma única vez na tela inicial e remova-o do ambiente depois que o administrador for criado. Não coloque nenhum desses valores no Git ou em variáveis `VITE_*`, nem os envie em mensagens.
+
+Localmente, o comando acima define apenas um token temporário no terminal atual; a chave de assinatura fica efêmera no perfil de desenvolvimento. Não reutilize esses valores na produção.
