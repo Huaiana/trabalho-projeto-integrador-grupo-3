@@ -121,6 +121,14 @@ function canDeleteOperational() { return roleCapabilities(userRole()).canDeleteO
 export function visibleSectionSlugs(role) { return sections.filter((section) => !section.adminOnly || roleCapabilities(role).canManageStaff).map((section) => section.slug); }
 function visibleSections() { const allowed = new Set(visibleSectionSlugs(userRole())); return sections.filter((section) => allowed.has(section.slug)); }
 
+export function spaNavigationPath(anchorHref, currentHref, event = {}) {
+  if (event.defaultPrevented || (event.button != null && event.button !== 0) || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.target) return null;
+  const destination = new URL(anchorHref, currentHref);
+  const current = new URL(currentHref);
+  if (destination.origin !== current.origin || (destination.pathname === current.pathname && destination.hash) || destination.href === current.href) return null;
+  return `${destination.pathname}${destination.search}${destination.hash}`;
+}
+
 function renderHome() {
   document.title = "Techocean — Amarração e Segurança de Cargas";
   app.innerHTML = `
@@ -640,13 +648,11 @@ function navigateTo(path, { replace = false } = {}) {
 
 if (app) app.addEventListener("click", async (event) => {
   const anchor = event.target.closest("a[href]");
-  if (anchor && !event.defaultPrevented && event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey && !anchor.target) {
-    const destination = new URL(anchor.href, window.location.href);
-    if (destination.origin === window.location.origin && !(destination.pathname === window.location.pathname && destination.hash)) {
-      event.preventDefault();
-      navigateTo(`${destination.pathname}${destination.search}${destination.hash}`);
-      return;
-    }
+  const routeDestination = anchor && spaNavigationPath(anchor.href, window.location.href, { ...event, target: anchor.target });
+  if (routeDestination) {
+    event.preventDefault();
+    navigateTo(routeDestination);
+    return;
   }
   const target = event.target.closest("[data-action], [data-service], [data-close-modal], [data-close-form], [data-reload], [data-status-id]");
   const resourceAction = event.target.closest("[data-resource-action]");
