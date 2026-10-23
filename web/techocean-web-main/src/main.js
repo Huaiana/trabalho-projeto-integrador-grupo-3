@@ -91,6 +91,7 @@ const services = [
 ];
 
 const esc = (value = "") => String(value).replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
+const isSensitiveField = (key) => /^(senha|password|token|accesstoken|refreshtoken|secret)$/i.test(key);
 const routePath = () => window.location.pathname.replace(/\/+$/, "") || "/";
 const valueText = (value) => {
   if (value == null || value === "") return "—";
@@ -256,7 +257,8 @@ function renderReadOnlySection(records, title) {
 }
 
 function resourceFieldMarkup(fieldDefinition, record, editing) {
-  let value = record?.[fieldDefinition.name] ?? "";
+  const aliases = fieldDefinition.name === "cpf" ? ["cpf", "cpfcnpj", "cpfCnpj", "cpfcNPJ"] : [fieldDefinition.name];
+  let value = aliases.map((name) => record?.[name]).find((entry) => entry != null) ?? "";
   if (fieldDefinition.type === "datetime-local" && value) {
     const date = new Date(value);
     if (!Number.isNaN(date.valueOf())) value = new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
@@ -281,7 +283,7 @@ function resourceFormMarkup(slug, record = null) {
 function renderTable(records, columns, title) {
   if (!records.length) return `<div class="empty-state"><span>▱</span><strong>Nenhum registro encontrado</strong><p>A lista de ${esc(title.toLowerCase())} ainda está vazia no servidor.</p></div>`;
   const available = columns?.filter((key) => key in records[0]) || [];
-  const keys = (available.length ? available : Object.keys(records[0])).filter((key) => !["senha", "password"].includes(key.toLowerCase())).slice(0, 8);
+  const keys = (available.length ? available : Object.keys(records[0])).filter((key) => !isSensitiveField(key)).slice(0, 8);
   return `<div class="table-scroll"><table class="records-table"><thead><tr>${keys.map((key) => `<th>${esc(labelFor(key))}</th>`).join("")}${title === "Agendamento" || title === "Solicitação" ? "<th>Ação</th>" : ""}</tr></thead><tbody>${records.map((item) => `<tr>${keys.map((key) => `<td>${statusPill(key, item[key])}</td>`).join("")}${title === "Agendamento" || title === "Solicitação" ? `<td>${item.id ? `<button class="small-action" data-status-id="${esc(item.id)}" data-status="${String(item.status).toLowerCase() === "true" || String(item.status).toLowerCase() === "confirmado" ? "pendente" : "confirmado"}">${String(item.status).toLowerCase() === "true" || String(item.status).toLowerCase() === "confirmado" ? "Marcar pendente" : "Confirmar"}</button>` : "—"}</td>` : ""}</tr>`).join("")}</tbody></table></div>`;
 }
 
@@ -362,7 +364,7 @@ function dismissModal() {
 }
 
 function recordDetailsMarkup(record) {
-  return `<dl class="record-details">${Object.entries(record).filter(([key]) => !["senha", "password"].includes(key.toLowerCase())).map(([key, value]) => `<div><dt>${esc(labelFor(key))}</dt><dd>${valueText(value)}</dd></div>`).join("")}</dl>`;
+  return `<dl class="record-details">${Object.entries(record).filter(([key]) => !isSensitiveField(key)).map(([key, value]) => `<div><dt>${esc(labelFor(key))}</dt><dd>${valueText(value)}</dd></div>`).join("")}</dl>`;
 }
 
 function printRecord(record, title) {
