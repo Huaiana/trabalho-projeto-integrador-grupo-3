@@ -6,6 +6,7 @@ import {
   renderResourceTable,
   roleCapabilities,
   scrollActiveChipIntoView,
+  spaNavigationPath,
   trapFocusWithinModal,
   visibleSectionSlugs,
 } from "../src/main.js";
@@ -102,6 +103,13 @@ describe("DOM interface helpers", () => {
     expect(roleCapabilities("FUNCIONARIO")).toMatchObject({ canReadOperational: true, canCreateOperational: true, canUpdateOperational: true, canDeleteOperational: false, canManageStaff: false });
     expect(visibleSectionSlugs("FUNCIONARIO")).not.toEqual(expect.arrayContaining(["usuario", "auditoria", "sessoes"]));
     expect(visibleSectionSlugs("ADMIN")).toEqual(expect.arrayContaining(["usuario", "auditoria", "sessoes"]));
+  });
+
+  it("uses history navigation for same-origin routes but leaves modified and in-page links alone", () => {
+    expect(spaNavigationPath("/dashboard/carga", "https://techocean.example/")) .toBe("/dashboard/carga");
+    expect(spaNavigationPath("/admin/login", "https://techocean.example/dashboard", { ctrlKey: true })).toBeNull();
+    expect(spaNavigationPath("https://external.example/", "https://techocean.example/" )).toBeNull();
+    expect(spaNavigationPath("/#servicos", "https://techocean.example/" )).toBeNull();
   });
 
   it("renders operational CRUD actions by role and escapes returned fields", () => {

@@ -648,7 +648,15 @@ function navigateTo(path, { replace = false } = {}) {
 
 if (app) app.addEventListener("click", async (event) => {
   const anchor = event.target.closest("a[href]");
-  const routeDestination = anchor && spaNavigationPath(anchor.href, window.location.href, { ...event, target: anchor.target });
+  const routeDestination = anchor && spaNavigationPath(anchor.href, window.location.href, {
+    defaultPrevented: event.defaultPrevented,
+    button: event.button,
+    metaKey: event.metaKey,
+    ctrlKey: event.ctrlKey,
+    shiftKey: event.shiftKey,
+    altKey: event.altKey,
+    target: anchor.target,
+  });
   if (routeDestination) {
     event.preventDefault();
     navigateTo(routeDestination);
