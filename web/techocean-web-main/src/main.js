@@ -19,7 +19,7 @@ const sections = [
   { slug: "usuario", name: "Equipe", description: "Contas e permissões da equipe.", endpoint: "/admin/usuarios", columns: ["id", "nome", "email", "cargo"], resource: true, adminOnly: true },
   { slug: "auditoria", name: "Auditoria", description: "Registro de atividades administrativas.", endpoint: "/admin/auditoria", adminOnly: true },
   { slug: "sessoes", name: "Sessões", description: "Sessões administrativas ativas e recentes.", endpoint: "/admin/sessoes", adminOnly: true },
-  { slug: "servico", name: "Serviço", description: "Serviços oferecidos.", endpoint: "/servicos", columns: ["id", "nome", "descricao", "categoria", "disponivel"], resource: true },
+  { slug: "servico", name: "Serviço", description: "Serviços oferecidos.", endpoint: "/servicos/todos", columns: ["id", "nome", "descricao", "categoria", "disponivel"], resource: true },
   { slug: "solicitacao", name: "Solicitação", description: "Solicitações recebidas.", endpoint: "/solicitacoes", columns: ["id", "cliente", "carga", "servico", "status"] },
   { slug: "agendamento", name: "Agendamento", description: "Solicitações de visita técnica.", endpoint: "/agendamentos", columns: ["id", "nome", "email", "telefone", "dataHora", "status"], resource: true },
 ];

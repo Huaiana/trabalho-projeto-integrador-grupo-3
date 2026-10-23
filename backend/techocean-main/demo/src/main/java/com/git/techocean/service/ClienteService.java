@@ -9,6 +9,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import com.git.techocean.model.Cliente;
 import com.git.techocean.repository.ClienteRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.dao.DataIntegrityViolationException;
 
 @Service
 public class ClienteService {
@@ -53,6 +55,43 @@ public class ClienteService {
     public Cliente buscarPorId(Long id) {
         return clienteRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Cliente " + id + " não encontrado"));
+    }
+
+    @Transactional
+    public Cliente atualizar(Long id, String nome, String cpfCnpj, String telefone, String email, String senha) {
+        if (nome == null || nome.isBlank()) throw erro("O campo 'nome' é obrigatório.");
+        if (cpfCnpj == null || cpfCnpj.isBlank()) throw erro("O campo 'cpf' é obrigatório.");
+        if (telefone == null || telefone.isBlank()) throw erro("O campo 'telefone' é obrigatório.");
+        if (email == null || email.isBlank()) throw erro("O campo 'email' é obrigatório.");
+
+        Cliente cliente = buscarPorId(id);
+        String emailNormalizado = email.trim().toLowerCase(java.util.Locale.ROOT);
+        Cliente donoDoEmail = clienteRepository.findByEmail(emailNormalizado);
+        if (donoDoEmail != null && !donoDoEmail.getId().equals(id)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "E-mail já cadastrado.");
+        }
+
+        cliente.setNome(nome.trim());
+        cliente.setCPFCNPJ(cpfCnpj.trim());
+        cliente.setTelefone(telefone.trim());
+        cliente.setEmail(emailNormalizado);
+        if (senha != null && !senha.isBlank()) {
+            if (senha.length() < 8) throw erro("A senha precisa ter pelo menos 8 caracteres.");
+            cliente.setSenha(passwordEncoder.encode(senha));
+        }
+        return clienteRepository.save(cliente);
+    }
+
+    @Transactional
+    public void excluir(Long id) {
+        Cliente cliente = buscarPorId(id);
+        try {
+            clienteRepository.delete(cliente);
+            clienteRepository.flush();
+        } catch (DataIntegrityViolationException ex) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "O cliente possui solicitações, orçamentos ou mensagens vinculadas e não pode ser excluído.");
+        }
     }
 
     private void validarCamposObrigatorios(

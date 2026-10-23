@@ -66,28 +66,30 @@ describe("API client", () => {
     const payload = { usuarioId: 21, telefone: "13999990000", dataHora: "2026-10-25T10:30:00", confirmado: true };
     const fetchMock = vi.fn().mockResolvedValue(Response.json({ id: 4, ...payload }, { status: 201 }));
     vi.stubGlobal("fetch", fetchMock);
+    setAccessToken("manager-token");
 
     await createManagedAppointment(payload);
 
-    expect(fetchMock).toHaveBeenCalledWith(`${API_BASE_URL}/agendamentos/gerenciamento`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+    const [url, options] = fetchMock.mock.calls[0];
+    expect(url).toBe(`${API_BASE_URL}/agendamentos/gerenciamento`);
+    expect(options.method).toBe("POST");
+    expect(options.headers.get("Authorization")).toBe("Bearer manager-token");
+    expect(options.body).toBe(JSON.stringify(payload));
   });
 
   it("updates managed appointments with PUT /agendamentos/{id} and the same DTO", async () => {
     const payload = { usuarioId: 21, telefone: "13999990000", dataHora: "2026-10-25T10:30:00", confirmado: false };
     const fetchMock = vi.fn().mockResolvedValue(Response.json({ id: 4, ...payload }));
     vi.stubGlobal("fetch", fetchMock);
+    setAccessToken("manager-token");
 
     await updateManagedAppointment("4/5", payload);
 
-    expect(fetchMock).toHaveBeenCalledWith(`${API_BASE_URL}/agendamentos/4%2F5`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+    const [url, options] = fetchMock.mock.calls[0];
+    expect(url).toBe(`${API_BASE_URL}/agendamentos/4%2F5`);
+    expect(options.method).toBe("PUT");
+    expect(options.headers.get("Authorization")).toBe("Bearer manager-token");
+    expect(options.body).toBe(JSON.stringify(payload));
   });
 
   it("adds the in-memory Bearer token to protected API requests", async () => {

@@ -7,7 +7,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import com.git.techocean.model.Cliente;
-import com.git.techocean.repository.ClienteRepository;
 import com.git.techocean.service.ClienteService;
 
 @RestController
@@ -15,11 +14,9 @@ import com.git.techocean.service.ClienteService;
 public class ClienteController {
 
     private final ClienteService clienteService;
-    private final ClienteRepository clienteRepository;
 
-    public ClienteController(ClienteService clienteService, ClienteRepository clienteRepository) {
+    public ClienteController(ClienteService clienteService) {
         this.clienteService = clienteService;
-        this.clienteRepository = clienteRepository;
     }
 
     // RF01 - Cadastrar cliente
@@ -64,17 +61,15 @@ public class ClienteController {
 
     // RF22 - Editar ou atualizar dados de cliente
     @PutMapping("/{id}")
-    public ResponseEntity<Cliente> atualizarCliente(@PathVariable Long id, @RequestBody Cliente clienteAtualizado) {
-        Cliente clienteExistente = clienteRepository.findById(id).orElse(null);
-        if (clienteExistente != null) {
-            clienteExistente.setNome(clienteAtualizado.getNome());
-            clienteExistente.setEmail(clienteAtualizado.getEmail());
-            clienteExistente.setTelefone(clienteAtualizado.getTelefone());
-            clienteExistente.setCPFCNPJ(clienteAtualizado.getCPFCNPJ());
-            Cliente clienteSalvo = clienteRepository.save(clienteExistente);
-            return new ResponseEntity<>(clienteSalvo, HttpStatus.OK);
-        }
-        return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+    public ResponseEntity<Cliente> atualizarCliente(@PathVariable Long id, @RequestBody AtualizarClienteRequest request) {
+        Cliente cliente = clienteService.atualizar(id, request.nome(), request.cpf(), request.telefone(), request.email(), request.senha());
+        return new ResponseEntity<>(cliente, HttpStatus.OK);
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> excluirCliente(@PathVariable Long id) {
+        clienteService.excluir(id);
+        return ResponseEntity.noContent().build();
     }
 
     public record CadastroClienteRequest(
@@ -83,5 +78,8 @@ public class ClienteController {
             String telefone,
             String email,
             String senha) {
+    }
+
+    public record AtualizarClienteRequest(String nome, String cpf, String telefone, String email, String senha) {
     }
 }
