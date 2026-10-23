@@ -44,7 +44,7 @@ const resourceDefinitions = {
     ],
   },
   operacao: {
-    endpoint: "/operacoes", singular: "operação", createMode: "params", updateMode: "andamento", updateFields: ["andamento", "observacoes"],
+    endpoint: "/operacoes", singular: "operação", createMode: "params",
     fields: [
       { name: "solicitacaoId", label: "Código da solicitação", type: "number", required: true },
       { name: "conteinerId", label: "Código do contêiner", type: "number" },
