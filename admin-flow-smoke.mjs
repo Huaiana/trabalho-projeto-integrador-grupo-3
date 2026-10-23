@@ -85,7 +85,7 @@ try {
   const adminEmail = `admin.${Date.now()}@example.test`;
   const adminPassword = "SmokeAdmin123";
   await evaluate(`(() => { const f=document.querySelector('form[data-form="admin-setup"]'); f.elements.namedItem("setupToken").value=${JSON.stringify(setupToken)}; f.elements.namedItem("nome").value="Admin Smoke"; f.elements.namedItem("email").value=${JSON.stringify(adminEmail)}; f.elements.namedItem("senha").value=${JSON.stringify(adminPassword)}; f.requestSubmit(); return true; })()`);
-  await waitDom("setup completed", `location.pathname === "/admin/login"`);
+  await waitDom("setup completed", `location.pathname === "/dashboard/acesso-admin"`);
   assert(true, "first administrator is provisioned through the one-time setup token in the UI");
 
   await evaluate(`(() => { const f=document.querySelector('form[data-form="admin-login"]'); f.elements.namedItem("email").value=${JSON.stringify(adminEmail)}; f.elements.namedItem("senha").value=${JSON.stringify(adminPassword)}; f.requestSubmit(); return true; })()`);
@@ -102,6 +102,38 @@ try {
   await evaluate(`(() => { const f=document.querySelector('form[data-form="resource"][data-resource="usuario"]'); f.elements.namedItem("nome").value="Funcionário Smoke"; f.elements.namedItem("email").value=${JSON.stringify(employeeEmail)}; f.elements.namedItem("cargo").value="FUNCIONARIO"; f.elements.namedItem("senha").value="StaffSmoke123"; f.requestSubmit(); return true; })()`);
   await waitDom("staff account created", `document.querySelector('#section-content')?.textContent.includes(${JSON.stringify(employeeEmail)})`);
   assert(true, "admin creates a staff account through POST /admin/usuarios");
+
+  await evaluate(`(() => { const a=document.querySelector('.sidebar a[href="/dashboard/conteiner"]'); a?.click(); return !!a; })()`);
+  await waitDom("container section", `document.querySelector('#section-content')?.textContent.includes("Nenhum registro")`);
+  await evaluate(`document.querySelector('[data-action="new-resource"][data-resource="conteiner"]').click()`);
+  const containerNumber = `SMOKE-${Date.now()}`;
+  await evaluate(`(() => { const f=document.querySelector('form[data-form="resource"][data-resource="conteiner"]'); f.elements.namedItem("numeroConteiner").value=${JSON.stringify(containerNumber)}; f.elements.namedItem("tipo").value="40 HC"; f.elements.namedItem("situacao").value="VAZIO"; f.requestSubmit(); return true; })()`);
+  await waitDom("container created by panel", `document.querySelector('#section-content')?.textContent.includes(${JSON.stringify(containerNumber)})`);
+  await evaluate(`(() => { const row=[...document.querySelectorAll("#section-content tbody tr")].find(r=>r.textContent.includes(${JSON.stringify(containerNumber)})); row?.querySelector('[data-resource-action="edit"]').click(); return !!row; })()`);
+  await waitDom("container edit form", `!!document.querySelector('form[data-form="resource"][data-resource="conteiner"]')`);
+  await evaluate(`(() => { const f=document.querySelector('form[data-form="resource"][data-resource="conteiner"]'); f.elements.namedItem("tipo").value="20 DRY"; f.requestSubmit(); return true; })()`);
+  await waitDom("container updated by panel", `document.querySelector('#section-content')?.textContent.includes("20 DRY")`);
+  await evaluate(`window.confirm=()=>true; const row=[...document.querySelectorAll("#section-content tbody tr")].find(r=>r.textContent.includes(${JSON.stringify(containerNumber)})); row?.querySelector('[data-resource-action="delete"]').click(); !!row`);
+  await waitDom("container deleted by panel", `!document.querySelector('#section-content')?.textContent.includes(${JSON.stringify(containerNumber)})`);
+  assert(true, "dashboard container create/update/delete calls the protected controllers");
+
+  const bookingDate = new Date(Date.now() + 86400000).toISOString().slice(0, 16);
+  const publicBookingResponse = await fetch(`${apiUrl}/agendamentos`, { method: "POST", headers: { "Content-Type": "application/json", Origin: origin }, body: JSON.stringify({ nome: "Cliente Agenda Smoke", cpf: "12345678901", telefone: "11977770000", email: `agenda.${Date.now()}@example.test`, senha: "AgendaSmoke123", dataHora: bookingDate, confirmacao: true }) });
+  if (!publicBookingResponse.ok) throw new Error(`Public appointment signup failed with HTTP ${publicBookingResponse.status}`);
+  const adminApiLogin = await fetch(`${apiUrl}/admin/login`, { method: "POST", headers: { "Content-Type": "application/json", Origin: origin }, body: JSON.stringify({ email: adminEmail, senha: adminPassword }) });
+  const adminApiToken = (await adminApiLogin.json()).accessToken;
+  const accountsResponse = await fetch(`${apiUrl}/agendamentos/usuarios`, { headers: { Authorization: `Bearer ${adminApiToken}`, Origin: origin } });
+  const accounts = await accountsResponse.json();
+  const appointmentAccount = accounts.find((account) => account.email.startsWith("agenda."));
+  if (!appointmentAccount) throw new Error("Appointment customer account was not available to staff");
+  await evaluate(`(() => { const a=document.querySelector('.sidebar a[href="/dashboard/agendamento"]'); a?.click(); return !!a; })()`);
+  await waitDom("appointments section", `!!document.querySelector('[data-action="new-resource"][data-resource="agendamento"]')`);
+  await evaluate(`document.querySelector('[data-action="new-resource"][data-resource="agendamento"]').click()`);
+  await waitDom("appointment create form", `!!document.querySelector('form[data-form="resource"][data-resource="agendamento"]')`);
+  const managedPhone = `1196666${String(Date.now()).slice(-4)}`;
+  await evaluate(`(() => { const f=document.querySelector('form[data-form="resource"][data-resource="agendamento"]'); f.elements.namedItem("usuarioId").value="${appointmentAccount.id}"; f.elements.namedItem("telefone").value="${managedPhone}"; f.elements.namedItem("dataHora").value="${bookingDate}"; f.elements.namedItem("confirmado").value="false"; f.requestSubmit(); return true; })()`);
+  await waitDom("appointment created by staff UI", `document.querySelector('#section-content')?.textContent.includes("${managedPhone}")`);
+  assert(true, "staff appointment form uses the protected management endpoint and customer selector");
 
   const userResponse = await fetch(`${apiUrl}/admin/login`, { method: "POST", headers: { "Content-Type": "application/json", Origin: origin }, body: JSON.stringify({ email: employeeEmail, senha: "StaffSmoke123" }) });
   if (!userResponse.ok) throw new Error(`Staff login failed with HTTP ${userResponse.status}`);
