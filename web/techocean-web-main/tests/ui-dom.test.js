@@ -3,8 +3,11 @@ import {
   clearRegistrationValidation,
   closeModal,
   renderMessages,
+  renderResourceTable,
+  roleCapabilities,
   scrollActiveChipIntoView,
   trapFocusWithinModal,
+  visibleSectionSlugs,
 } from "../src/main.js";
 
 describe("DOM interface helpers", () => {
@@ -91,5 +94,26 @@ describe("DOM interface helpers", () => {
 
     expect(root.replaceChildren).toHaveBeenCalledOnce();
     expect(opener.focus).toHaveBeenCalledOnce();
+  });
+
+  it("applies staff role permissions to operational deletion and admin-only sections", () => {
+    expect(roleCapabilities("ADMIN")).toMatchObject({ canDeleteOperational: true, canManageStaff: true, canViewAudit: true, canViewSessions: true });
+    expect(roleCapabilities("SUPERVISOR")).toMatchObject({ canCreateOperational: true, canUpdateOperational: true, canDeleteOperational: true, canManageStaff: false, canViewAudit: false });
+    expect(roleCapabilities("FUNCIONARIO")).toMatchObject({ canReadOperational: true, canCreateOperational: true, canUpdateOperational: true, canDeleteOperational: false, canManageStaff: false });
+    expect(visibleSectionSlugs("FUNCIONARIO")).not.toEqual(expect.arrayContaining(["usuario", "auditoria", "sessoes"]));
+    expect(visibleSectionSlugs("ADMIN")).toEqual(expect.arrayContaining(["usuario", "auditoria", "sessoes"]));
+  });
+
+  it("renders operational CRUD actions by role and escapes returned fields", () => {
+    const record = { id: 4, numeroConteiner: '<img src=x onerror="alert(1)">', tipo: "40 HC", situacao: "Disponível" };
+    const staffMarkup = renderResourceTable([record], "conteiner", "FUNCIONARIO");
+    const supervisorMarkup = renderResourceTable([record], "conteiner", "SUPERVISOR");
+
+    expect(staffMarkup).toContain('data-resource-action="view"');
+    expect(staffMarkup).toContain('data-resource-action="edit"');
+    expect(staffMarkup).not.toContain('data-resource-action="delete"');
+    expect(supervisorMarkup).toContain('data-resource-action="delete"');
+    expect(staffMarkup).not.toContain('<img src=x');
+    expect(staffMarkup).toContain("&lt;img");
   });
 });

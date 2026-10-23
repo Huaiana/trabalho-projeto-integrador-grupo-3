@@ -10,7 +10,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
-import java.util.Objects;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -63,7 +62,10 @@ public class UsuarioAdminController {
         UsuarioAdmin user = users.findById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         user.setNome(request.nome()); user.setEmail(request.email().trim().toLowerCase(Locale.ROOT));
         if (request.senha() != null && !request.senha().isBlank()) user.setSenha(new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder().encode(request.senha()));
-        if (request.cargo() != null) user.setCargo(request.cargo().trim().toUpperCase(Locale.ROOT));
+        if (request.cargo() != null) {
+            try { user.setCargo(com.git.techocean.model.StaffRole.valueOf(request.cargo().trim().toUpperCase(Locale.ROOT)).name()); }
+            catch (IllegalArgumentException ex) { throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cargo inválido."); }
+        }
         return UserDto.from(users.save(user));
     }
     @DeleteMapping("/usuarios/{id}") public ResponseEntity<Void> deleteUser(@PathVariable Long id) {
