@@ -41,16 +41,23 @@ npm run lint
 
 Se a API estiver em outra porta, atualize o `target` do proxy em `web/techocean-web-main/vite.config.js` e reinicie o Vite. `VITE_API_URL` permanece definido para o endpoint remoto no build de produção.
 
+## Publicação
+
+- **Frontend:** Cloudflare Pages, diretório `web/techocean-web-main`, comando `npm ci && npm run build`, saída `dist`. Defina `VITE_API_URL` como a URL HTTPS pública da API Railway.
+- **API e banco:** Railway com o serviço Docker em `backend/techocean-main/demo` e um PostgreSQL no mesmo projeto. Configure `SPRING_PROFILES_ACTIVE=production`, as variáveis `DB_*` ligadas às variáveis `PG*` do PostgreSQL, `APP_AUTH_SECRET` e `CORS_ALLOWED_ORIGIN_PATTERNS` com o domínio Pages do site. As instruções completas estão em `backend/techocean-main/README.md`.
+
+O banco novo começa vazio. Exporte/import os dados do banco antigo antes de direcionar o tráfego se precisar preservá-los.
+
 ## Primeiro acesso administrativo
 
-O sistema não cria uma conta ou senha padrão. Antes do primeiro deploy com a API protegida, configure no serviço `techocean-api` do Render, como variáveis **secretas**:
+O sistema não cria uma conta ou senha padrão. Antes do primeiro deploy com a API protegida, configure no serviço da API no Railway, como variáveis **secretas**:
 
 - `APP_AUTH_SECRET`: chave aleatória estável de pelo menos 32 bytes. Mantenha o mesmo valor entre reinícios e não a coloque no repositório nem em variáveis `VITE_*`.
 - `ADMIN_SETUP_TOKEN`: token aleatório temporário para criar o primeiro administrador.
 
-Depois do deploy, abra o painel, escolha **Acesso administrativo**, entre na configuração inicial e informe o token junto com nome, e-mail e senha do primeiro administrador. Assim que a conta for criada, remova `ADMIN_SETUP_TOKEN` do serviço do Render e faça novo deploy. O endpoint de configuração também se bloqueia quando já existe um administrador.
+Depois do deploy, abra o painel, escolha **Acesso administrativo**, entre na configuração inicial e informe o token junto com nome, e-mail e senha do primeiro administrador. Assim que a conta for criada, remova `ADMIN_SETUP_TOKEN` do serviço Railway e faça novo deploy. O endpoint de configuração também se bloqueia quando já existe um administrador.
 
-O Render exige um `APP_AUTH_SECRET` estável com pelo menos 32 bytes antes de iniciar a API em produção; configure-o como secret no serviço `techocean-api`. Configure `ADMIN_SETUP_TOKEN` como secret temporário, use-o uma única vez na tela inicial e remova-o do ambiente depois que o administrador for criado. Não coloque nenhum desses valores no Git ou em variáveis `VITE_*`, nem os envie em mensagens.
+O Railway exige um `APP_AUTH_SECRET` estável com pelo menos 32 bytes antes de iniciar a API em produção; configure-o como secret no serviço da API. Configure `ADMIN_SETUP_TOKEN` como secret temporário, use-o uma única vez na tela inicial e remova-o do ambiente depois que o administrador for criado. Não coloque nenhum desses valores no Git ou em variáveis `VITE_*`, nem os envie em mensagens.
 
 Localmente, o comando acima define apenas um token temporário no terminal atual; a chave de assinatura fica efêmera no perfil de desenvolvimento. Não reutilize esses valores na produção.
 

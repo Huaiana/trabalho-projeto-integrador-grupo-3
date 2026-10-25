@@ -75,17 +75,20 @@ npm run build
 npm run preview
 ```
 
-### Publicar a API no Render
+### Publicar no Cloudflare Pages e Railway
 
-O Blueprint em `backend/techocean-main/render.yaml` prepara o frontend estático, a API Spring Boot e um banco PostgreSQL de teste no Render. O frontend é compilado a partir de `web/techocean-web-main/` e usa `VITE_API_URL` definido no serviço do Render:
+O frontend estático é publicado no Cloudflare Pages; a API Java/Spring Boot e o PostgreSQL são executados no Railway. O arquivo `demo/railway.toml` configura o Dockerfile e o healthcheck da API. No monorepo, configure o serviço Railway assim:
 
-1. No Render, crie ou sincronize o Blueprint do repositório `Huaiana/techocean`, apontando o arquivo Blueprint para `backend/techocean-main/render.yaml`, e confirme os recursos definidos nele.
-2. Aguarde `techocean-api` e `techocean-site` ficarem disponíveis. O site será publicado em `https://techocean-site.onrender.com` e usa `https://techocean-api.onrender.com` para as chamadas da API.
-3. O site também pode ser publicado no Lovable: mantenha o projeto conectado à branch `main` do GitHub, sincronize os commits e use **Publish** no projeto.
+1. Crie um projeto no Railway e adicione um serviço PostgreSQL. O banco e a API devem estar no mesmo projeto e ambiente.
+2. Adicione um serviço a partir do repositório GitHub para a API. Defina o **Root Directory** como `/backend/techocean-main/demo` e o **Railway Config File** como `/backend/techocean-main/demo/railway.toml`. O Dockerfile selecionado é `Dockerfile`.
+3. No serviço da API, defina `SPRING_PROFILES_ACTIVE=production`, `APP_AUTH_SECRET` (secreto estável de pelo menos 32 bytes) e `CORS_ALLOWED_ORIGIN_PATTERNS=https://techocean-web.pages.dev,https://*.techocean-web.pages.dev`. Se usar domínio próprio, inclua sua origem HTTPS nessa lista.
+4. Crie variáveis de referência para o banco usando o nome exato do serviço PostgreSQL (o exemplo usa `Postgres`): `DB_HOST=${{Postgres.PGHOST}}`, `DB_PORT=${{Postgres.PGPORT}}`, `DB_NAME=${{Postgres.PGDATABASE}}`, `DB_USER=${{Postgres.PGUSER}}` e `DB_PASSWORD=${{Postgres.PGPASSWORD}}`. Não exponha essas credenciais. Gere um domínio público para a API no Railway e confirme que `https://<domínio-da-api>/actuator/health` responde com status saudável.
+5. No Cloudflare Pages, conecte o repositório e use Root Directory `web/techocean-web-main`, build command `npm ci && npm run build` e build output directory `dist`. Defina `VITE_API_URL` como a URL pública HTTPS da API Railway (sem caminho final). A configuração `wrangler.toml` informa a pasta de saída e `public/_redirects` mantém o fallback da SPA.
+6. Depois que o Cloudflare Pages criar o site, confirme a URL do projeto Pages e mantenha essa origem em `CORS_ALLOWED_ORIGIN_PATTERNS` no Railway. Após qualquer mudança nas variáveis, redeploy os serviços afetados.
 
-Os serviços Render usam planos gratuitos para teste. Podem suspender após inatividade e o banco gratuito é temporário; não use essa configuração para dados importantes ou de produção. O banco criado no Render começa vazio: dados gravados apenas no H2 local não são copiados.
+Para configurar o primeiro administrador, defina também `ADMIN_SETUP_TOKEN` como variável **secreta e temporária** no Railway. Use-o uma vez na tela **Acesso administrativo** e remova-o logo após a criação da conta. O banco PostgreSQL novo começa vazio; dados locais ou do banco antigo não são copiados automaticamente. Faça exportação e importação dos dados antes de trocar o tráfego se houver dados a preservar.
 
-Para desenvolvimento local depois da publicação, mantenha o proxy Vite apontando para a API local (`http://127.0.0.1:8080` por padrão). O valor de `VITE_API_URL` definido no ambiente de build do provedor aponta o frontend publicado para a API remota.
+Para desenvolvimento local depois da publicação, mantenha o proxy Vite apontando para a API local (`http://127.0.0.1:8080` por padrão). `VITE_API_URL` só é necessário no build publicado.
 
 ## API REST
 

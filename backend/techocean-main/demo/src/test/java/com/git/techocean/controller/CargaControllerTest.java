@@ -33,7 +33,7 @@ import org.springframework.test.context.TestPropertySource;
 
 @WebMvcTest(CargaController.class)
 @Import({CorsConfig.class, SecurityConfig.class})
-@TestPropertySource(properties = "CORS_ALLOWED_ORIGIN_PATTERNS=https://extra-origin.example")
+@TestPropertySource(properties = "CORS_ALLOWED_ORIGIN_PATTERNS=https://extra-origin.example,https://techocean-web.pages.dev")
 class CargaControllerTest {
 
     @Autowired
@@ -80,7 +80,7 @@ class CargaControllerTest {
 
     @Test
     void allowsConfiguredSiteOriginEvenWhenAnExtraCorsOriginIsConfigured() throws Exception {
-        String siteOrigin = "https://techocean-site.onrender.com";
+        String siteOrigin = "https://techocean-web.pages.dev";
 
         mockMvc.perform(options("/cargas")
                         .header(HttpHeaders.ORIGIN, siteOrigin)

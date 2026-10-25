@@ -4,10 +4,11 @@ import { apiRequest, getAppointmentAccounts, createManagedAppointment, updateMan
 afterEach(() => { vi.unstubAllGlobals(); clearAccessToken(); });
 
 describe("API client", () => {
-  it("uses the same-origin Vite proxy in development and the deployed API in production by default", () => {
+  it("uses the same-origin Vite proxy in development and requires a production API URL", () => {
     expect(resolveApiBaseUrl({ DEV: true })).toBe(LOCAL_API_URL);
     expect(LOCAL_API_URL).toBe("/api");
-    expect(resolveApiBaseUrl({ DEV: false })).toBe(PRODUCTION_API_URL);
+    expect(resolveApiBaseUrl({ DEV: false })).toBe("");
+    expect(PRODUCTION_API_URL).toBe("");
   });
 
   it("prefers VITE_API_URL over environment defaults", () => {

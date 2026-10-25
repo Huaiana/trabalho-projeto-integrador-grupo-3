@@ -1,5 +1,6 @@
 export const LOCAL_API_URL = "/api";
-export const PRODUCTION_API_URL = "https://techocean-api.onrender.com";
+// Production deployments must provide VITE_API_URL at build time.
+export const PRODUCTION_API_URL = "";
 
 export function resolveApiBaseUrl(env = import.meta.env) {
   const configuredBase = env?.VITE_API_URL || (env?.DEV ? LOCAL_API_URL : PRODUCTION_API_URL);
