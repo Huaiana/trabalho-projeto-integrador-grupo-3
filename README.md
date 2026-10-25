@@ -39,14 +39,14 @@ npm test
 npm run lint
 ```
 
-Se a API estiver em outra porta, atualize o `target` do proxy em `web/techocean-web-main/vite.config.js` e reinicie o Vite. `VITE_API_URL` permanece definido para o endpoint remoto no build de produção.
+Se a API estiver em outra porta, atualize o `target` do proxy em `web/techocean-web-main/vite.config.js` e reinicie o Vite. No deploy, defina `VITE_API_URL` no ambiente de build do Cloudflare Pages para o endpoint remoto.
 
 ## Publicação
 
 - **Frontend:** Cloudflare Pages, diretório `web/techocean-web-main`, comando `npm ci && npm run build`, saída `dist`. Defina `VITE_API_URL` como a URL HTTPS pública da API Railway.
 - **API e banco:** Railway com o serviço Docker em `backend/techocean-main/demo` e um PostgreSQL no mesmo projeto. Configure `SPRING_PROFILES_ACTIVE=production`, as variáveis `DB_*` ligadas às variáveis `PG*` do PostgreSQL, `APP_AUTH_SECRET` e `CORS_ALLOWED_ORIGIN_PATTERNS` com o domínio Pages do site. As instruções completas estão em `backend/techocean-main/README.md`.
 
-O banco novo começa vazio. Exporte/import os dados do banco antigo antes de direcionar o tráfego se precisar preservá-los.
+O banco novo começa vazio. Exporte e importe os dados do banco antigo antes de direcionar o tráfego se precisar preservá-los.
 
 ## Primeiro acesso administrativo
 
