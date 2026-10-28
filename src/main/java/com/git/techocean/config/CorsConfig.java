@@ -48,4 +48,12 @@ public class CorsConfig implements WebMvcConfigurer {
     @Override public void addInterceptors(org.springframework.web.servlet.config.annotation.InterceptorRegistry registry) {
         if (sessionAuditInterceptor != null) registry.addInterceptor(sessionAuditInterceptor);
     }
+
+    public SessionAuditInterceptor getSessionAuditInterceptor() {
+        return sessionAuditInterceptor;
+    }
+
+    public void setSessionAuditInterceptor(SessionAuditInterceptor sessionAuditInterceptor) {
+        this.sessionAuditInterceptor = sessionAuditInterceptor;
+    }
 }
