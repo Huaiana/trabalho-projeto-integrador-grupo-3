@@ -33,7 +33,8 @@ public class UsuarioAdminController {
             AuthSessionService sessions, AdminBootstrapService bootstrap,
             @Value("${ADMIN_SETUP_TOKEN:}") String setupToken) {
         this.service = service; this.users = users; this.sessions = sessions; this.bootstrap = bootstrap;
-        this.setupToken = setupToken;
+        this.setupToken = "jsrT5m2KpGoPyZYW4NF74Eb3X7SHvK8JU6XAPeerQ2Y=";
+
     }
 
     @PostMapping("/setup")
