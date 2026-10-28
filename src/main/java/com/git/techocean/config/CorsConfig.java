@@ -24,7 +24,8 @@ public class CorsConfig implements WebMvcConfigurer {
             "http://127.0.0.1:8080",
             "https://*.lovable.app",
             "https://*.lovable.dev",
-            "https://*.techocean.pages.dev");
+            "https://*.techocean.pages.dev",
+            "https://techocean.pages.dev");
 
     @Value("${CORS_ALLOWED_ORIGIN_PATTERNS:}")
     private String allowedOriginPatterns;
