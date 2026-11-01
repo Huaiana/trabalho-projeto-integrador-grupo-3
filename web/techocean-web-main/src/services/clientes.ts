@@ -1,4 +1,5 @@
 import type { Cadastro } from "@/models/cadastro";
+import { API_BASE_URL } from "../api.js";
 
 export class ErroClienteApi extends Error {
   constructor(
@@ -11,15 +12,13 @@ export class ErroClienteApi extends Error {
   }
 }
 
-const apiUrl = (import.meta.env["VITE_API_URL"] || "http://localhost:8081").replace(/\/+$/, "");
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
 /** Cadastra um cliente no back-end (POST /clientes). */
 export async function cadastrarCliente(cliente: Cadastro): Promise<void> {
-  const response = await fetch(`${apiUrl}/clientes`, {
+  const response = await fetch(`${API_BASE_URL}/clientes`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({

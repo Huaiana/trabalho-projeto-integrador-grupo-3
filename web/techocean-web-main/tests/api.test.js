@@ -11,8 +11,12 @@ describe("API client", () => {
     expect(PRODUCTION_API_URL).toBe("");
   });
 
-  it("prefers VITE_API_URL over environment defaults", () => {
-    expect(resolveApiBaseUrl({ DEV: true, VITE_API_URL: "https://api.example.com/" })).toBe("https://api.example.com");
+  it("uses the Vite proxy in development even when an upstream API URL is configured", () => {
+    expect(resolveApiBaseUrl({ DEV: true, VITE_API_URL: "https://api.example.com/" })).toBe(LOCAL_API_URL);
+  });
+
+  it("uses VITE_API_URL directly in production", () => {
+    expect(resolveApiBaseUrl({ DEV: false, VITE_API_URL: "https://api.example.com/" })).toBe("https://api.example.com");
   });
 
   it("uses the configurable API origin and requests a JSON resource", async () => {

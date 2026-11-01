@@ -1,3 +1,5 @@
+import { API_BASE_URL } from "../api.js";
+
 export interface DadosAgendamento {
   nome: string;
   telefone: string;
@@ -22,7 +24,6 @@ export class ErroAgendamentoApi extends Error {
   }
 }
 
-const apiUrl = (import.meta.env["VITE_API_URL"] || "http://localhost:8081").replace(/\/+$/, "");
 const pendingVisitKey = "techocean.agendamento.pendente";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -32,7 +33,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 export async function solicitarAgendamento(
   solicitacao: SolicitacaoAgendamento,
 ): Promise<void> {
-  const response = await fetch(`${apiUrl}/agendamentos`, {
+  const response = await fetch(`${API_BASE_URL}/agendamentos`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(solicitacao),

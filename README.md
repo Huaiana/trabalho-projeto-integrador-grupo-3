@@ -24,9 +24,9 @@ npm ci
 npm run dev
 ```
 
-O `npm ci` na raiz instala as dependências do frontend em `web/techocean-web-main/`. O site ficará disponível em `http://localhost:5173`. Em desenvolvimento, chamadas `/api` são encaminhadas pelo Vite ao Spring Boot em `http://127.0.0.1:8080`; assim, o navegador não precisa acessar `localhost` diretamente na API.
+O `npm ci` na raiz instala as dependências do frontend em `web/techocean-web-main/`. O site ficará disponível em `http://localhost:5173`. Em desenvolvimento, as chamadas usam o proxy `/api` do Vite, evitando chamadas cross-origin do navegador. O destino do proxy é `VITE_API_URL`, quando definido, ou o Spring Boot local em `http://127.0.0.1:8080`.
 
-Se `VITE_API_URL` estiver definido em `web/techocean-web-main/.env`, ele substitui esse proxy; confirme que aponta para a API ativa.
+Assim, `web/techocean-web-main/.env` pode apontar `VITE_API_URL` para a API Render ou para uma API local. No build de produção, essa mesma variável define a URL chamada diretamente pelo navegador.
 
 Se a porta `8080` já estiver ocupada, inicie a API em outra porta e configure a URL no terminal do frontend:
 
@@ -35,14 +35,14 @@ Se a porta `8080` já estiver ocupada, inicie a API em outra porta e configure a
 $env:SERVER_PORT = "8081"
 .\mvnw.cmd spring-boot:run
 
-# Terminal 2
+# Terminal 2 (o proxy usa VITE_API_URL como destino)
 $env:VITE_API_URL = "http://127.0.0.1:8081"
 npm run dev
 ```
 
 ### Acessar de outro dispositivo na mesma rede
 
-O Vite já escuta em todas as interfaces (`0.0.0.0`). Descubra o IPv4 deste computador com `ipconfig` e, no outro dispositivo, abra `http://<IPv4-do-computador>:5173` (nesta máquina o IPv4 atual é `10.32.22.85`). O Spring Boot permanece local: o proxy do Vite encaminha as chamadas `/api` para ele. Se o site não abrir, permita conexões TCP de entrada na porta `5173` no Firewall do Windows para redes privadas.
+O Vite já escuta em todas as interfaces (`0.0.0.0`). Descubra o IPv4 deste computador com `ipconfig` e, no outro dispositivo, abra `http://<IPv4-do-computador>:5173` (nesta máquina o IPv4 atual é `10.32.22.85`). As chamadas `/api` passam pelo proxy do Vite, então o navegador não precisa de acesso CORS direto ao Render ou ao Spring Boot. Se o site não abrir, permita conexões TCP de entrada na porta `5173` no Firewall do Windows para redes privadas.
 
 Para gerar o build ou executar verificações do frontend a partir da raiz:
 

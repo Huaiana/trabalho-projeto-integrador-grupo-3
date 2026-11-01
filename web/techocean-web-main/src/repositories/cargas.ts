@@ -1,12 +1,11 @@
 import { z } from "zod";
 import { cargaRecebidaSchema, type Carga, type DadosCarga } from "@/models/carga";
-
-const apiUrl = (import.meta.env["VITE_API_URL"] || "http://localhost:8081").replace(/\/+$/, "");
+import { API_BASE_URL } from "../api.js";
 
 async function requisitar(init?: RequestInit): Promise<Response> {
   let response: Response;
   try {
-    response = await fetch(`${apiUrl}/cargas`, init);
+    response = await fetch(`${API_BASE_URL}/cargas`, init);
   } catch {
     throw new Error("Não foi possível conectar ao servidor de cargas. Verifique se ele está ligado e permite o acesso do site.");
   }
