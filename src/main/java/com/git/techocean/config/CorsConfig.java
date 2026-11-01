@@ -45,12 +45,16 @@ public class CorsConfig implements WebMvcConfigurer {
                     .forEach(allowedOrigins::add);
         }
 
-        String[] originPatterns = allowedOrigins.toArray(new String[0]);
         registry.addMapping("/**")
-                .allowedOriginPatterns(originPatterns)
+                .allowedOriginPatterns(toOriginPatterns(allowedOrigins))
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS")
                 .allowedHeaders("*")
                 .allowCredentials(true);
+    }
+
+    @NonNull
+    private String[] toOriginPatterns(Set<String> origins) {
+        return origins.toArray(new String[0]);
     }
 
     @Override public void addInterceptors(
