@@ -51,10 +51,12 @@ export async function apiRequest(path, options = {}, { authenticated = true } = 
   const contentType = response.headers.get("content-type") || "";
   const payload = contentType.includes("json") ? await response.json().catch(() => null) : await response.text().catch(() => "");
   if (!response.ok) {
-    const message = payload && typeof payload === "object" && payload.message
-      ? payload.message
+    const message = payload && typeof payload === "object" && (payload.message || payload.detail || payload.title)
+      ? payload.message || payload.detail || payload.title
       : typeof payload === "string" && payload.trim()
         ? payload
+        : response.status === 401 && path === "/admin/me"
+          ? "Login aceito, mas o servidor recusou a sessão. Tente entrar novamente; se persistir, verifique se as instâncias da API usam o mesmo APP_AUTH_SECRET."
         : `Não foi possível concluir a operação (HTTP ${response.status}).`;
     throw new ApiError(message, response.status, payload?.code || "");
   }

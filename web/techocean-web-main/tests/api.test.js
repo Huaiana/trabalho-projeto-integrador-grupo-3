@@ -170,6 +170,24 @@ describe("API client", () => {
     });
   });
 
+  it("surfaces Spring Problem Details for invalid login credentials", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({
+      type: "about:blank",
+      title: "Unauthorized",
+      status: 401,
+      detail: "Credenciais inválidas.",
+    }, { status: 401 })));
+
+    await expect(postPublic("/admin/login", { email: "wrong@example.com", senha: "wrong" }))
+      .rejects.toMatchObject({ status: 401, message: "Credenciais inválidas." });
+  });
+
+  it("explains when login succeeds but the API rejects the resulting session", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 401 })));
+
+    await expect(apiRequest("/admin/me")).rejects.toThrow("mesmo APP_AUTH_SECRET");
+  });
+
   it("surfaces an actionable connection error", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("offline")));
     await expect(apiRequest("/clientes")).rejects.toBeInstanceOf(ApiError);
