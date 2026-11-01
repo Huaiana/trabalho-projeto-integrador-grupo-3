@@ -2,6 +2,7 @@ package com.git.techocean.service;
 
 import java.util.List;
 import org.springframework.http.HttpStatus;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -21,7 +22,7 @@ public class MensagemService {
         this.clienteRepository = clienteRepository;
     }
 
-    public Mensagem enviarMensagem(Long clienteId, String especialista, String conteudo) {
+    public Mensagem enviarMensagem(@NonNull Long clienteId, String especialista, String conteudo) {
         Cliente cliente = clienteRepository.findById(clienteId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Cliente não encontrado."));
         
@@ -32,11 +33,11 @@ public class MensagemService {
         return mensagemRepository.save(new Mensagem(cliente, especialista != null ? especialista : "Suporte", conteudo, "ENVIADO"));
     }
 
-    public List<Mensagem> listarPorCliente(Long clienteId) {
+    public List<Mensagem> listarPorCliente(@NonNull Long clienteId) {
         return mensagemRepository.findByClienteId(clienteId);
     }
 
-    public Mensagem responder(Long id, String resposta) {
+    public Mensagem responder(@NonNull Long id, String resposta) {
         Mensagem mensagem = mensagemRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Mensagem não encontrada."));
 
@@ -49,9 +50,9 @@ public class MensagemService {
         return mensagemRepository.save(mensagem);
     }
 
-    public void deletar(Long id) {
-        Mensagem mensagem = mensagemRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Mensagem não encontrada."));
+    public void deletar(@NonNull Long id) {
+        Mensagem mensagem = java.util.Objects.requireNonNull(mensagemRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Mensagem não encontrada.")));
         mensagemRepository.delete(mensagem);
     }
 }

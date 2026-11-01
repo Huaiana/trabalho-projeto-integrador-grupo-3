@@ -2,7 +2,9 @@ package com.git.techocean.controller;
 
 import java.util.List;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
+import org.springframework.lang.NonNull;
 import org.springframework.web.bind.annotation.*;
 
 import com.git.techocean.model.Agendamento;
@@ -81,7 +83,7 @@ public class AgendamentoController {
 
     @ExceptionHandler(AgendamentoException.class)
     public ResponseEntity<ApiError> handleRequestError(AgendamentoException exception) {
-        return ResponseEntity.status(exception.getStatus())
+        return ResponseEntity.status(java.util.Objects.requireNonNull(exception.getStatus()))
                 .body(new ApiError(exception.getCode(), exception.getMessage()));
     }
 

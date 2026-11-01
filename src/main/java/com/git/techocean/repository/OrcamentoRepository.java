@@ -2,11 +2,9 @@ package com.git.techocean.repository;
 
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
 
 import com.git.techocean.model.Orcamento;
 
-@Repository
 public interface OrcamentoRepository extends JpaRepository<Orcamento, Long> {
 
     // Lista orçamentos/solicitações de um cliente específico

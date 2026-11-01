@@ -2,6 +2,7 @@ package com.git.techocean.service;
 
 import java.util.List;
 import org.springframework.http.HttpStatus;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -26,7 +27,7 @@ public class ConteinerService {
         return conteinerRepository.findAll();
     }
 
-    public Conteiner buscarPorId(Long id) {
+    public @NonNull Conteiner buscarPorId(@NonNull Long id) {
         validarId(id);
         return conteinerRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Contêiner não encontrado."));
@@ -41,7 +42,7 @@ public class ConteinerService {
         return conteinerRepository.save(conteiner);
     }
 
-    public void excluir(Long id) {
+    public void excluir(@NonNull Long id) {
         conteinerRepository.delete(buscarPorId(id));
     }
 

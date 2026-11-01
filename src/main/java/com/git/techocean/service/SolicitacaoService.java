@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import org.springframework.http.HttpStatus;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -34,7 +35,7 @@ public class SolicitacaoService {
         this.servicoRepository = servicoRepository;
     }
 
-    public Solicitacao criarSolicitacao(Long clienteId, Long cargaId, Long servicoId) {
+    public Solicitacao criarSolicitacao(@NonNull Long clienteId, @NonNull Long cargaId, @NonNull Long servicoId) {
         Cliente cliente = clienteRepository.findById(clienteId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Cliente não encontrado."));
         Carga carga = cargaRepository.findById(cargaId)
@@ -49,11 +50,11 @@ public class SolicitacaoService {
         return solicitacaoRepository.findAll();
     }
 
-    public List<Solicitacao> listarPorCliente(Long clienteId) {
+    public List<Solicitacao> listarPorCliente(@NonNull Long clienteId) {
         return solicitacaoRepository.findByClienteId(clienteId);
     }
 
-    public Solicitacao buscarPorId(Long id) {
+    public @NonNull Solicitacao buscarPorId(@NonNull Long id) {
         return solicitacaoRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Solicitação não encontrada."));
     }

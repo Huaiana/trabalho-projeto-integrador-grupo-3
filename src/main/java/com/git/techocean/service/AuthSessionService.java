@@ -10,6 +10,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.lang.NonNull;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
@@ -44,7 +45,7 @@ public class AuthSessionService {
                 JwsHeader.with(MacAlgorithm.HS256).build(), claims)).getTokenValue();
     }
 
-    public boolean touch(String id, Long actorId, String tokenRole) {
+    public boolean touch(@NonNull String id, @NonNull Long actorId, String tokenRole) {
         AuthSession session = sessions.findById(id).orElse(null);
         if (session == null || session.getLoggedOutAt() != null) return false;
         Instant now = Instant.now();
@@ -60,7 +61,7 @@ public class AuthSessionService {
         session.setLastActivityAt(now); sessions.save(session); return true;
     }
 
-    public void logout(String id) {
+    public void logout(@NonNull String id) {
         sessions.findById(id).ifPresent(session -> { session.setLoggedOutAt(Instant.now()); sessions.save(session); });
     }
 

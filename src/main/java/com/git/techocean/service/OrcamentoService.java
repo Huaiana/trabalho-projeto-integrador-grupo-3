@@ -2,6 +2,7 @@ package com.git.techocean.service;
 
 import java.util.List;
 import org.springframework.http.HttpStatus;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -30,7 +31,7 @@ public class OrcamentoService {
         this.servicoRepository = servicoRepository;
     }
 
-    public Orcamento criarOrcamento(Long clienteId, Long cargaId, Long servicoId) {
+    public Orcamento criarOrcamento(@NonNull Long clienteId, @NonNull Long cargaId, @NonNull Long servicoId) {
         Cliente cliente = clienteRepository.findById(clienteId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Cliente não encontrado."));
         Carga carga = cargaRepository.findById(cargaId)
@@ -45,11 +46,11 @@ public class OrcamentoService {
         return orcamentoRepository.findAll();
     }
 
-    public List<Orcamento> listarPorCliente(Long clienteId) {
+    public List<Orcamento> listarPorCliente(@NonNull Long clienteId) {
         return orcamentoRepository.findByClienteId(clienteId);
     }
 
-    public Orcamento atualizarAnalise(Long id, String status, Double valorEstimado, String observacoes) {
+    public Orcamento atualizarAnalise(@NonNull Long id, String status, Double valorEstimado, String observacoes) {
         Orcamento orcamento = orcamentoRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Orçamento não encontrado."));
 

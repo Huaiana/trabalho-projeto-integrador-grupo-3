@@ -2,6 +2,7 @@ package com.git.techocean.service;
 
 import java.util.List;
 import org.springframework.http.HttpStatus;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -28,7 +29,7 @@ public class ServicoService {
         return servicoRepository.findByDisponivelTrue();
     }
 
-    public Servico buscarPorId(Long id) {
+    public @NonNull Servico buscarPorId(@NonNull Long id) {
         validarId(id);
         return servicoRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Serviço não encontrado."));
@@ -44,7 +45,7 @@ public class ServicoService {
         return servicoRepository.save(servico);
     }
 
-    public void excluir(Long id) { servicoRepository.delete(buscarPorId(id)); }
+    public void excluir(@NonNull Long id) { servicoRepository.delete(buscarPorId(id)); }
 
     private void validar(String nome, String descricao, String categoria) {
         if (nome == null || nome.trim().isEmpty() || descricao == null || descricao.trim().isEmpty()

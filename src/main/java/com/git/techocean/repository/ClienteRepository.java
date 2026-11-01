@@ -1,13 +1,9 @@
 package com.git.techocean.repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
 
 import com.git.techocean.model.Cliente;
-import java.util.List;
 
-
-@Repository
 public interface ClienteRepository extends JpaRepository<Cliente, Long> {
 
     // Busca cliente pelo e-mail para autenticação de login (RF02)

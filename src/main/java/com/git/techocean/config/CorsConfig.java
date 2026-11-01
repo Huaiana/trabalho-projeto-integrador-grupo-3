@@ -3,17 +3,22 @@ package com.git.techocean.config;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.Set;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.lang.NonNull;
+import org.springframework.lang.Nullable;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
-import org.springframework.beans.factory.annotation.Autowired;
 
 @Configuration
 public class CorsConfig implements WebMvcConfigurer {
-
-    @Autowired(required = false)
+    @Nullable
     private SessionAuditInterceptor sessionAuditInterceptor;
+
+    public CorsConfig(ObjectProvider<SessionAuditInterceptor> sessionAuditInterceptor) {
+        this.sessionAuditInterceptor = sessionAuditInterceptor.getIfAvailable();
+    }
 
     private static final Set<String> BASE_ALLOWED_ORIGINS = Set.of(
             "http://localhost:5173",
@@ -31,31 +36,33 @@ public class CorsConfig implements WebMvcConfigurer {
     private String allowedOriginPatterns;
 
     @Override
-    public void addCorsMappings(CorsRegistry registry) {
+    public void addCorsMappings(@NonNull CorsRegistry registry) {
         Set<String> allowedOrigins = new LinkedHashSet<>(BASE_ALLOWED_ORIGINS);
         if (allowedOriginPatterns != null && !allowedOriginPatterns.isBlank()) {
             Arrays.stream(allowedOriginPatterns.split(","))
-                    .map(String::trim)
+                    .map((@NonNull String origin) -> origin.trim())
                     .filter(origin -> !origin.isEmpty())
                     .forEach(allowedOrigins::add);
         }
 
+        String[] originPatterns = allowedOrigins.toArray(new String[0]);
         registry.addMapping("/**")
-                .allowedOriginPatterns(allowedOrigins.toArray(String[]::new))
+                .allowedOriginPatterns(originPatterns)
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS")
                 .allowedHeaders("*")
                 .allowCredentials(true);
     }
 
-    @Override public void addInterceptors(org.springframework.web.servlet.config.annotation.InterceptorRegistry registry) {
+    @Override public void addInterceptors(
+            @NonNull org.springframework.web.servlet.config.annotation.InterceptorRegistry registry) {
         if (sessionAuditInterceptor != null) registry.addInterceptor(sessionAuditInterceptor);
     }
 
-    public SessionAuditInterceptor getSessionAuditInterceptor() {
+    public @Nullable SessionAuditInterceptor getSessionAuditInterceptor() {
         return sessionAuditInterceptor;
     }
 
-    public void setSessionAuditInterceptor(SessionAuditInterceptor sessionAuditInterceptor) {
+    public void setSessionAuditInterceptor(@Nullable SessionAuditInterceptor sessionAuditInterceptor) {
         this.sessionAuditInterceptor = sessionAuditInterceptor;
     }
 }

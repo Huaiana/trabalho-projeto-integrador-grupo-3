@@ -2,6 +2,7 @@ package com.git.techocean.service;
 
 import java.util.List;
 import org.springframework.http.HttpStatus;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -29,7 +30,8 @@ public class OperacaoService {
         if (solicitacaoId == null || solicitacaoId <= 0) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Solicitação inválida.");
         validarTexto(responsavel, "Responsável");
         validarTexto(observacoes, "Observações");
-        Solicitacao solicitacao = solicitacaoRepository.findById(solicitacaoId)
+        Long validSolicitacaoId = java.util.Objects.requireNonNull(solicitacaoId);
+        Solicitacao solicitacao = solicitacaoRepository.findById(validSolicitacaoId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Solicitação não encontrada."));
         
         Conteiner conteiner = null;
@@ -54,14 +56,14 @@ public class OperacaoService {
         return operacaoRepository.save(op);
     }
 
-    public Operacao buscarPorId(Long id) {
+    public @NonNull Operacao buscarPorId(@NonNull Long id) {
         validarId(id);
         return operacaoRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Operação não encontrada."));
     }
 
     public Operacao atualizar(Long id, Long solicitacaoId, Long conteinerId, String responsavel, String andamento, String observacoes) {
-        Operacao op = buscarPorId(id);
+        Operacao op = java.util.Objects.requireNonNull(buscarPorId(id));
         if (solicitacaoId != null) op.setSolicitacao(solicitacaoRepository.findById(solicitacaoId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Solicitação não encontrada.")));
         if (conteinerId != null) op.setConteiner(conteinerRepository.findById(conteinerId)
@@ -71,7 +73,7 @@ public class OperacaoService {
         return operacaoRepository.save(op);
     }
 
-    public void excluir(Long id) { operacaoRepository.delete(buscarPorId(id)); }
+    public void excluir(@NonNull Long id) { operacaoRepository.delete(buscarPorId(id)); }
 
     private void validarId(Long id) { if (id == null || id <= 0) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "ID inválido."); }
     private void validarTexto(String valor, String campo) {

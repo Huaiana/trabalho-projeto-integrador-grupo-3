@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.regex.Pattern;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -37,17 +38,17 @@ public class ContatoMensagemService {
         return repository.findAllByOrderByCriadoEmDesc();
     }
 
-    public ContatoMensagem responder(Long id, String resposta) {
-        ContatoMensagem contato = repository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Mensagem não encontrada."));
+    public ContatoMensagem responder(@NonNull Long id, String resposta) {
+        ContatoMensagem contato = java.util.Objects.requireNonNull(repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Mensagem não encontrada.")));
         contato.setResposta(validarTexto(resposta, "Resposta", 1000));
         contato.setStatus("RESPONDIDO");
         return repository.save(contato);
     }
 
-    public void deletar(Long id) {
-        ContatoMensagem contato = repository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Mensagem não encontrada."));
+    public void deletar(@NonNull Long id) {
+        ContatoMensagem contato = java.util.Objects.requireNonNull(repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Mensagem não encontrada.")));
         repository.delete(contato);
     }
 

@@ -9,6 +9,7 @@ import java.util.Objects;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -105,11 +106,11 @@ public class AgendamentoService {
         return usuarioRepository.findAll();
     }
 
-    public List<Agendamento> listarPorCliente(Long clienteId) {
+    public List<Agendamento> listarPorCliente(@NonNull Long clienteId) {
         return agendamentoRepository.findByUsuarioId(clienteId);
     }
 
-    public Agendamento buscarPorId(Long id) {
+    public @NonNull Agendamento buscarPorId(@NonNull Long id) {
         return agendamentoRepository.findById(id)
                 .orElseThrow(() -> new AgendamentoException(
                         "AGENDAMENTO_NAO_ENCONTRADO",
@@ -178,7 +179,7 @@ public class AgendamentoService {
     }
 
     @Transactional
-    public void excluir(Long id) {
+    public void excluir(@NonNull Long id) {
         agendamentoRepository.delete(buscarPorId(id));
     }
 

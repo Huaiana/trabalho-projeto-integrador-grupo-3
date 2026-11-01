@@ -1,6 +1,7 @@
 package com.git.techocean.service;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -54,9 +55,9 @@ public class UsuarioAdminService {
     }
 
     @Transactional
-    public UsuarioAdmin atualizar(Long id, String nome, String email, String senha, String cargo, Long actorId) {
-        UsuarioAdmin user = usuarioAdminRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuário não encontrado."));
+    public UsuarioAdmin atualizar(@NonNull Long id, String nome, String email, String senha, String cargo, Long actorId) {
+        UsuarioAdmin user = java.util.Objects.requireNonNull(usuarioAdminRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuário não encontrado.")));
         if (nome == null || nome.isBlank()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Nome é obrigatório.");
         String normalizedEmail = normalizeEmail(email);
         if (usuarioAdminRepository.existsByEmailIgnoreCaseAndIdNot(normalizedEmail, id))
@@ -79,9 +80,9 @@ public class UsuarioAdminService {
     }
 
     @Transactional
-    public void excluir(Long id, Long actorId) {
-        UsuarioAdmin user = usuarioAdminRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuário não encontrado."));
+    public void excluir(@NonNull Long id, Long actorId) {
+        UsuarioAdmin user = java.util.Objects.requireNonNull(usuarioAdminRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuário não encontrado.")));
         if (actorId != null && actorId.equals(id))
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Não é possível excluir sua própria conta.");
         if (StaffRole.ADMIN.name().equals(user.getCargo()) && usuarioAdminRepository.countAdmins() <= 1)

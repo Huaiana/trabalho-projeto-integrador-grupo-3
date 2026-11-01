@@ -11,6 +11,7 @@ import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.lang.NonNull;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
@@ -57,12 +58,13 @@ public class UsuarioAdminController {
     }
 
     @GetMapping("/me") public UserDto me(@org.springframework.security.core.annotation.AuthenticationPrincipal Jwt jwt) {
-        return users.findById(Long.valueOf(jwt.getSubject())).map(UserDto::from)
+        Long userId = java.util.Objects.requireNonNull(Long.valueOf(jwt.getSubject()));
+        return users.findById(userId).map(UserDto::from)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
     }
 
     @PostMapping("/logout") public ResponseEntity<Void> logout(@org.springframework.security.core.annotation.AuthenticationPrincipal Jwt jwt) {
-        sessions.logout(jwt.getId()); return ResponseEntity.noContent().build();
+        sessions.logout(java.util.Objects.requireNonNull(jwt.getId())); return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/usuarios") public List<UserDto> listUsers() { return users.findAll().stream().map(UserDto::from).toList(); }
