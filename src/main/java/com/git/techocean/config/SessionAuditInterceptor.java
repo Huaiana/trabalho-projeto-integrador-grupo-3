@@ -7,8 +7,9 @@ import com.git.techocean.repository.AuthSessionRepository;
 import com.git.techocean.service.AuthSessionService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.time.Duration;
 import java.time.Instant;
+import org.springframework.lang.NonNull;
+import org.springframework.lang.Nullable;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
@@ -24,7 +25,8 @@ public class SessionAuditInterceptor implements HandlerInterceptor {
         this.sessionService = sessionService; this.sessions = sessions; this.audits = audits;
     }
 
-    @Override public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
+    @Override public boolean preHandle(@NonNull HttpServletRequest request, @NonNull HttpServletResponse response,
+            @NonNull Object handler) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication instanceof JwtAuthenticationToken jwt) {
             String sid = jwt.getToken().getId();
@@ -39,9 +41,10 @@ public class SessionAuditInterceptor implements HandlerInterceptor {
         return true;
     }
 
-    @Override public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) {
+    @Override public void afterCompletion(@NonNull HttpServletRequest request, @NonNull HttpServletResponse response,
+            @NonNull Object handler, @Nullable Exception ex) {
         Object sid = request.getAttribute("authSessionId");
-        AuthSession session = sid == null ? null : sessions.findById(sid.toString()).orElse(null);
+        AuthSession session = sid instanceof String sessionId ? sessions.findById(sessionId).orElse(null) : null;
         AuditEvent event = new AuditEvent();
         if (session != null) {
             event.setActorId(session.getActorId()); event.setActorName(session.getActorName()); event.setActorRole(session.getRole());

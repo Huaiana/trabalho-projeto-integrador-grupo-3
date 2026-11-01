@@ -22,24 +22,24 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest({UsuarioAdminController.class, ClienteController.class, ServicoController.class})
 @Import(SecurityConfig.class)
 class StaffRoleSecurityTest {
     @Autowired MockMvc mvc;
-    @MockBean UsuarioAdminService service;
-    @MockBean UsuarioAdminRepository users;
-    @MockBean AuthSessionService sessions;
-    @MockBean AuthSessionRepository sessionRepository;
-    @MockBean AuditEventRepository auditRepository;
-    @MockBean AdminBootstrapService bootstrap;
-    @MockBean ClienteService clientes;
-    @MockBean ClienteRepository clienteRepository;
-    @MockBean ServicoService servicos;
+    @MockitoBean UsuarioAdminService service;
+    @MockitoBean UsuarioAdminRepository users;
+    @MockitoBean AuthSessionService sessions;
+    @MockitoBean AuthSessionRepository sessionRepository;
+    @MockitoBean AuditEventRepository auditRepository;
+    @MockitoBean AdminBootstrapService bootstrap;
+    @MockitoBean ClienteService clientes;
+    @MockitoBean ClienteRepository clienteRepository;
+    @MockitoBean ServicoService servicos;
 
     @Test void supervisorCannotReadAdminAudit() throws Exception {
         mvc.perform(get("/admin/auditoria").with(jwt().authorities(new SimpleGrantedAuthority("ROLE_SUPERVISOR"))))

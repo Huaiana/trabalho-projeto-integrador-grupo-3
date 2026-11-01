@@ -1,7 +1,6 @@
 package com.git.techocean.controller;
 
 import com.git.techocean.model.AuditEvent;
-import com.git.techocean.model.AuthSession;
 import com.git.techocean.model.UsuarioAdmin;
 import com.git.techocean.repository.UsuarioAdminRepository;
 import com.git.techocean.service.AuthSessionService;
@@ -9,7 +8,6 @@ import com.git.techocean.service.UsuarioAdminService;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
-import java.util.Locale;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

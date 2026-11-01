@@ -12,7 +12,6 @@ $bytes = New-Object byte[] 32
 [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
 $env:ADMIN_SETUP_TOKEN = [Convert]::ToBase64String($bytes)
 
-cd backend\techocean-main\demo
 .\mvnw.cmd spring-boot:run
 ```
 
@@ -27,6 +26,20 @@ npm run dev
 
 O `npm ci` na raiz instala as dependências do frontend em `web/techocean-web-main/`. O site ficará disponível em `http://localhost:5173`. Em desenvolvimento, chamadas `/api` são encaminhadas pelo Vite ao Spring Boot em `http://127.0.0.1:8080`; assim, o navegador não precisa acessar `localhost` diretamente na API.
 
+Se `VITE_API_URL` estiver definido em `web/techocean-web-main/.env`, ele substitui esse proxy; confirme que aponta para a API ativa.
+
+Se a porta `8080` já estiver ocupada, inicie a API em outra porta e configure a URL no terminal do frontend:
+
+```powershell
+# Terminal 1
+$env:SERVER_PORT = "8081"
+.\mvnw.cmd spring-boot:run
+
+# Terminal 2
+$env:VITE_API_URL = "http://127.0.0.1:8081"
+npm run dev
+```
+
 ### Acessar de outro dispositivo na mesma rede
 
 O Vite já escuta em todas as interfaces (`0.0.0.0`). Descubra o IPv4 deste computador com `ipconfig` e, no outro dispositivo, abra `http://<IPv4-do-computador>:5173` (nesta máquina o IPv4 atual é `10.32.22.85`). O Spring Boot permanece local: o proxy do Vite encaminha as chamadas `/api` para ele. Se o site não abrir, permita conexões TCP de entrada na porta `5173` no Firewall do Windows para redes privadas.
@@ -39,12 +52,12 @@ npm test
 npm run lint
 ```
 
-Se a API estiver em outra porta, atualize o `target` do proxy em `web/techocean-web-main/vite.config.js` e reinicie o Vite. No deploy, defina `VITE_API_URL` no ambiente de build do Cloudflare Pages para o endpoint remoto.
+No deploy, defina `VITE_API_URL` no ambiente de build do Cloudflare Pages para o endpoint remoto.
 
 ## Publicação
 
 - **Frontend:** Cloudflare Pages, diretório `web/techocean-web-main`, comando `npm ci && npm run build`, saída `dist`. Defina `VITE_API_URL` como a URL HTTPS pública da API Railway.
-- **API e banco:** Railway com o serviço Docker em `backend/techocean-main/demo` e um PostgreSQL no mesmo projeto. Configure `SPRING_PROFILES_ACTIVE=production`, as variáveis `DB_*` ligadas às variáveis `PG*` do PostgreSQL, `APP_AUTH_SECRET` e `CORS_ALLOWED_ORIGIN_PATTERNS` com o domínio Pages do site. As instruções completas estão em `backend/techocean-main/README.md`.
+- **API e banco:** Railway usando o Dockerfile da raiz e um PostgreSQL no mesmo projeto. Configure `SPRING_PROFILES_ACTIVE=production`, as variáveis `DB_*` ligadas às variáveis `PG*` do PostgreSQL, `APP_AUTH_SECRET` e `CORS_ALLOWED_ORIGIN_PATTERNS` com o domínio Pages do site. As instruções completas estão em [backend/techocean-main/README.md](./backend/techocean-main/README.md).
 
 O banco novo começa vazio. Exporte e importe os dados do banco antigo antes de direcionar o tráfego se precisar preservá-los.
 
