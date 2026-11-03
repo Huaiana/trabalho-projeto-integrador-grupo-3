@@ -188,6 +188,16 @@ describe("API client", () => {
       .rejects.toMatchObject({ status: 401, message: "Credenciais inválidas." });
   });
 
+  it("explains an empty 401 response from the admin login endpoint", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 401 })));
+
+    await expect(postPublic("/admin/login", { email: "admin@example.com", senha: "wrong" }))
+      .rejects.toMatchObject({
+        status: 401,
+        message: "A API recusou o login (HTTP 401). Confira o e-mail e a senha e confirme se o administrador já foi configurado.",
+      });
+  });
+
   it("explains when login succeeds but the API rejects the resulting session", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 401 })));
 

@@ -54,7 +54,7 @@ public class CorsConfig implements WebMvcConfigurer {
 
     @NonNull
     private String[] toOriginPatterns(Set<String> origins) {
-        return origins.toArray(new String[0]);
+        return origins.toArray(String[]::new);
     }
 
     @Override public void addInterceptors(

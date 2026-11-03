@@ -76,6 +76,8 @@ export async function apiRequest(path, options = {}, { authenticated = true } = 
             ? payload.message || payload.detail || payload.title
             : typeof payload === "string" && payload.trim()
               ? payload
+              : response.status === 401 && path === "/admin/login"
+                ? "A API recusou o login (HTTP 401). Confira o e-mail e a senha e confirme se o administrador já foi configurado."
               : response.status === 401 && path === "/admin/me"
                 ? "Login aceito, mas o servidor recusou a sessão. Tente entrar novamente; se persistir, verifique se as instâncias da API usam o mesmo APP_AUTH_SECRET."
                 : `Não foi possível concluir a operação (HTTP ${response.status}).`;

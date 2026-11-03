@@ -2,9 +2,7 @@ package com.git.techocean.controller;
 
 import java.util.List;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
-import org.springframework.lang.NonNull;
 import org.springframework.web.bind.annotation.*;
 
 import com.git.techocean.model.Agendamento;

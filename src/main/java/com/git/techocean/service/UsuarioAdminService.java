@@ -110,7 +110,7 @@ public class UsuarioAdminService {
     }
 
     public UsuarioAdmin login(String email, String senha) {
-        UsuarioAdmin admin = usuarioAdminRepository.findByEmail(email);
+        UsuarioAdmin admin = usuarioAdminRepository.findByEmailIgnoreCase(normalizeEmail(email));
         if (admin != null && matchesAndUpgrade(admin, senha)) {
             try {
                 String role = normalizeRole(admin.getCargo());
