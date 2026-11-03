@@ -7,7 +7,7 @@ Abra dois terminais na pasta raiz deste repositório.
 ### Terminal 1 — API Spring Boot
 
 ```powershell
-# Gere um token temporário local para configurar o primeiro administrador.
+# Gere um token temporário local para provisionar o primeiro administrador pela API.
 $bytes = New-Object byte[] 32
 [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
 $env:ADMIN_SETUP_TOKEN = [Convert]::ToBase64String($bytes)
@@ -63,17 +63,19 @@ No deploy, defina `VITE_API_URL` no ambiente de build do Cloudflare Pages para o
 
 O banco novo começa vazio. Exporte e importe os dados do banco antigo antes de direcionar o tráfego se precisar preservá-los.
 
-## Primeiro acesso administrativo
+## Acesso administrativo
 
-O sistema não cria uma conta ou senha padrão. Antes do primeiro deploy com a API protegida, configure no serviço da API no Railway, como variáveis **secretas**:
+O sistema não cria uma conta ou senha padrão. Para provisionar o primeiro administrador em um banco vazio, configure no serviço da API no Railway, como variáveis **secretas**:
 
 - `APP_AUTH_SECRET`: chave aleatória estável de pelo menos 32 bytes. Mantenha o mesmo valor entre reinícios e não a coloque no repositório nem em variáveis `VITE_*`.
-- `ADMIN_SETUP_TOKEN`: token aleatório temporário para criar o primeiro administrador.
+- `ADMIN_SETUP_TOKEN`: token aleatório temporário para o provisionamento inicial pela API.
 
-Depois do deploy, abra o painel, escolha **Acesso administrativo**, entre na configuração inicial e informe o token junto com nome, e-mail e senha do primeiro administrador. Assim que a conta for criada, remova `ADMIN_SETUP_TOKEN` do serviço Railway e faça novo deploy. O endpoint de configuração também se bloqueia quando já existe um administrador.
+O provisionamento inicial é feito por uma chamada `POST /admin/setup`, enviando `X-Admin-Setup-Token` e os campos `nome`, `email` e `senha` no corpo JSON. Esse formulário não aparece na tela de login; o endpoint recusa a operação quando já existe um administrador. Assim que a conta for criada, remova `ADMIN_SETUP_TOKEN` do serviço Railway e faça novo deploy.
 
-O Railway exige um `APP_AUTH_SECRET` estável com pelo menos 32 bytes antes de iniciar a API em produção; configure-o como secret no serviço da API. Configure `ADMIN_SETUP_TOKEN` como secret temporário, use-o uma única vez na tela inicial e remova-o do ambiente depois que o administrador for criado. Não coloque nenhum desses valores no Git ou em variáveis `VITE_*`, nem os envie em mensagens.
+Depois de entrar como administrador, use **Configurações** no painel para atualizar dados e senhas das contas ou criar novas contas de administrador e equipe. Para editar uma conta sem trocar sua senha, deixe o campo senha em branco.
+
+O Railway exige um `APP_AUTH_SECRET` estável com pelo menos 32 bytes antes de iniciar a API em produção; configure-o como secret no serviço da API. Configure `ADMIN_SETUP_TOKEN` como secret temporário e remova-o do ambiente após o provisionamento inicial. Não coloque nenhum desses valores no Git ou em variáveis `VITE_*`, nem os envie em mensagens.
 
 Localmente, o comando acima define apenas um token temporário no terminal atual; a chave de assinatura fica efêmera no perfil de desenvolvimento. Não reutilize esses valores na produção.
 
-Para ver e copiar o token local gerado no terminal, execute `$env:ADMIN_SETUP_TOKEN` no mesmo PowerShell e cole-o no campo **Token de configuração** da tela inicial. O token não é salvo no frontend.
+Para consultar o token temporário gerado localmente, execute `$env:ADMIN_SETUP_TOKEN` no mesmo PowerShell e use-o somente no cabeçalho da chamada inicial à API. Não o salve no frontend.

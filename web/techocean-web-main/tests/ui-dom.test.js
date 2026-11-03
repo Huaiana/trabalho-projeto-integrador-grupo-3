@@ -6,6 +6,7 @@ import {
   loginScreenMarkup,
   renderAppointmentAccountsEmpty,
   renderMessages,
+  renderCrudSection,
   renderResourceFormMarkup,
   renderResourceTable,
   dashboardGatewayMarkup,
@@ -170,6 +171,19 @@ describe("DOM interface helpers", () => {
     expect(markup).toContain("CPF / CNPJ");
   });
 
+  it("defaults new dashboard accounts to administrator and keeps password optional when editing", () => {
+    const createMarkup = renderResourceFormMarkup("usuario");
+    const editMarkup = renderResourceFormMarkup("usuario", {
+      id: 8,
+      nome: "Admin",
+      email: "admin@example.com",
+      cargo: "ADMIN",
+    });
+
+    expect(createMarkup).toContain('<option value="ADMIN" selected>Administrador</option>');
+    expect(editMarkup).toContain("Deixe em branco para manter a senha atual.");
+  });
+
   it("shows an explicit empty state instead of an unusable staff appointment form", () => {
     const markup = renderAppointmentAccountsEmpty();
 
@@ -207,16 +221,20 @@ describe("DOM interface helpers", () => {
     expect(footer).not.toContain("<a");
   });
 
-  it("renders distinct login copy and exposes first-admin setup only on the admin entry", () => {
+  it("hides first-admin setup from login and exposes account management in dashboard settings", () => {
     const team = loginScreenMarkup("team");
     const admin = loginScreenMarkup("admin");
+    const settings = renderCrudSection([], { slug: "usuario", name: "Configurações" });
 
     expect(team).toContain('data-login-portal="team"');
     expect(team).toContain("supervisor ou funcionário");
     expect(team).not.toContain("/admin/setup");
     expect(admin).toContain('data-login-portal="admin"');
     expect(admin).toContain("gerenciar a equipe, auditoria e controles");
-    expect(admin).toContain("/admin/setup");
+    expect(admin).not.toContain("/admin/setup");
+    expect(settings).toContain("Contas de acesso");
+    expect(settings).toContain("Novo administrador");
+    expect(settings).toContain("atualizar nome, e-mail, perfil ou senha");
   });
 
   it("accepts only the portal's expected staff roles", () => {

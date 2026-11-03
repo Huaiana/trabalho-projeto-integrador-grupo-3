@@ -1,4 +1,4 @@
-import { apiRequest, get, post, postPublic, postWithHeaders, postParams, put, putParams, del, getAppointmentAccounts, createManagedAppointment, updateManagedAppointment, setAccessToken, clearAccessToken, getAccessToken, ApiError } from "./api.js";
+import { apiRequest, get, post, postPublic, postParams, put, putParams, del, getAppointmentAccounts, createManagedAppointment, updateManagedAppointment, setAccessToken, clearAccessToken, getAccessToken, ApiError } from "./api.js";
 import lashingImage from "./assets/lashing.jpg";
 import "./vanilla.css";
 import "./admin.css";
@@ -16,7 +16,7 @@ const sections = [
   { slug: "mensagens", name: "Mensagens", description: "Mensagens recebidas pelo Fale conosco.", endpoint: "/mensagens/contatos" },
   { slug: "operacao", name: "Operação", description: "Operações em andamento.", endpoint: "/operacoes", columns: ["id", "solicitacao", "conteiner", "responsavel", "andamento", "observacoes"], resource: true },
   { slug: "orcamento", name: "Orçamento", description: "Orçamentos e solicitações comerciais.", endpoint: "/orcamentos", columns: ["id", "cliente", "carga", "servico", "valorEstimado", "status"] },
-  { slug: "usuario", name: "Equipe", description: "Contas e permissões da equipe.", endpoint: "/admin/usuarios", columns: ["id", "nome", "email", "cargo"], resource: true, adminOnly: true },
+  { slug: "usuario", name: "Configurações", description: "Atualize seus dados e gerencie contas de administradores e equipe.", endpoint: "/admin/usuarios", columns: ["id", "nome", "email", "cargo"], resource: true, adminOnly: true },
   { slug: "auditoria", name: "Auditoria", description: "Registro de atividades administrativas.", endpoint: "/admin/auditoria", adminOnly: true },
   { slug: "sessoes", name: "Sessões", description: "Sessões administrativas ativas e recentes.", endpoint: "/admin/sessoes", adminOnly: true },
   { slug: "servico", name: "Serviço", description: "Serviços oferecidos.", endpoint: "/servicos/todos", columns: ["id", "nome", "descricao", "categoria", "disponivel"], resource: true },
@@ -72,7 +72,7 @@ const resourceDefinitions = {
     ],
   },
   usuario: {
-    endpoint: "/admin/usuarios", singular: "usuário", createMode: "json",
+    endpoint: "/admin/usuarios", singular: "administrador", createMode: "json",
     fields: [
       { name: "nome", label: "Nome completo", required: true },
       { name: "email", label: "E-mail", type: "email", required: true },
@@ -201,8 +201,7 @@ export function loginScreenMarkup(portal = "admin", error = "", notice = "") {
     ? "Entre como supervisor ou funcionário para acompanhar e atualizar a operação."
     : "Entre como administrador para gerenciar a equipe, auditoria e controles.";
   const returnPortal = `<a href="/dashboard">← Voltar ao painel</a>`;
-  const setupLink = teamPortal ? "" : `<a href="/admin/setup">Configurar primeiro administrador</a>`;
-  return `<main class="auth-page"><section class="auth-card ${teamPortal ? "auth-team" : "auth-admin"}"><a href="/dashboard" class="wordmark">Techocean</a><p class="eyebrow">${eyebrow} · PAINEL</p><h1>${title}</h1><p class="muted">${intro}</p>${notice ? `<p class="inline-success" role="status">${esc(notice)}</p>` : ""}<form class="form-grid" data-form="admin-login" data-login-portal="${teamPortal ? "team" : "admin"}">${field("E-mail", "email", "email", "username")}${field("Senha", "senha", "password", "current-password")}<p class="form-feedback" role="alert">${esc(error)}</p><button class="button button-primary form-submit">Entrar <span>↗</span></button></form><div class="auth-links">${returnPortal}${setupLink}</div></section></main>`;
+  return `<main class="auth-page"><section class="auth-card ${teamPortal ? "auth-team" : "auth-admin"}"><a href="/dashboard" class="wordmark">Techocean</a><p class="eyebrow">${eyebrow} · PAINEL</p><h1>${title}</h1><p class="muted">${intro}</p>${notice ? `<p class="inline-success" role="status">${esc(notice)}</p>` : ""}<form class="form-grid" data-form="admin-login" data-login-portal="${teamPortal ? "team" : "admin"}">${field("E-mail", "email", "email", "username")}${field("Senha", "senha", "password", "current-password")}<p class="form-feedback" role="alert">${esc(error)}</p><button class="button button-primary form-submit">Entrar <span>↗</span></button></form><div class="auth-links">${returnPortal}</div></section></main>`;
 }
 
 function renderLogin(portal = "admin", error = "") {
@@ -233,11 +232,6 @@ function renderPortalLogin(portal) {
     return;
   }
   renderLogin(portal);
-}
-
-function renderSetup(error = "") {
-  document.title = "Configuração inicial — Techocean";
-  app.innerHTML = `<main class="auth-page"><section class="auth-card auth-admin"><a href="/dashboard" class="wordmark">Techocean</a><p class="eyebrow">CONFIGURAÇÃO INICIAL</p><h1>Criar primeiro administrador</h1><p class="muted">Use o token de configuração fornecido pelo responsável pelo sistema. Ele será enviado ao servidor, mas não ficará salvo neste navegador.</p><form class="form-grid" data-form="admin-setup"><label class="field-label">Token de configuração<input name="setupToken" type="password" autocomplete="off" required></label>${field("Nome completo", "nome", "text", "name")}${field("E-mail", "email", "email", "email")}${field("Senha", "senha", "password", "new-password", 'minlength="8"')}<p class="form-feedback" role="alert">${esc(error)}</p><button class="button button-primary form-submit">Criar administrador <span>↗</span></button></form><div class="auth-links"><a href="/dashboard/acesso-admin">Voltar ao login administrativo</a><a href="/dashboard">Voltar ao painel</a></div></section></main>`;
 }
 
 function normalizeAdminUser(payload) {
@@ -308,10 +302,21 @@ function renderCargas(records) {
   return `<section class="data-panel"><div class="panel-heading"><div><span class="eyebrow">OPERAÇÕES / REGISTROS</span><h2>Cargas cadastradas <span class="count-pill">${records.length}</span></h2></div><div class="panel-actions"><button class="button button-outline compact" data-reload>↻ <span>Atualizar</span></button><button class="button button-primary compact" data-action="new-charge">＋ Nova carga</button></div></div><div id="charge-form-slot"></div>${records.length ? renderTable(records, ["id", ...chargeFields.map(([name]) => name)], "cargas") : `<div class="empty-state"><span>▱</span><strong>Nenhuma carga cadastrada</strong><p>Cadastre uma carga para começar a acompanhar as especificações.</p></div>`}</section>`;
 }
 
-function renderCrudSection(records, section) {
+export function renderCrudSection(records, section) {
   const definition = resourceDefinitions[section.slug];
-  const actions = `<div class="panel-actions"><button class="button button-outline compact" data-reload>↻ <span>Atualizar</span></button><button class="button button-primary compact" data-action="new-resource" data-resource="${section.slug}">＋ Novo ${esc(definition.singular)}</button></div>`;
-  return `<section class="data-panel"><div class="panel-heading"><div><span class="eyebrow">GESTÃO / REGISTROS</span><h2>${esc(section.name)}s <span class="count-pill">${records.length}</span></h2></div>${actions}</div><div id="resource-form-slot"></div>${records.length ? renderResourceTable(records, section.slug) : `<div class="empty-state"><span>▱</span><strong>Nenhum registro encontrado</strong><p>Cadastre o primeiro ${esc(definition.singular)} para começar.</p></div>`}</section>`;
+  const isUserSettings = section.slug === "usuario";
+  const panelTitle = isUserSettings ? "Contas de acesso" : `${section.name}s`;
+  const panelEyebrow = isUserSettings ? "CONFIGURAÇÕES" : "GESTÃO / REGISTROS";
+  const actionLabel = isUserSettings ? "Novo administrador" : `Novo ${definition.singular}`;
+  const actions = `<div class="panel-actions"><button class="button button-outline compact" data-reload>↻ <span>Atualizar</span></button><button class="button button-primary compact" data-action="new-resource" data-resource="${section.slug}">＋ ${actionLabel}</button></div>`;
+  const emptyTitle = isUserSettings ? "Nenhuma conta de acesso encontrada" : "Nenhum registro encontrado";
+  const emptyDescription = isUserSettings
+    ? "Crie uma conta para o administrador ou para outro integrante da equipe."
+    : `Cadastre o primeiro ${definition.singular} para começar.`;
+  const guidance = isUserSettings
+    ? `<p class="settings-guidance">Edite uma conta para atualizar nome, e-mail, perfil ou senha. Para manter a senha atual, deixe o campo senha em branco.</p>`
+    : "";
+  return `<section class="data-panel"><div class="panel-heading"><div><span class="eyebrow">${panelEyebrow}</span><h2>${esc(panelTitle)} <span class="count-pill">${records.length}</span></h2></div>${actions}</div>${guidance}<div id="resource-form-slot"></div>${records.length ? renderResourceTable(records, section.slug) : `<div class="empty-state"><span>▱</span><strong>${emptyTitle}</strong><p>${emptyDescription}</p></div>`}</section>`;
 }
 
 export function renderResourceTable(records, slug, role = userRole()) {
@@ -342,7 +347,8 @@ function resourceFieldMarkup(fieldDefinition, record, editing) {
   const optionalPassword = editing && fieldDefinition.editOptional ? "<small>Deixe em branco para manter a senha atual.</small>" : "";
   const id = `resource-${fieldDefinition.name}`;
   if (fieldDefinition.type === "select") {
-    return `<label class="field-label" for="${id}">${esc(fieldDefinition.label)}<select id="${id}" name="${fieldDefinition.name}" ${required}>${fieldDefinition.options.map(([optionValue, label]) => `<option value="${esc(optionValue)}" ${String(value) === optionValue ? "selected" : ""}>${esc(label)}</option>`).join("")}</select></label>`;
+    const selectedValue = value || (!editing && fieldDefinition.name === "cargo" ? "ADMIN" : "");
+    return `<label class="field-label" for="${id}">${esc(fieldDefinition.label)}<select id="${id}" name="${fieldDefinition.name}" ${required}>${fieldDefinition.options.map(([optionValue, label]) => `<option value="${esc(optionValue)}" ${String(selectedValue) === optionValue ? "selected" : ""}>${esc(label)}</option>`).join("")}</select></label>`;
   }
   if (fieldDefinition.type === "account") {
     const selectedId = value ?? record?.usuarioId ?? record?.usuario?.id ?? "";
@@ -545,6 +551,7 @@ async function saveResource(form) {
   const definition = resourceDefinitions[slug];
   const id = form.dataset.resourceId;
   const payload = coerceResourceForm(form, slug);
+  const updatingOwnAccount = slug === "usuario" && id && String(id) === String(currentUser?.id);
   if (slug === "agendamento") {
     if (id) await updateManagedAppointment(id, payload);
     else await createManagedAppointment(payload);
@@ -559,7 +566,18 @@ async function saveResource(form) {
   } else {
     await post(definition.endpoint, payload);
   }
-  await reloadCurrentSection(id ? `${sections.find((item) => item.slug === slug)?.name} atualizado com sucesso.` : `${sections.find((item) => item.slug === slug)?.name} criado com sucesso.`);
+  if (updatingOwnAccount && payload.senha) {
+    clearAccessToken();
+    currentUser = null;
+    authNotice = "Dados atualizados. Entre novamente com as novas credenciais.";
+    navigateTo("/dashboard/acesso-admin", { replace: true });
+    return;
+  }
+  if (updatingOwnAccount) currentUser = { ...currentUser, nome: payload.nome, email: payload.email, cargo: payload.cargo };
+  const message = slug === "usuario"
+    ? `Conta ${id ? "atualizada" : "criada"} com sucesso.`
+    : `${sections.find((item) => item.slug === slug)?.name} ${id ? "atualizado" : "criado"} com sucesso.`;
+  await reloadCurrentSection(message);
 }
 
 function openService(service) {
@@ -632,13 +650,6 @@ async function handleSubmit(event) {
         navigateTo("/dashboard", { replace: true });
         break;
       }
-      case "admin-setup": {
-        const { setupToken, ...adminData } = fields;
-        await postWithHeaders("/admin/setup", adminData, { "X-Admin-Setup-Token": setupToken }, { authenticated: false });
-        authNotice = "Administrador criado. Entre usando o e-mail e a senha definidos.";
-        navigateTo("/dashboard/acesso-admin", { replace: true });
-        break;
-      }
       case "register": await submitRegistration(form, fields); break;
       case "contact":
         await postPublic("/mensagens/contatos", fields);
@@ -685,9 +696,8 @@ async function handleSubmit(event) {
         break;
     }
   } catch (error) {
-    if (form.dataset.form === "admin-login" || form.dataset.form === "admin-setup") {
+    if (form.dataset.form === "admin-login") {
       setFeedback(form, error.message);
-      if (form.dataset.form === "admin-setup") form.elements.setupToken.value = "";
       if (form.dataset.form === "admin-login") { clearAccessToken(); currentUser = null; }
     } else if (form.dataset.form === "resource") {
       setFeedback(form, error.message);
@@ -831,7 +841,6 @@ function renderRoute() {
   else if (path === "/dashboard/acesso-equipe") renderPortalLogin("team");
   else if (path === "/admin/login") navigateTo("/dashboard/acesso-admin", { replace: true });
   else if (path === "/painel") navigateTo("/dashboard", { replace: true });
-  else if (path === "/admin/setup") renderSetup();
   else if (path === "/dashboard" || path === "/dashboard/index" || path.startsWith("/dashboard/")) {
     if (!getAccessToken()) {
       currentUser = null;
