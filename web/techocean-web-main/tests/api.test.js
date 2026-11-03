@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { apiRequest, getAppointmentAccounts, createManagedAppointment, updateManagedAppointment, post, postPublic, postWithHeaders, putParams, ApiError, API_BASE_URL, LOCAL_API_URL, PRODUCTION_API_URL, resolveApiBaseUrl, setAccessToken, clearAccessToken, getAccessToken } from "../src/api.js";
+import { apiRequest, getAppointmentAccounts, createManagedAppointment, updateManagedAppointment, post, postPublic, postWithHeaders, putParams, ApiError, API_BASE_URL, API_REQUEST_TIMEOUT_MS, LOCAL_API_URL, PRODUCTION_API_URL, resolveApiBaseUrl, setAccessToken, clearAccessToken, getAccessToken } from "../src/api.js";
 
-afterEach(() => { vi.unstubAllGlobals(); clearAccessToken(); });
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); clearAccessToken(); });
 
 describe("API client", () => {
   it("uses the same-origin Vite proxy in development and requires a production API URL", () => {
@@ -23,18 +23,21 @@ describe("API client", () => {
     const fetchMock = vi.fn().mockResolvedValue(Response.json([{ id: 4 }]));
     vi.stubGlobal("fetch", fetchMock);
     await expect(apiRequest("/cargas")).resolves.toEqual([{ id: 4 }]);
-    expect(fetchMock).toHaveBeenCalledWith(`${API_BASE_URL}/cargas`, {});
+    expect(fetchMock.mock.calls[0][0]).toBe(`${API_BASE_URL}/cargas`);
+    expect(fetchMock.mock.calls[0][1].signal).toBeInstanceOf(AbortSignal);
   });
 
   it("serializes JSON request bodies for implemented endpoints", async () => {
     const fetchMock = vi.fn().mockResolvedValue(Response.json({ id: 3 }, { status: 201 }));
     vi.stubGlobal("fetch", fetchMock);
     await post("/mensagens/contatos", { nome: "Ana", email: "ana@example.com", conteudo: "Olá" });
-    expect(fetchMock).toHaveBeenCalledWith(`${API_BASE_URL}/mensagens/contatos`, {
+    expect(fetchMock.mock.calls[0][0]).toBe(`${API_BASE_URL}/mensagens/contatos`);
+    expect(fetchMock.mock.calls[0][1]).toMatchObject({
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ nome: "Ana", email: "ana@example.com", conteudo: "Olá" }),
     });
+    expect(fetchMock.mock.calls[0][1].signal).toBeInstanceOf(AbortSignal);
   });
 
   it("sends cargo fields as JSON for the backend's request-body contract", async () => {
@@ -42,11 +45,13 @@ describe("API client", () => {
     const fetchMock = vi.fn().mockResolvedValue(Response.json({ id: 7, ...cargo }, { status: 201 }));
     vi.stubGlobal("fetch", fetchMock);
     await post("/cargas", cargo);
-    expect(fetchMock).toHaveBeenCalledWith(`${API_BASE_URL}/cargas`, {
+    expect(fetchMock.mock.calls[0][0]).toBe(`${API_BASE_URL}/cargas`);
+    expect(fetchMock.mock.calls[0][1]).toMatchObject({
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(cargo),
     });
+    expect(fetchMock.mock.calls[0][1].signal).toBeInstanceOf(AbortSignal);
   });
 
   it("sends state updates using the implemented query-parameter contract", async () => {
@@ -54,7 +59,8 @@ describe("API client", () => {
     vi.stubGlobal("fetch", fetchMock);
     await putParams("/agendamentos/9/status", { status: "confirmado" });
     expect(fetchMock.mock.calls[0][0]).toBe(`${API_BASE_URL}/agendamentos/9/status?status=confirmado`);
-    expect(fetchMock.mock.calls[0][1]).toEqual({ method: "PUT" });
+    expect(fetchMock.mock.calls[0][1]).toMatchObject({ method: "PUT" });
+    expect(fetchMock.mock.calls[0][1].signal).toBeInstanceOf(AbortSignal);
   });
 
   it("loads appointment accounts through the authenticated account-list route", async () => {
@@ -192,5 +198,43 @@ describe("API client", () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("offline")));
     await expect(apiRequest("/clientes")).rejects.toBeInstanceOf(ApiError);
     await expect(apiRequest("/clientes")).rejects.toThrow("localhost:8080");
+  });
+
+  it("aborts requests that do not respond before the timeout", async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.fn((_url, { signal }) => new Promise((_resolve, reject) => {
+      signal.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")), { once: true });
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const request = apiRequest("/admin/me");
+    const rejection = expect(request).rejects.toMatchObject({
+      name: "ApiError",
+      status: 408,
+      code: "TEMPO_ESGOTADO",
+    });
+    await vi.advanceTimersByTimeAsync(API_REQUEST_TIMEOUT_MS);
+
+    await rejection;
+    expect(fetchMock.mock.calls[0][1].signal.aborted).toBe(true);
+  });
+
+  it("also times out when the response body stalls after headers arrive", async () => {
+    vi.useFakeTimers();
+    const stalledBody = new ReadableStream({ start() {} });
+    const fetchMock = vi.fn().mockResolvedValue(new Response(stalledBody, {
+      headers: { "Content-Type": "application/json" },
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const request = apiRequest("/cargas");
+    const rejection = expect(request).rejects.toMatchObject({
+      status: 408,
+      code: "TEMPO_ESGOTADO",
+    });
+    await vi.advanceTimersByTimeAsync(API_REQUEST_TIMEOUT_MS);
+
+    await rejection;
+    expect(fetchMock.mock.calls[0][1].signal.aborted).toBe(true);
   });
 });

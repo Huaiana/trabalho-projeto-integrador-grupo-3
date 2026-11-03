@@ -1,6 +1,7 @@
 export const LOCAL_API_URL = "/api";
 // Production deployments must provide VITE_API_URL at build time.
 export const PRODUCTION_API_URL = "";
+export const API_REQUEST_TIMEOUT_MS = 15_000;
 
 export function resolveApiBaseUrl(env = import.meta.env) {
   const configuredBase = env?.DEV ? LOCAL_API_URL : env?.VITE_API_URL || PRODUCTION_API_URL;
@@ -38,29 +39,63 @@ export async function apiRequest(path, options = {}, { authenticated = true } = 
     headers.set("Authorization", `Bearer ${accessToken}`);
     requestOptions = { ...options, headers };
   }
-  let response;
+  const controller = new AbortController();
+  const callerSignal = requestOptions.signal;
+  let timedOut = false;
+  let timeoutId;
+  const abortFromCaller = () => controller.abort(callerSignal.reason);
+  if (callerSignal?.aborted) abortFromCaller();
+  else callerSignal?.addEventListener("abort", abortFromCaller, { once: true });
+
+  const timeoutError = new ApiError(
+    `A API não respondeu em até ${API_REQUEST_TIMEOUT_MS / 1000} segundos. Verifique a conexão e tente novamente.`,
+    408,
+    "TEMPO_ESGOTADO",
+  );
+  const timeout = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+      reject(timeoutError);
+    }, API_REQUEST_TIMEOUT_MS);
+  });
+
   try {
-    response = await fetch(`${API_BASE_URL}${path}`, requestOptions);
-  } catch {
+    return await Promise.race([
+      (async () => {
+        const response = await fetch(`${API_BASE_URL}${path}`, {
+          ...requestOptions,
+          signal: controller.signal,
+        });
+        const contentType = response.headers.get("content-type") || "";
+        const payload = contentType.includes("json")
+          ? await response.json().catch(() => null)
+          : await response.text().catch(() => "");
+        if (!response.ok) {
+          const message = payload && typeof payload === "object" && (payload.message || payload.detail || payload.title)
+            ? payload.message || payload.detail || payload.title
+            : typeof payload === "string" && payload.trim()
+              ? payload
+              : response.status === 401 && path === "/admin/me"
+                ? "Login aceito, mas o servidor recusou a sessão. Tente entrar novamente; se persistir, verifique se as instâncias da API usam o mesmo APP_AUTH_SECRET."
+                : `Não foi possível concluir a operação (HTTP ${response.status}).`;
+          throw new ApiError(message, response.status, payload?.code || "");
+        }
+        return payload;
+      })(),
+      timeout,
+    ]);
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    if (timedOut) throw timeoutError;
     const guidance = import.meta.env?.DEV
       ? "Confirme o Spring Boot em localhost:8080 e o proxy /api do Vite."
       : "Verifique VITE_API_URL, a disponibilidade do serviço e o CORS.";
     throw new ApiError(`Não foi possível conectar à API (${API_BASE_URL}). ${guidance}`, 0, "SEM_CONEXAO");
+  } finally {
+    clearTimeout(timeoutId);
+    callerSignal?.removeEventListener("abort", abortFromCaller);
   }
-
-  const contentType = response.headers.get("content-type") || "";
-  const payload = contentType.includes("json") ? await response.json().catch(() => null) : await response.text().catch(() => "");
-  if (!response.ok) {
-    const message = payload && typeof payload === "object" && (payload.message || payload.detail || payload.title)
-      ? payload.message || payload.detail || payload.title
-      : typeof payload === "string" && payload.trim()
-        ? payload
-        : response.status === 401 && path === "/admin/me"
-          ? "Login aceito, mas o servidor recusou a sessão. Tente entrar novamente; se persistir, verifique se as instâncias da API usam o mesmo APP_AUTH_SECRET."
-        : `Não foi possível concluir a operação (HTTP ${response.status}).`;
-    throw new ApiError(message, response.status, payload?.code || "");
-  }
-  return payload;
 }
 
 export function get(path) {

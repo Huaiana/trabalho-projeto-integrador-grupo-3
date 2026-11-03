@@ -26,6 +26,8 @@ npm run dev
 
 O `npm ci` na raiz instala as dependências do frontend em `web/techocean-web-main/`. O site ficará disponível em `http://localhost:5173`. Em desenvolvimento, as chamadas usam o proxy `/api` do Vite, evitando chamadas cross-origin do navegador. O destino do proxy é `VITE_API_URL`, quando definido, ou o Spring Boot local em `http://127.0.0.1:8080`.
 
+Para evitar que a interface fique carregando indefinidamente quando a API não responde, as requisições expiram após 15 segundos e exibem um erro que permite tentar novamente.
+
 Assim, `web/techocean-web-main/.env` pode apontar `VITE_API_URL` para a API Render ou para uma API local. No build de produção, essa mesma variável define a URL chamada diretamente pelo navegador.
 
 Se a porta `8080` já estiver ocupada, inicie a API em outra porta e configure a URL no terminal do frontend:
