@@ -16,6 +16,7 @@ const sections = [
   { slug: "mensagens", name: "Mensagens", description: "Mensagens recebidas pelo Fale conosco.", endpoint: "/mensagens/contatos" },
   { slug: "operacao", name: "Operação", description: "Operações em andamento.", endpoint: "/operacoes", columns: ["id", "solicitacao", "conteiner", "responsavel", "andamento", "observacoes"], resource: true },
   { slug: "orcamento", name: "Orçamento", description: "Orçamentos e solicitações comerciais.", endpoint: "/orcamentos", columns: ["id", "cliente", "carga", "servico", "valorEstimado", "status"] },
+  { slug: "backup", name: "Backup", description: "Gere cópias de segurança dos dados da operação.", endpoint: null },
   { slug: "usuario", name: "Configurações", description: "Atualize seus dados e gerencie contas de administradores e equipe.", endpoint: "/admin/usuarios", columns: ["id", "nome", "email", "cargo"], resource: true, adminOnly: true },
   { slug: "auditoria", name: "Auditoria", description: "Registro de atividades administrativas.", endpoint: "/admin/auditoria", adminOnly: true },
   { slug: "sessoes", name: "Sessões", description: "Sessões administrativas ativas e recentes.", endpoint: "/admin/sessoes", adminOnly: true },
@@ -309,6 +310,10 @@ function collectionFrom(payload) {
 async function loadSection(section) {
   const host = document.querySelector("#section-content");
   if (!host) return;
+  if (section.slug === "backup") {
+    host.innerHTML = renderBackupSection();
+    return;
+  }
   if (!section.endpoint) {
     host.innerHTML = `<div class="notice-panel"><span class="notice-mark">i</span><div><strong>Consulta ainda não disponível</strong><p>O servidor não oferece uma rota para listar usuários administrativos. Nenhum dado de exemplo é exibido aqui.</p></div></div>`;
     return;
@@ -330,6 +335,10 @@ async function loadSection(section) {
   } catch (error) {
     if (host.isConnected) host.innerHTML = `<div class="load-error" role="alert"><p>${esc(error.message)}</p><button class="button button-outline" data-reload>Atualizar</button></div>`;
   }
+}
+
+export function renderBackupSection() {
+  return `<section class="data-panel backup-panel"><div class="panel-heading"><div><span class="eyebrow">SEGURANÇA DOS DADOS</span><h2>Cópias de segurança</h2></div></div><p class="dash-description">Gere uma cópia dos dados antes de alterações importantes ou sempre que precisar preservar o estado atual da operação.</p><div class="backup-actions"><button class="button button-primary compact" data-action="backup" data-backup-type="operacional">Gerar backup operacional</button>${isAdmin() ? '<button class="button button-outline compact" data-action="backup" data-backup-type="completo">Gerar backup administrativo completo</button>' : ""}</div><p class="backup-feedback" role="status"></p></section>`;
 }
 
 const chargeFields = [["descricao", "Descrição", "text"], ["peso", "Peso (t)", "number"], ["volume", "Volume (m³)", "number"], ["tipoCarga", "Tipo de carga", "text"], ["origem", "Origem", "text"], ["destino", "Destino", "text"]];
@@ -864,6 +873,26 @@ if (app) app.addEventListener("click", async (event) => {
   if (target.hasAttribute("data-close-form")) { target.closest("form")?.remove(); return; }
   if (target.hasAttribute("data-reload")) { await reloadCurrentSection(); return; }
   if (target.dataset.action === "logout") { await logoutAdmin(); return; }
+  if (target.dataset.action === "backup") {
+    const type = target.dataset.backupType;
+    const endpoint = type === "completo" ? "/api/backup/admin/completo" : "/api/backup/operacional";
+    const originalText = target.textContent;
+    const feedback = document.querySelector(".backup-feedback");
+    target.disabled = true;
+    target.textContent = "Gerando…";
+    try {
+      const result = await post(endpoint);
+      if (feedback) feedback.textContent = typeof result === "string" ? result : "Backup gerado com sucesso.";
+    } catch (error) {
+      if (feedback) feedback.textContent = error.message;
+    } finally {
+      if (target.isConnected) {
+        target.disabled = false;
+        target.textContent = originalText;
+      }
+    }
+    return;
+  }
   if (target.dataset.action === "new-resource") {
     await openResourceForm(target.dataset.resource);
     return;
