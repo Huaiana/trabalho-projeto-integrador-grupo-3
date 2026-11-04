@@ -1,6 +1,7 @@
 package com.git.techocean.controller;
 
 import java.util.List;
+import java.util.Objects;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -47,12 +48,15 @@ public class AgendamentoController {
 
     @GetMapping("/cliente/{clienteId}")
     public ResponseEntity<List<AgendamentoDto>> listarPorCliente(@PathVariable Long clienteId) {
-        return ResponseEntity.ok(agendamentoService.listarPorCliente(clienteId).stream().map(AgendamentoDto::from).toList());
+        Long clienteIdObrigatorio = Objects.requireNonNull(clienteId, "clienteId não pode ser nulo");
+        return ResponseEntity.ok(
+                agendamentoService.listarPorCliente(clienteIdObrigatorio).stream().map(AgendamentoDto::from).toList());
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<AgendamentoDto> buscarPorId(@PathVariable Long id) {
-        return ResponseEntity.ok(AgendamentoDto.from(agendamentoService.buscarPorId(id)));
+        Long idObrigatorio = Objects.requireNonNull(id, "id não pode ser nulo");
+        return ResponseEntity.ok(AgendamentoDto.from(agendamentoService.buscarPorId(idObrigatorio)));
     }
 
     /** Team-only edit; a null usuarioId preserves the existing customer. */
@@ -67,7 +71,7 @@ public class AgendamentoController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> excluir(@PathVariable Long id) {
-        agendamentoService.excluir(id);
+        agendamentoService.excluir(Objects.requireNonNull(id, "id não pode ser nulo"));
         return ResponseEntity.noContent().build();
     }
 
