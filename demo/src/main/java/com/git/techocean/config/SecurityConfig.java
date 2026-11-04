@@ -25,8 +25,10 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.web.SecurityFilterChain;
 
 @Configuration
+@SuppressWarnings("unused")
 public class SecurityConfig {
     @Bean
+    @SuppressWarnings("unused")
     SecretKey appSigningKey(@Value("${APP_AUTH_SECRET:}") String configuredSecret, Environment env) {
         boolean production = java.util.Arrays.asList(env.getActiveProfiles()).contains("production");
         String secret = configuredSecret;
@@ -39,8 +41,12 @@ public class SecurityConfig {
         return new SecretKeySpec(bytes, "HmacSHA256");
     }
 
-    @Bean PasswordEncoder passwordEncoder() { return new BCryptPasswordEncoder(); }
-    @Bean JwtEncoder jwtEncoder(SecretKey key) { return new NimbusJwtEncoder(new ImmutableSecret<>(key)); }
+    @Bean
+    @SuppressWarnings("unused")
+    PasswordEncoder passwordEncoder() { return new BCryptPasswordEncoder(); }
+    @Bean
+    @SuppressWarnings("unused")
+    JwtEncoder jwtEncoder(SecretKey key) { return new NimbusJwtEncoder(new ImmutableSecret<>(key)); }
     @Bean JwtDecoder jwtDecoder(SecretKey key) {
         return NimbusJwtDecoder.withSecretKey(key).macAlgorithm(MacAlgorithm.HS256).build();
     }
@@ -57,6 +63,7 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.POST, "/admin/setup", "/admin/login").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/auth/password-reset/request", "/auth/password-reset/confirm").permitAll()
                         .requestMatchers(HttpMethod.POST, "/clientes", "/clientes/login", "/mensagens/contatos", "/agendamentos").permitAll()
                         .requestMatchers(HttpMethod.GET, "/servicos", "/servicos/*").permitAll()
                         .requestMatchers("/actuator/health", "/error").permitAll()

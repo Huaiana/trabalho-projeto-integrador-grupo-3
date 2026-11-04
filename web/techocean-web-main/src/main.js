@@ -201,7 +201,18 @@ export function loginScreenMarkup(portal = "admin", error = "", notice = "") {
     ? "Entre como supervisor ou funcionário para acompanhar e atualizar a operação."
     : "Entre como administrador para gerenciar a equipe, auditoria e controles.";
   const returnPortal = `<a href="/dashboard">← Voltar ao painel</a>`;
-  return `<main class="auth-page"><section class="auth-card ${teamPortal ? "auth-team" : "auth-admin"}"><a href="/dashboard" class="wordmark">Techocean</a><p class="eyebrow">${eyebrow} · PAINEL</p><h1>${title}</h1><p class="muted">${intro}</p>${notice ? `<p class="inline-success" role="status">${esc(notice)}</p>` : ""}<form class="form-grid" data-form="admin-login" data-login-portal="${teamPortal ? "team" : "admin"}">${field("E-mail", "email", "email", "username")}${field("Senha", "senha", "password", "current-password")}<p class="form-feedback" role="alert">${esc(error)}</p><button class="button button-primary form-submit">Entrar <span>↗</span></button></form><div class="auth-links">${returnPortal}</div></section></main>`;
+  return `<main class="auth-page"><section class="auth-card ${teamPortal ? "auth-team" : "auth-admin"}"><a href="/dashboard" class="wordmark">Techocean</a><p class="eyebrow">${eyebrow} · PAINEL</p><h1>${title}</h1><p class="muted">${intro}</p>${notice ? `<p class="inline-success" role="status">${esc(notice)}</p>` : ""}<form class="form-grid" data-form="admin-login" data-login-portal="${teamPortal ? "team" : "admin"}">${field("E-mail", "email", "email", "username")}${field("Senha", "senha", "password", "current-password")}<p class="form-feedback" role="alert">${esc(error)}</p><button class="button button-primary form-submit">Entrar <span>↗</span></button></form><div class="auth-links"><a href="/esqueci-senha">Esqueci minha senha</a>${returnPortal}</div></section></main>`;
+}
+
+function renderForgotPassword() {
+  document.title = "Recuperar senha — Techocean";
+  app.innerHTML = `<main class="auth-page"><section class="auth-card"><a href="/dashboard" class="wordmark">Techocean</a><p class="eyebrow">RECUPERAÇÃO DE ACESSO</p><h1>Esqueci minha senha</h1><p class="muted">Informe o e-mail da conta. Se existir, enviaremos um link para criar uma nova senha.</p><form class="form-grid" data-form="password-reset-request">${field("E-mail", "email", "email", "username")}<p class="form-feedback" role="alert"></p><button class="button button-primary form-submit">Enviar link <span>↗</span></button></form><div class="auth-links"><a href="/dashboard/acesso-admin">Voltar ao login</a></div></section></main>`;
+}
+
+function renderResetPassword() {
+  const token = new URLSearchParams(window.location.search).get("token") || "";
+  document.title = "Nova senha — Techocean";
+  app.innerHTML = `<main class="auth-page"><section class="auth-card"><a href="/dashboard" class="wordmark">Techocean</a><p class="eyebrow">RECUPERAÇÃO DE ACESSO</p><h1>Criar nova senha</h1><p class="muted">A nova senha deve ter pelo menos 8 caracteres, com letras e números.</p><form class="form-grid" data-form="password-reset-confirm" data-reset-token="${esc(token)}">${field("Nova senha", "senha", "password", "new-password", "minlength=\"8\"")}${field("Confirmar senha", "confirmacao", "password", "new-password", "minlength=\"8\"")}<p class="form-feedback" role="alert"></p><button class="button button-primary form-submit">Atualizar senha <span>↗</span></button></form></section></main>`;
 }
 
 function renderLogin(portal = "admin", error = "") {
@@ -651,6 +662,18 @@ async function handleSubmit(event) {
         navigateTo("/dashboard", { replace: true });
         break;
       }
+      case "password-reset-request": {
+        await postPublic("/auth/password-reset/request", { email: fields.email.trim() });
+        setFeedback(form, "Se o e-mail estiver cadastrado, enviaremos um link para redefinir a senha.", true);
+        form.reset();
+        break;
+      }
+      case "password-reset-confirm": {
+        if (fields.senha !== fields.confirmacao) throw new Error("As senhas não conferem.");
+        await postPublic("/auth/password-reset/confirm", { token: form.dataset.resetToken, senha: fields.senha });
+        form.innerHTML = `<p class="success-message" role="status">Senha atualizada com sucesso. <a href="/dashboard/acesso-admin">Voltar ao login</a></p>`;
+        break;
+      }
       case "register": await submitRegistration(form, fields); break;
       case "contact":
         await postPublic("/mensagens/contatos", fields);
@@ -838,6 +861,8 @@ function renderRoute() {
   const path = routePath();
   if (path === "/") renderHome();
   else if (path === "/cadastro") renderCadastro();
+  else if (path === "/esqueci-senha") renderForgotPassword();
+  else if (path === "/redefinir-senha") renderResetPassword();
   else if (path === "/dashboard/acesso-admin") renderPortalLogin("admin");
   else if (path === "/dashboard/acesso-equipe") renderPortalLogin("team");
   else if (path === "/admin/login") navigateTo("/dashboard/acesso-admin", { replace: true });
