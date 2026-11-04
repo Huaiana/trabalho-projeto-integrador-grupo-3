@@ -1,6 +1,7 @@
 package com.git.techocean.service;
 
 import java.util.List;
+import java.util.Objects;
 import org.springframework.http.HttpStatus;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
@@ -37,7 +38,7 @@ public class CargaService {
     }
 
     public @NonNull Carga buscarPorId(@NonNull Long id) {
-        return cargaRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Carga não encontrada."));
+        return Objects.requireNonNull(cargaRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Carga não encontrada.")));
     }
 }

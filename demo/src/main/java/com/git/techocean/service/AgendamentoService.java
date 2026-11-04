@@ -36,6 +36,7 @@ public class AgendamentoService {
     }
 
     @Transactional
+    @SuppressWarnings("null")
     public Agendamento solicitarVisita(Agendamento request) {
         if (request == null
                 || isBlank(request.getNome())
@@ -91,11 +92,12 @@ public class AgendamentoService {
                     HttpStatus.UNAUTHORIZED);
         }
 
-        request.setEmail(email);
-        request.setTelefone(request.getTelefone().trim());
-        request.setStatus(true);
-        request.setUsuario(usuario);
-        return agendamentoRepository.save(request);
+        Agendamento agendamentoValidado = Objects.requireNonNull(request);
+        agendamentoValidado.setEmail(email);
+        agendamentoValidado.setTelefone(agendamentoValidado.getTelefone().trim());
+        agendamentoValidado.setStatus(true);
+        agendamentoValidado.setUsuario(usuario);
+        return agendamentoRepository.save(agendamentoValidado);
     }
 
     public List<Agendamento> listar() {
@@ -111,13 +113,14 @@ public class AgendamentoService {
     }
 
     public @NonNull Agendamento buscarPorId(@NonNull Long id) {
-        return agendamentoRepository.findById(id)
+        return Objects.requireNonNull(agendamentoRepository.findById(id)
                 .orElseThrow(() -> new AgendamentoException(
                         "AGENDAMENTO_NAO_ENCONTRADO",
                         "Agendamento não encontrado.",
-                        HttpStatus.NOT_FOUND));
+                        HttpStatus.NOT_FOUND)));
     }
 
+    @SuppressWarnings("null")
     public Agendamento atualizarStatus(Long id, String status) {
         boolean confirmado;
         if ("confirmado".equalsIgnoreCase(status) || "true".equalsIgnoreCase(status)) {
@@ -137,6 +140,7 @@ public class AgendamentoService {
     }
 
     @Transactional
+    @SuppressWarnings("null")
     public Agendamento criarPelaEquipe(Long usuarioId, String telefone, LocalDateTime dataHora, Boolean confirmado) {
         if (usuarioId == null || usuarioId <= 0) {
             throw new AgendamentoException("USUARIO_INVALIDO", "Selecione um cliente cadastrado.", HttpStatus.BAD_REQUEST);
@@ -160,6 +164,7 @@ public class AgendamentoService {
     }
 
     @Transactional
+    @SuppressWarnings("null")
     public Agendamento atualizarPelaEquipe(Long id, Long usuarioId, String telefone, LocalDateTime dataHora, Boolean confirmado) {
         Agendamento agendamento = buscarPorId(id);
         if (usuarioId != null) {
@@ -179,8 +184,10 @@ public class AgendamentoService {
     }
 
     @Transactional
+    @SuppressWarnings("null")
     public void excluir(@NonNull Long id) {
-        agendamentoRepository.delete(buscarPorId(id));
+        Agendamento agendamento = buscarPorId(id);
+        agendamentoRepository.delete(agendamento);
     }
 
     private boolean isBlank(String value) {

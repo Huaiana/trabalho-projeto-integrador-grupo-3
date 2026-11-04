@@ -1,6 +1,7 @@
 package com.git.techocean.service;
 
 import java.util.List;
+import java.util.Objects;
 import org.springframework.http.HttpStatus;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
@@ -54,8 +55,8 @@ public class ClienteService {
     }
 
     public @NonNull Cliente buscarPorId(@NonNull Long id) {
-        return clienteRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Cliente " + id + " não encontrado"));
+        return Objects.requireNonNull(clienteRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Cliente " + id + " não encontrado")));
     }
 
     @Transactional
