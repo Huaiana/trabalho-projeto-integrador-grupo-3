@@ -82,7 +82,7 @@ public class SessionAuditInterceptor implements HandlerInterceptor {
 
     private ActionMetadata genericActionMetadata(String method, String uri) {
         String[] resource = switch (uri.startsWith("/") ? uri.substring(1).split("/") [0] : "") {
-            case "cargas" -> new String[] {"CARGA", "cargas"};
+            case "cargas" -> new String[] {"CAR", "cargas"};
             case "clientes" -> new String[] {"CLI", "clientes"};
             case "conteineres" -> new String[] {"CNT", "contêineres"};
             case "operacoes" -> new String[] {"OPR", "operações"};

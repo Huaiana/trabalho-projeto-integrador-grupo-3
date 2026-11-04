@@ -3,8 +3,8 @@ package com.git.techocean.service;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.time.LocalDateTime;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
@@ -13,18 +13,18 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
-import com.git.techocean.model.Cliente;
 import com.git.techocean.model.BackupRecord;
+import com.git.techocean.model.Cliente;
 import com.git.techocean.model.Mensagem;
 import com.git.techocean.model.Operacao;
 import com.git.techocean.model.Solicitacao;
+import com.git.techocean.repository.BackupRecordRepository;
 import com.git.techocean.repository.ClienteRepository;
 import com.git.techocean.repository.MensagemRepository;
 import com.git.techocean.repository.OperacaoRepository;
 import com.git.techocean.repository.OrcamentoRepository;
 import com.git.techocean.repository.SolicitacaoRepository;
 import com.git.techocean.repository.UsuarioAdminRepository;
-import com.git.techocean.repository.BackupRecordRepository;
 
 @Service
 public class BackupService {
@@ -53,8 +53,8 @@ public class BackupService {
         this.backupRecords = backupRecords;
     }
 
-    // Backup automático agendado diariamente à meia-noite
-    @Scheduled(cron = "0 0 0 * * *")
+    // Backup automático agendado diariamente com horários distintos: meio-dia, 15:00 horas, 19:00 horas e meia-noite
+    @Scheduled(cron = "0 0 0,12,15,19 * * *")
     public void executarBackupAutomatico() {
         gerarBackupAdministrativo(null);
     }
@@ -114,6 +114,7 @@ public class BackupService {
                 org.springframework.data.domain.Sort.Direction.DESC, "createdAt"));
     }
 
+    @SuppressWarnings("null")
     private BackupRecord saveRecord(String type, Long actorId, int clientes, int orcamentos, int solicitacoes,
             int operacoes, int mensagens, int administradores) {
         BackupRecord record = new BackupRecord();
