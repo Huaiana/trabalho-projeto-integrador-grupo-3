@@ -2,6 +2,7 @@ package com.git.techocean.config;
 
 import java.util.Arrays;
 import java.util.LinkedHashSet;
+import java.util.Objects;
 import java.util.Set;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
@@ -54,7 +55,7 @@ public class CorsConfig implements WebMvcConfigurer {
 
     @NonNull
     private String[] toOriginPatterns(Set<String> origins) {
-        return origins.toArray(String[]::new);
+        return Objects.requireNonNull(origins.toArray(String[]::new));
     }
 
     @Override public void addInterceptors(
