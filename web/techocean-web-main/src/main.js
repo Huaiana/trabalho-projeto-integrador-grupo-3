@@ -1,4 +1,4 @@
-import { apiRequest, get, post, postPublic, postParams, put, putParams, del, getAppointmentAccounts, createManagedAppointment, updateManagedAppointment, setAccessToken, clearAccessToken, getAccessToken, ApiError } from "./api.js";
+import { apiRequest, get, post, postPublic, postWithHeaders, postParams, put, putParams, del, getAppointmentAccounts, createManagedAppointment, updateManagedAppointment, setAccessToken, clearAccessToken, getAccessToken, ApiError } from "./api.js";
 import lashingImage from "./assets/lashing.jpg";
 import "./vanilla.css";
 import "./admin.css";
@@ -181,7 +181,11 @@ function renderCadastro() {
 }
 
 function field(label, name, type = "text", autocomplete = "off", attributes = "") {
-  return `<label class="field-label" for="field-${name}">${label}<input id="field-${name}" name="${name}" type="${type}" autocomplete="${autocomplete}" ${attributes} required></label>`;
+  const input = `<input id="field-${name}" name="${name}" type="${type}" autocomplete="${autocomplete}" ${attributes} required>`;
+  const control = type === "password"
+    ? `<span class="password-field">${input}<button type="button" class="password-toggle" data-toggle-password="field-${name}" aria-label="Mostrar ${label.toLowerCase()}" aria-pressed="false">Mostrar</button></span>`
+    : input;
+  return `<label class="field-label" for="field-${name}">${label}${control}</label>`;
 }
 
 export function dashboardGatewayMarkup(notice = "") {
@@ -389,7 +393,11 @@ function resourceFieldMarkup(fieldDefinition, record, editing) {
     return `<label class="field-label" for="${id}">${esc(fieldDefinition.label)}<select id="${id}" name="${fieldDefinition.name}" ${required}><option value="">Selecione uma conta</option>${(record?.appointmentAccounts || []).map((account) => `<option value="${esc(account.id)}" ${String(selectedId) === String(account.id) ? "selected" : ""}>${esc(account.nome)} · ${esc(account.email)}</option>`).join("")}</select></label>`;
   }
   if (fieldDefinition.type === "textarea") return `<label class="field-label" for="${id}">${esc(fieldDefinition.label)}<textarea id="${id}" name="${fieldDefinition.name}" rows="3" ${required}>${esc(value)}</textarea></label>`;
-  return `<label class="field-label" for="${id}">${esc(fieldDefinition.label)}<input id="${id}" name="${fieldDefinition.name}" type="${fieldDefinition.type || "text"}" value="${fieldDefinition.type === "password" ? "" : esc(value)}" ${required}>${optionalPassword}</label>`;
+  const input = `<input id="${id}" name="${fieldDefinition.name}" type="${fieldDefinition.type || "text"}" value="${fieldDefinition.type === "password" ? "" : esc(value)}" ${required}>`;
+  const control = fieldDefinition.type === "password"
+    ? `<span class="password-field">${input}<button type="button" class="password-toggle" data-toggle-password="${id}" aria-label="Mostrar ${esc(fieldDefinition.label).toLowerCase()}" aria-pressed="false">Mostrar</button></span>`
+    : input;
+  return `<label class="field-label" for="${id}">${esc(fieldDefinition.label)}${control}${optionalPassword}</label>`;
 }
 
 export function renderResourceFormMarkup(slug, record = null, appointmentAccounts = []) {
@@ -831,13 +839,23 @@ if (app) app.addEventListener("click", async (event) => {
     navigateTo(routeDestination);
     return;
   }
-  const target = event.target.closest("[data-action], [data-service], [data-close-modal], [data-close-form], [data-reload], [data-status-id]");
+  const target = event.target.closest("[data-action], [data-service], [data-close-modal], [data-close-form], [data-reload], [data-status-id], [data-toggle-password]");
   const resourceAction = event.target.closest("[data-resource-action]");
   if (resourceAction) {
     await handleResourceAction(resourceAction.dataset.resourceAction, resourceAction.dataset.resource, resourceAction.dataset.id, resourceAction.dataset.label);
     return;
   }
   if (!target) return;
+  if (target.hasAttribute("data-toggle-password")) {
+    const input = document.getElementById(target.dataset.togglePassword);
+    if (!input) return;
+    const visible = input.type === "text";
+    input.type = visible ? "password" : "text";
+    target.textContent = visible ? "Mostrar" : "Ocultar";
+    target.setAttribute("aria-label", `${visible ? "Mostrar" : "Ocultar"} senha`);
+    target.setAttribute("aria-pressed", String(!visible));
+    return;
+  }
   if (target.hasAttribute("data-close-modal")) {
     if (target.classList.contains("modal-backdrop") && event.target.closest(".modal-card")) return;
     dismissModal();
