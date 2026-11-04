@@ -1,14 +1,9 @@
 import { z } from "zod";
 import { cargaRecebidaSchema, type Carga, type DadosCarga } from "@/models/carga";
-import { API_BASE_URL } from "../api.js";
+import { apiRequest } from "../api.js";
 
 async function requisitar(init?: RequestInit): Promise<Response> {
-  let response: Response;
-  try {
-    response = await fetch(`${API_BASE_URL}/cargas`, init);
-  } catch {
-    throw new Error("Não foi possível conectar ao servidor de cargas. Verifique se ele está ligado e permite o acesso do site.");
-  }
+  const response = await apiRequest("/cargas", init);
   if (!response.ok) {
     const payload: unknown = await response.json().catch(() => null);
     const erro = z.object({ message: z.string() }).safeParse(payload);
