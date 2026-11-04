@@ -12,6 +12,7 @@ import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.Optional;
 import java.util.Objects;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
@@ -30,13 +31,13 @@ public class PasswordResetService {
     private final ClienteRepository clienteRepository;
     private final UsuarioAdminRepository adminRepository;
     private final PasswordEncoder passwordEncoder;
-    private final JavaMailSender mailSender;
+    private final Optional<JavaMailSender> mailSender;
     private final String publicUrl;
     private final String mailFrom;
     private final SecureRandom random = new SecureRandom();
 
     public PasswordResetService(PasswordResetTokenRepository tokenRepository, ClienteRepository clienteRepository,
-            UsuarioAdminRepository adminRepository, PasswordEncoder passwordEncoder, JavaMailSender mailSender,
+            UsuarioAdminRepository adminRepository, PasswordEncoder passwordEncoder, Optional<JavaMailSender> mailSender,
             @Value("${APP_PUBLIC_URL:http://localhost:5173}") String publicUrl,
             @Value("${MAIL_FROM:}") String mailFrom) {
         this.tokenRepository = tokenRepository;
@@ -60,7 +61,7 @@ public class PasswordResetService {
             accountId = cliente == null ? null : cliente.getId();
         }
         if (accountId == null) return;
-        if (mailFrom.isBlank()) {
+        if (mailFrom.isBlank() || mailSender.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
                     "Recuperação de senha indisponível: o envio de e-mail não está configurado.");
         }
@@ -77,7 +78,7 @@ public class PasswordResetService {
         message.setSubject("Redefinição de senha Techocean");
         message.setText("Acesse este link para criar uma nova senha (válido por 30 minutos):\n\n"
                 + publicUrl + "/redefinir-senha?token=" + rawToken);
-        mailSender.send(message);
+        mailSender.orElseThrow(() -> new IllegalStateException("JavaMailSender não configurado.")).send(message);
     }
 
     @Transactional
