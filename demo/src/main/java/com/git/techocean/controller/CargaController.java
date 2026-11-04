@@ -37,4 +37,19 @@ public class CargaController {
         Long idObrigatorio = Objects.requireNonNull(id, "id não pode ser nulo");
         return new ResponseEntity<>(cargaService.buscarPorId(idObrigatorio), HttpStatus.OK);
     }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<Carga> atualizar(@PathVariable Long id, @RequestBody Carga dados) {
+        Long idObrigatorio = Objects.requireNonNull(id, "id não pode ser nulo");
+        Carga carga = cargaService.atualizar(idObrigatorio, dados.getDescricao(), dados.getPeso(), dados.getVolume(),
+                dados.getTipoCarga(), dados.getOrigem(), dados.getDestino());
+        return ResponseEntity.ok(carga);
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> excluir(@PathVariable Long id) {
+        Long idObrigatorio = Objects.requireNonNull(id, "id não pode ser nulo");
+        cargaService.excluir(idObrigatorio);
+        return ResponseEntity.noContent().build();
+    }
 }

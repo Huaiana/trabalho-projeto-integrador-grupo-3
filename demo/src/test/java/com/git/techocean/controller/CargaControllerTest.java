@@ -6,6 +6,9 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.ArgumentMatchers.any;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -29,6 +32,7 @@ import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequ
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.context.TestPropertySource;
+import java.util.List;
 
 @WebMvcTest(CargaController.class)
 @Import({CorsConfig.class, SecurityConfig.class})
@@ -85,5 +89,61 @@ class CargaControllerTest {
                         .header(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, "content-type"))
                 .andExpect(status().isOk())
                 .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, siteOrigin));
+    }
+
+    @Test
+    void listsLoads() throws Exception {
+        Carga carga = new Carga("Carga", 10.0, 5.0, "Geral", "Santos", "Recife");
+        when(cargaService.listar()).thenReturn(List.of(carga));
+
+        mockMvc.perform(get("/cargas")
+                        .with(SecurityMockMvcRequestPostProcessors.jwt()
+                                .jwt(token -> token.subject("1").claim("jti", "test-session").claim("role", "ADMIN"))
+                                .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].descricao").value("Carga"));
+    }
+
+    @Test
+    void getsLoadById() throws Exception {
+        Carga carga = new Carga("Carga", 10.0, 5.0, "Geral", "Santos", "Recife");
+        when(cargaService.buscarPorId(3L)).thenReturn(carga);
+
+        mockMvc.perform(get("/cargas/3")
+                        .with(SecurityMockMvcRequestPostProcessors.jwt()
+                                .jwt(token -> token.subject("1").claim("jti", "test-session").claim("role", "ADMIN"))
+                                .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.descricao").value("Carga"));
+    }
+
+    @Test
+    void updatesLoad() throws Exception {
+        Carga carga = new Carga("Carga atualizada", 20.0, 8.0, "Geral", "Santos", "Rio");
+        when(cargaService.atualizar(3L, "Carga atualizada", 20.0, 8.0, "Geral", "Santos", "Rio"))
+                .thenReturn(carga);
+
+        mockMvc.perform(put("/cargas/3")
+                        .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
+                        .with(SecurityMockMvcRequestPostProcessors.jwt()
+                                .jwt(token -> token.subject("1").claim("jti", "test-session").claim("role", "ADMIN"))
+                                .authorities(new SimpleGrantedAuthority("ROLE_ADMIN")))
+                        .content("""
+                                {"descricao":"Carga atualizada","peso":20.0,"volume":8.0,
+                                 "tipoCarga":"Geral","origem":"Santos","destino":"Rio"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.destino").value("Rio"));
+    }
+
+    @Test
+    void deletesLoad() throws Exception {
+        mockMvc.perform(delete("/cargas/3")
+                        .with(SecurityMockMvcRequestPostProcessors.jwt()
+                                .jwt(token -> token.subject("1").claim("jti", "test-session").claim("role", "ADMIN"))
+                                .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+                .andExpect(status().isNoContent());
+
+        verify(cargaService).excluir(3L);
     }
 }
