@@ -2,6 +2,7 @@ export const LOCAL_API_URL = "/api";
 // Production deployments must provide VITE_API_URL at build time.
 export const PRODUCTION_API_URL = "";
 export const API_REQUEST_TIMEOUT_MS = 15_000;
+const ACCESS_TOKEN_STORAGE_KEY = "techocean.accessToken";
 
 export function resolveApiBaseUrl(env = import.meta.env) {
   const configuredBase = env?.DEV ? LOCAL_API_URL : env?.VITE_API_URL || PRODUCTION_API_URL;
@@ -9,14 +10,24 @@ export function resolveApiBaseUrl(env = import.meta.env) {
 }
 
 export const API_BASE_URL = resolveApiBaseUrl();
-let accessToken = null;
+function readStoredAccessToken() {
+  try {
+    return globalThis.localStorage?.getItem(ACCESS_TOKEN_STORAGE_KEY) || null;
+  } catch {
+    return null;
+  }
+}
+
+let accessToken = readStoredAccessToken();
 
 export function setAccessToken(token) {
   accessToken = typeof token === "string" && token.trim() ? token : null;
+  if (accessToken) globalThis.localStorage?.setItem(ACCESS_TOKEN_STORAGE_KEY, accessToken);
 }
 
 export function clearAccessToken() {
   accessToken = null;
+  globalThis.localStorage?.removeItem(ACCESS_TOKEN_STORAGE_KEY);
 }
 
 export function getAccessToken() {

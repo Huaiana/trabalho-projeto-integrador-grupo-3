@@ -5,6 +5,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import java.util.List;
+import com.git.techocean.model.BackupRecord;
 
 import com.git.techocean.service.BackupService;
 
@@ -20,15 +22,20 @@ public class BackupController {
 
     // Acesso exclusivo do Administrador: Backup Global de todo o sistema
     @PostMapping("/admin/completo")
-    public ResponseEntity<String> dispararBackupAdministrativo() {
-        String resultado = backupService.gerarBackupAdministrativo();
-        return new ResponseEntity<>(resultado, HttpStatus.OK);
+    public ResponseEntity<BackupRecord> dispararBackupAdministrativo(
+            @org.springframework.security.core.annotation.AuthenticationPrincipal Jwt actor) {
+        return new ResponseEntity<>(backupService.gerarBackupAdministrativo(Long.valueOf(actor.getSubject())), HttpStatus.OK);
     }
 
     // Acesso do Funcionário (e também liberado para o Administrador): Backup de atendimento e operações
     @PostMapping("/operacional")
-    public ResponseEntity<String> dispararBackupOperacional() {
-        String resultado = backupService.gerarBackupOperacional();
-        return new ResponseEntity<>(resultado, HttpStatus.OK);
+    public ResponseEntity<BackupRecord> dispararBackupOperacional(
+            @org.springframework.security.core.annotation.AuthenticationPrincipal Jwt actor) {
+        return new ResponseEntity<>(backupService.gerarBackupOperacional(Long.valueOf(actor.getSubject())), HttpStatus.OK);
+    }
+
+    @org.springframework.web.bind.annotation.GetMapping("/historico")
+    public List<BackupRecord> historico() {
+        return backupService.historico();
     }
 }

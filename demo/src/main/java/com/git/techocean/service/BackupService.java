@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.time.LocalDateTime;
+import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.git.techocean.model.Cliente;
+import com.git.techocean.model.BackupRecord;
 import com.git.techocean.model.Mensagem;
 import com.git.techocean.model.Operacao;
 import com.git.techocean.model.Solicitacao;
@@ -22,6 +24,7 @@ import com.git.techocean.repository.OperacaoRepository;
 import com.git.techocean.repository.OrcamentoRepository;
 import com.git.techocean.repository.SolicitacaoRepository;
 import com.git.techocean.repository.UsuarioAdminRepository;
+import com.git.techocean.repository.BackupRecordRepository;
 
 @Service
 public class BackupService {
@@ -32,49 +35,58 @@ public class BackupService {
     private final OperacaoRepository operacaoRepository;
     private final MensagemRepository mensagemRepository;
     private final UsuarioAdminRepository usuarioAdminRepository;
+    private final BackupRecordRepository backupRecords;
 
     public BackupService(ClienteRepository clienteRepository, 
                          OrcamentoRepository orcamentoRepository, 
                          SolicitacaoRepository solicitacaoRepository,
                          OperacaoRepository operacaoRepository, 
                          MensagemRepository mensagemRepository, 
-                         UsuarioAdminRepository usuarioAdminRepository) {
+                         UsuarioAdminRepository usuarioAdminRepository,
+                         BackupRecordRepository backupRecords) {
         this.clienteRepository = clienteRepository;
         this.orcamentoRepository = orcamentoRepository;
         this.solicitacaoRepository = solicitacaoRepository;
         this.operacaoRepository = operacaoRepository;
         this.mensagemRepository = mensagemRepository;
         this.usuarioAdminRepository = usuarioAdminRepository;
+        this.backupRecords = backupRecords;
     }
 
     // Backup automático agendado diariamente à meia-noite
     @Scheduled(cron = "0 0 0 * * *")
     public void executarBackupAutomatico() {
-        gerarBackupAdministrativo();
+        gerarBackupAdministrativo(null);
     }
 
     // 1. Backup Administrativo Completo (Acesso exclusivo e total do Administrador)
-    public String gerarBackupAdministrativo() {
+    public BackupRecord gerarBackupAdministrativo(Long actorId) {
         String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss"));
         String diretorioPath = "./backups/admin/";
         criarDiretorio(diretorioPath);
 
         try {
-            salvarEmFicheiro(diretorioPath + "clientes_" + timestamp + ".json", clienteRepository.findAll().toString());
-            salvarEmFicheiro(diretorioPath + "orcamentos_" + timestamp + ".json", orcamentoRepository.findAll().toString());
-            salvarEmFicheiro(diretorioPath + "solicitacoes_" + timestamp + ".json", solicitacaoRepository.findAll().toString());
-            salvarEmFicheiro(diretorioPath + "operacoes_" + timestamp + ".json", operacaoRepository.findAll().toString());
-            salvarEmFicheiro(diretorioPath + "mensagens_" + timestamp + ".json", mensagemRepository.findAll().toString());
-            salvarEmFicheiro(diretorioPath + "admins_" + timestamp + ".json", usuarioAdminRepository.findAll().toString());
-
-            return "Backup administrativo total gerado com sucesso em: " + timestamp;
+            List<Cliente> clientes = clienteRepository.findAll();
+            var orcamentos = orcamentoRepository.findAll();
+            List<Solicitacao> solicitacoes = solicitacaoRepository.findAll();
+            List<Operacao> operacoes = operacaoRepository.findAll();
+            List<Mensagem> mensagens = mensagemRepository.findAll();
+            var administradores = usuarioAdminRepository.findAll();
+            salvarEmFicheiro(diretorioPath + "clientes_" + timestamp + ".json", clientes.toString());
+            salvarEmFicheiro(diretorioPath + "orcamentos_" + timestamp + ".json", orcamentos.toString());
+            salvarEmFicheiro(diretorioPath + "solicitacoes_" + timestamp + ".json", solicitacoes.toString());
+            salvarEmFicheiro(diretorioPath + "operacoes_" + timestamp + ".json", operacoes.toString());
+            salvarEmFicheiro(diretorioPath + "mensagens_" + timestamp + ".json", mensagens.toString());
+            salvarEmFicheiro(diretorioPath + "admins_" + timestamp + ".json", administradores.toString());
+            return saveRecord("ADMINISTRATIVO", actorId, clientes.size(), orcamentos.size(), solicitacoes.size(),
+                    operacoes.size(), mensagens.size(), administradores.size());
         } catch (IOException e) {
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Erro ao gerar backup administrativo: " + e.getMessage());
+            throw backupError("administrativo", e);
         }
     }
 
     // 2. Backup Operacional (Acessível ao Funcionário e TAMBÉM ao Administrador)
-    public String gerarBackupOperacional() {
+    public BackupRecord gerarBackupOperacional(Long actorId) {
         String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss"));
         String diretorioPath = "./backups/operacional/";
         criarDiretorio(diretorioPath);
@@ -90,10 +102,43 @@ public class BackupService {
             salvarEmFicheiro(diretorioPath + "operacoes_andamento_" + timestamp + ".json", operacoes.toString());
             salvarEmFicheiro(diretorioPath + "mensagens_chat_" + timestamp + ".json", mensagens.toString());
 
-            return "Backup operacional (atendimento) gerado com sucesso em: " + timestamp;
+            return saveRecord("OPERACIONAL", actorId, clientes.size(), 0, solicitacoes.size(),
+                    operacoes.size(), mensagens.size(), 0);
         } catch (IOException e) {
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Erro ao gerar backup operacional: " + e.getMessage());
+            throw backupError("operacional", e);
         }
+    }
+
+    public List<BackupRecord> historico() {
+        return backupRecords.findAll(org.springframework.data.domain.Sort.by(
+                org.springframework.data.domain.Sort.Direction.DESC, "createdAt"));
+    }
+
+    private BackupRecord saveRecord(String type, Long actorId, int clientes, int orcamentos, int solicitacoes,
+            int operacoes, int mensagens, int administradores) {
+        BackupRecord record = new BackupRecord();
+        record.setBackupCode("BKP-" + java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss")
+                .format(java.time.LocalDateTime.now()) + "-" + java.util.UUID.randomUUID().toString().substring(0, 6).toUpperCase());
+        record.setType(type);
+        record.setActorId(actorId);
+        usuarioAdminRepository.findById(java.util.Objects.requireNonNullElse(actorId, -1L)).ifPresent(actor -> {
+            record.setActorName(actor.getNome());
+            record.setActorRole(actor.getCargo());
+        });
+        record.setCreatedAt(Instant.now());
+        record.setClientes(clientes);
+        record.setOrcamentos(orcamentos);
+        record.setSolicitacoes(solicitacoes);
+        record.setOperacoes(operacoes);
+        record.setMensagens(mensagens);
+        record.setAdministradores(administradores);
+        record.setTotalRegistros(clientes + orcamentos + solicitacoes + operacoes + mensagens + administradores);
+        return backupRecords.save(record);
+    }
+
+    private ResponseStatusException backupError(String type, IOException cause) {
+        return new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
+                "Erro ao gerar backup " + type + ": " + cause.getMessage(), cause);
     }
 
     private void criarDiretorio(String path) {

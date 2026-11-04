@@ -311,7 +311,11 @@ async function loadSection(section) {
   const host = document.querySelector("#section-content");
   if (!host) return;
   if (section.slug === "backup") {
-    host.innerHTML = renderBackupSection();
+    try {
+      host.innerHTML = renderBackupSection(await get("/api/backup/historico"));
+    } catch (error) {
+      host.innerHTML = `<div class="load-error" role="alert">${esc(error.message)}<br>Não foi possível carregar o histórico de backups.</div>`;
+    }
     return;
   }
   if (!section.endpoint) {
@@ -337,8 +341,10 @@ async function loadSection(section) {
   }
 }
 
-export function renderBackupSection() {
-  return `<section class="data-panel backup-panel"><div class="panel-heading"><div><span class="eyebrow">SEGURANÇA DOS DADOS</span><h2>Cópias de segurança</h2></div></div><p class="dash-description">Gere uma cópia dos dados antes de alterações importantes ou sempre que precisar preservar o estado atual da operação.</p><div class="backup-actions"><button class="button button-primary compact" data-action="backup" data-backup-type="operacional">Gerar backup operacional</button>${isAdmin() ? '<button class="button button-outline compact" data-action="backup" data-backup-type="completo">Gerar backup administrativo completo</button>' : ""}</div><p class="backup-feedback" role="status"></p></section>`;
+export function renderBackupSection(records = []) {
+  const history = Array.isArray(records) ? records : [];
+  const historyRows = history.map((record) => `<tr><td><span class="audit-code">${esc(record.backupCode || "BKP-—")}</span></td><td>${esc(record.type || "—")}</td><td>${esc(record.actorName || "Automático")}<br><span class="muted">${esc(record.actorRole || "Sistema")}</span></td><td>${formatAuditDate(record.createdAt)}</td><td>${esc(record.totalRegistros ?? 0)}</td><td>${esc(record.clientes ?? 0)} clientes · ${esc(record.operacoes ?? 0)} operações · ${esc(record.mensagens ?? 0)} mensagens</td></tr>`).join("");
+  return `<section class="data-panel backup-panel"><div class="panel-heading"><div><span class="eyebrow">SEGURANÇA DOS DADOS</span><h2>Cópias de segurança</h2></div></div><p class="dash-description">Gere uma cópia dos dados preservando o histórico de quem realizou cada backup, quando ele foi feito e quantos registros foram incluídos.</p><div class="backup-actions"><button class="button button-primary compact" data-action="backup" data-backup-type="operacional">Gerar backup operacional</button>${isAdmin() ? '<button class="button button-outline compact" data-action="backup" data-backup-type="completo">Gerar backup administrativo completo</button>' : ""}</div><p class="backup-feedback" role="status"></p><h3 class="backup-history-title">Backups anteriores <span class="count-pill">${history.length}</span></h3>${history.length ? `<div class="table-scroll"><table class="records-table"><thead><tr><th>Código</th><th>Tipo</th><th>Profissional</th><th>Data e hora</th><th>Total de registros</th><th>Dados incluídos</th></tr></thead><tbody>${historyRows}</tbody></table></div>` : `<div class="empty-state"><span>▱</span><strong>Nenhum backup registrado</strong><p>Os próximos backups aparecerão aqui com seus dados e responsável.</p></div>`}</section>`;
 }
 
 const chargeFields = [["descricao", "Descrição", "text"], ["peso", "Peso (t)", "number"], ["volume", "Volume (m³)", "number"], ["tipoCarga", "Tipo de carga", "text"], ["origem", "Origem", "text"], ["destino", "Destino", "text"]];
@@ -402,12 +408,20 @@ function auditMetadata(record) {
 }
 
 function renderAuditSection(records) {
-  const rows = records.map((record) => { const metadata = auditMetadata(record); return `<tr><td><span class="audit-code">${esc(metadata.code)}</span></td><td><strong>${esc(metadata.description)}</strong><br><span class="muted">${esc(record.method || "—")} · ${esc(record.resource || "—")}</span></td><td>${esc(record.actorName || "Sistema")}<br><span class="muted">${esc(record.actorRole || "Automático")}</span></td><td>${formatAuditDate(record.occurredAt)}</td><td>${esc(record.resourceId || "—")}</td><td><span class="status-pill">${esc(record.responseStatus ?? "—")}</span></td><td>${esc(record.ipAddress || "—")}</td></tr>`; }).join("");
-  return `<section class="data-panel audit-panel"><div class="panel-heading"><div><span class="eyebrow">ADMINISTRAÇÃO</span><h2>Auditoria <span class="count-pill">${records.length}</span></h2></div><button class="button button-outline compact" data-reload>↻ Atualizar</button></div>${records.length ? `<div class="table-scroll"><table class="records-table"><thead><tr><th>Código</th><th>Ação realizada</th><th>Profissional</th><th>Data e hora</th><th>Identificador</th><th>Resultado</th><th>IP</th></tr></thead><tbody>${rows}</tbody></table></div>` : `<div class="empty-state"><span>▱</span><strong>Nenhuma ação registrada</strong><p>As ações realizadas por profissionais aparecerão aqui.</p></div>`}</section>`;
+  const rows = records.map((record) => { const metadata = auditMetadata(record); const eventCode = record.eventCode || (record.id ? `EVT-${String(record.id).padStart(6, "0")}` : metadata.code); return `<tr><td><span class="audit-code">${esc(eventCode)}</span><br><span class="muted">${esc(metadata.code)}</span></td><td><strong>${esc(metadata.description)}</strong><br><span class="muted">${esc(record.method || "—")} · ${esc(record.resource || "—")}</span></td><td>${esc(record.actorName || "Sistema")}<br><span class="muted">${esc(record.actorRole || "Automático")}</span></td><td>${formatAuditDate(record.occurredAt)}</td><td>${esc(record.resourceId || "—")}</td><td><span class="status-pill">${esc(record.responseStatus ?? "—")}</span></td><td>${esc(record.ipAddress || "—")}</td></tr>`; }).join("");
+  return `<section class="data-panel audit-panel"><div class="panel-heading"><div><span class="eyebrow">ADMINISTRAÇÃO</span><h2>Auditoria <span class="count-pill">${records.length}</span></h2></div><button class="button button-outline compact" data-reload>↻ Atualizar</button></div>${records.length ? `<div class="table-scroll"><table class="records-table"><thead><tr><th>Código único<br><span class="muted">Tipo</span></th><th>Ação realizada</th><th>Profissional</th><th>Data e hora</th><th>Identificador</th><th>Resultado</th><th>IP</th></tr></thead><tbody>${rows}</tbody></table></div>` : `<div class="empty-state"><span>▱</span><strong>Nenhuma ação registrada</strong><p>As ações realizadas por profissionais aparecerão aqui.</p></div>`}</section>`;
 }
 
 function renderSessionsSection(records) {
-  return `<section class="data-panel"><div class="panel-heading"><div><span class="eyebrow">ADMINISTRAÇÃO</span><h2>Sessões <span class="count-pill">${records.length}</span></h2></div><button class="button button-outline compact" data-reload>↻ Atualizar</button></div>${renderTable(records, ["id", "actorName", "role", "startedAt", "lastActivityAt", "loggedOutAt", "durationSeconds"], "Sessões")}</section>`;
+  const rows = records.map((record) => {
+    const sessionId = String(record.id || "");
+    const sessionCode = sessionId ? `SES-${sessionId.slice(0, 8).toUpperCase()}` : "SES-—";
+    const closing = record.loggedOutAt
+      ? `Sessão encerrada<br><span class="muted">${formatAuditDate(record.loggedOutAt)}</span>`
+      : "Sessão ativa";
+    return `<tr><td><span class="audit-code">${esc(sessionCode)}</span></td><td>${esc(record.actorName || "—")}</td><td>${esc(record.role || "—")}</td><td>${formatAuditDate(record.startedAt)}</td><td>${formatAuditDate(record.lastActivityAt)}</td><td>${closing}</td><td>${esc(record.durationSeconds ?? 0)}</td></tr>`;
+  }).join("");
+  return `<section class="data-panel"><div class="panel-heading"><div><span class="eyebrow">ADMINISTRAÇÃO</span><h2>Sessões <span class="count-pill">${records.length}</span></h2></div><button class="button button-outline compact" data-reload>↻ Atualizar</button></div>${records.length ? `<div class="table-scroll"><table class="records-table"><thead><tr><th>Código</th><th>Profissional</th><th>Perfil</th><th>Início</th><th>Última atividade</th><th>Encerramento / ação</th><th>Duração (segundos)</th></tr></thead><tbody>${rows}</tbody></table></div>` : `<div class="empty-state"><span>▱</span><strong>Nenhuma sessão registrada</strong><p>Os acessos realizados aparecerão aqui.</p></div>`}</section>`;
 }
 
 function resourceFieldMarkup(fieldDefinition, record, editing) {
@@ -913,7 +927,10 @@ if (app) app.addEventListener("click", async (event) => {
     target.textContent = "Gerando…";
     try {
       const result = await post(endpoint);
-      if (feedback) feedback.textContent = typeof result === "string" ? result : "Backup gerado com sucesso.";
+      if (feedback) feedback.textContent = typeof result === "string"
+        ? result
+        : `Backup ${result?.backupCode || "gerado"} concluído com ${result?.totalRegistros ?? 0} registros.`;
+      await reloadCurrentSection();
     } catch (error) {
       if (feedback) feedback.textContent = error.message;
     } finally {

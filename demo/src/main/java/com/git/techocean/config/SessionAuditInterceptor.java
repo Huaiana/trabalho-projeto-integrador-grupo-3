@@ -51,6 +51,8 @@ public class SessionAuditInterceptor implements HandlerInterceptor {
         }
         String method = request.getMethod(); String uri = request.getRequestURI();
         ActionMetadata metadata = actionMetadata(method, uri);
+        event.setEventCode("EVT-" + java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd-HHmmssSSS")
+                .format(java.time.LocalDateTime.now()) + "-" + java.util.UUID.randomUUID().toString().substring(0, 6).toUpperCase());
         event.setAction(method); event.setActionCode(metadata.code()); event.setActionDescription(metadata.description());
         event.setMethod(method); event.setResource(uri);
         String[] segments = uri.split("/"); event.setResourceId(segments.length > 0 ? segments[segments.length - 1] : null);
