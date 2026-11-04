@@ -1,6 +1,7 @@
 package com.git.techocean.controller;
 
 import java.util.List;
+import java.util.Objects;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -56,7 +57,8 @@ public class ClienteController {
 
     @GetMapping("/{id}")
     public ResponseEntity<Cliente> buscarPorId(@PathVariable Long id) {
-        return new ResponseEntity<>(clienteService.buscarPorId(id), HttpStatus.OK);
+        Long idObrigatorio = Objects.requireNonNull(id, "id não pode ser nulo");
+        return new ResponseEntity<>(clienteService.buscarPorId(idObrigatorio), HttpStatus.OK);
     }
 
     // RF22 - Editar ou atualizar dados de cliente
@@ -68,7 +70,7 @@ public class ClienteController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> excluirCliente(@PathVariable Long id) {
-        clienteService.excluir(id);
+        clienteService.excluir(Objects.requireNonNull(id, "id não pode ser nulo"));
         return ResponseEntity.noContent().build();
     }
 

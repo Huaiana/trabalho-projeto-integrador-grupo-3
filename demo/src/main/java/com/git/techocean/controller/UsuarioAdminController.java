@@ -11,7 +11,6 @@ import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.lang.NonNull;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
@@ -73,12 +72,14 @@ public class UsuarioAdminController {
     }
     @PutMapping("/usuarios/{id}") public UserDto updateUser(@PathVariable Long id, @RequestBody StaffUpdate request,
             @org.springframework.security.core.annotation.AuthenticationPrincipal Jwt actor) {
-        return UserDto.from(service.atualizar(id, request.nome(), request.email(), request.senha(), request.cargo(),
+        return UserDto.from(service.atualizar(java.util.Objects.requireNonNull(id, "id não pode ser nulo"),
+                request.nome(), request.email(), request.senha(), request.cargo(),
                 Long.valueOf(actor.getSubject())));
     }
     @DeleteMapping("/usuarios/{id}") public ResponseEntity<Void> deleteUser(@PathVariable Long id,
             @org.springframework.security.core.annotation.AuthenticationPrincipal Jwt actor) {
-        service.excluir(id, Long.valueOf(actor.getSubject())); return ResponseEntity.noContent().build();
+        service.excluir(java.util.Objects.requireNonNull(id, "id não pode ser nulo"),
+                Long.valueOf(actor.getSubject())); return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/auditoria") public List<AuditEvent> audit() { return sessions.auditEvents(); }

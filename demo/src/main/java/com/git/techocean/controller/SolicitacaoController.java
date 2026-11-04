@@ -1,6 +1,7 @@
 package com.git.techocean.controller;
 
 import java.util.List;
+import java.util.Objects;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -24,7 +25,10 @@ public class SolicitacaoController {
             @RequestParam Long clienteId,
             @RequestParam Long cargaId,
             @RequestParam Long servicoId) {
-        Solicitacao solicitacao = solicitacaoService.criarSolicitacao(clienteId, cargaId, servicoId);
+        Solicitacao solicitacao = solicitacaoService.criarSolicitacao(
+                Objects.requireNonNull(clienteId, "clienteId não pode ser nulo"),
+                Objects.requireNonNull(cargaId, "cargaId não pode ser nulo"),
+                Objects.requireNonNull(servicoId, "servicoId não pode ser nulo"));
         return new ResponseEntity<>(solicitacao, HttpStatus.CREATED);
     }
 
@@ -36,12 +40,16 @@ public class SolicitacaoController {
 
     @GetMapping("/cliente/{clienteId}")
     public ResponseEntity<List<Solicitacao>> listarPorCliente(@PathVariable Long clienteId) {
-        return new ResponseEntity<>(solicitacaoService.listarPorCliente(clienteId), HttpStatus.OK);
+        return new ResponseEntity<>(
+                solicitacaoService.listarPorCliente(Objects.requireNonNull(clienteId, "clienteId não pode ser nulo")),
+                HttpStatus.OK);
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<Solicitacao> buscarPorId(@PathVariable Long id) {
-        return new ResponseEntity<>(solicitacaoService.buscarPorId(id), HttpStatus.OK);
+        return new ResponseEntity<>(
+                solicitacaoService.buscarPorId(Objects.requireNonNull(id, "id não pode ser nulo")),
+                HttpStatus.OK);
     }
 
     // RF04 - Atualizar status da solicitação

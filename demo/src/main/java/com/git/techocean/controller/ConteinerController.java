@@ -1,6 +1,7 @@
 package com.git.techocean.controller;
 
 import java.util.List;
+import java.util.Objects;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -40,7 +41,10 @@ public class ConteinerController {
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> excluir(@PathVariable Long id) { conteinerService.excluir(id); return ResponseEntity.noContent().build(); }
+    public ResponseEntity<Void> excluir(@PathVariable Long id) {
+        conteinerService.excluir(Objects.requireNonNull(id, "id não pode ser nulo"));
+        return ResponseEntity.noContent().build();
+    }
 
     @GetMapping
     public ResponseEntity<List<Conteiner>> listarConteineres() {
@@ -49,6 +53,7 @@ public class ConteinerController {
 
     @GetMapping("/{id}")
     public ResponseEntity<Conteiner> buscarPorId(@PathVariable Long id) {
-        return new ResponseEntity<>(conteinerService.buscarPorId(id), HttpStatus.OK);
+        Long idObrigatorio = Objects.requireNonNull(id, "id não pode ser nulo");
+        return new ResponseEntity<>(conteinerService.buscarPorId(idObrigatorio), HttpStatus.OK);
     }
 }

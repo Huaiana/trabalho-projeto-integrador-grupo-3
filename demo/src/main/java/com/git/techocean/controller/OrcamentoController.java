@@ -1,6 +1,7 @@
 package com.git.techocean.controller;
 
 import java.util.List;
+import java.util.Objects;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -24,7 +25,10 @@ public class OrcamentoController {
             @RequestParam Long clienteId,
             @RequestParam Long cargaId,
             @RequestParam Long servicoId) {
-        Orcamento orcamento = orcamentoService.criarOrcamento(clienteId, cargaId, servicoId);
+        Orcamento orcamento = orcamentoService.criarOrcamento(
+                Objects.requireNonNull(clienteId, "clienteId não pode ser nulo"),
+                Objects.requireNonNull(cargaId, "cargaId não pode ser nulo"),
+                Objects.requireNonNull(servicoId, "servicoId não pode ser nulo"));
         return new ResponseEntity<>(orcamento, HttpStatus.CREATED);
     }
 
@@ -36,7 +40,9 @@ public class OrcamentoController {
 
     @GetMapping("/cliente/{clienteId}")
     public ResponseEntity<List<Orcamento>> listarPorCliente(@PathVariable Long clienteId) {
-        return new ResponseEntity<>(orcamentoService.listarPorCliente(clienteId), HttpStatus.OK);
+        return new ResponseEntity<>(
+                orcamentoService.listarPorCliente(Objects.requireNonNull(clienteId, "clienteId não pode ser nulo")),
+                HttpStatus.OK);
     }
 
     // RF04 - Atualizar status e valor do orçamento
@@ -46,7 +52,8 @@ public class OrcamentoController {
             @RequestParam String status,
             @RequestParam(required = false) Double valorEstimado,
             @RequestParam(required = false) String observacoes) {
-        Orcamento orcamento = orcamentoService.atualizarAnalise(id, status, valorEstimado, observacoes);
+        Orcamento orcamento = orcamentoService.atualizarAnalise(
+                Objects.requireNonNull(id, "id não pode ser nulo"), status, valorEstimado, observacoes);
         return new ResponseEntity<>(orcamento, HttpStatus.OK);
     }
 }

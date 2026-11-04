@@ -1,6 +1,7 @@
 package com.git.techocean.controller;
 
 import java.util.List;
+import java.util.Objects;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -33,6 +34,7 @@ public class CargaController {
 
     @GetMapping("/{id}")
     public ResponseEntity<Carga> buscarPorId(@PathVariable Long id) {
-        return new ResponseEntity<>(cargaService.buscarPorId(id), HttpStatus.OK);
+        Long idObrigatorio = Objects.requireNonNull(id, "id não pode ser nulo");
+        return new ResponseEntity<>(cargaService.buscarPorId(idObrigatorio), HttpStatus.OK);
     }
 }

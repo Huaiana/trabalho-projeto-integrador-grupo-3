@@ -1,6 +1,7 @@
 package com.git.techocean.controller;
 
 import java.util.List;
+import java.util.Objects;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -37,7 +38,9 @@ public class OperacaoController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Operacao> buscarPorId(@PathVariable Long id) { return ResponseEntity.ok(operacaoService.buscarPorId(id)); }
+    public ResponseEntity<Operacao> buscarPorId(@PathVariable Long id) {
+        return ResponseEntity.ok(operacaoService.buscarPorId(Objects.requireNonNull(id, "id não pode ser nulo")));
+    }
 
     @PutMapping("/{id}")
     public ResponseEntity<Operacao> atualizar(@PathVariable Long id, @RequestBody OperacaoRequest request) {
@@ -45,7 +48,10 @@ public class OperacaoController {
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> excluir(@PathVariable Long id) { operacaoService.excluir(id); return ResponseEntity.noContent().build(); }
+    public ResponseEntity<Void> excluir(@PathVariable Long id) {
+        operacaoService.excluir(Objects.requireNonNull(id, "id não pode ser nulo"));
+        return ResponseEntity.noContent().build();
+    }
 
     // RF09 - Acompanhamento da operação
     @GetMapping

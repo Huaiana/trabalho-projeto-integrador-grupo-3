@@ -1,6 +1,7 @@
 package com.git.techocean.controller;
 
 import java.util.List;
+import java.util.Objects;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -26,7 +27,8 @@ public class ServicoController {
 
     @GetMapping("/{id}")
     public ResponseEntity<Servico> buscarPorId(@PathVariable Long id) {
-        return new ResponseEntity<>(servicoService.buscarPorId(id), HttpStatus.OK);
+        Long idObrigatorio = Objects.requireNonNull(id, "id não pode ser nulo");
+        return new ResponseEntity<>(servicoService.buscarPorId(idObrigatorio), HttpStatus.OK);
     }
 
     @PostMapping
@@ -55,5 +57,8 @@ public class ServicoController {
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> excluir(@PathVariable Long id) { servicoService.excluir(id); return ResponseEntity.noContent().build(); }
+    public ResponseEntity<Void> excluir(@PathVariable Long id) {
+        servicoService.excluir(Objects.requireNonNull(id, "id não pode ser nulo"));
+        return ResponseEntity.noContent().build();
+    }
 }

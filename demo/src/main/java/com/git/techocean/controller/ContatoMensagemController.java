@@ -2,6 +2,7 @@ package com.git.techocean.controller;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -42,12 +43,13 @@ public class ContatoMensagemController {
     public ResponseEntity<ContatoMensagem> responder(
             @PathVariable Long id,
             @RequestBody RespostaRequest request) {
-        return ResponseEntity.ok(service.responder(id, request.resposta()));
+        return ResponseEntity.ok(service.responder(
+                Objects.requireNonNull(id, "id não pode ser nulo"), request.resposta()));
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Map<String, String>> deletar(@PathVariable Long id) {
-        service.deletar(id);
+        service.deletar(Objects.requireNonNull(id, "id não pode ser nulo"));
         return ResponseEntity.ok(Map.of("message", "Mensagem deletada."));
     }
 
