@@ -88,6 +88,10 @@ public class UsuarioAdminController {
     }
 
     @GetMapping("/auditoria") public List<AuditEvent> audit() { return sessions.auditEvents(); }
+    @GetMapping("/sessoes/{id}/auditoria")
+    public List<AuditEvent> sessionAudit(@PathVariable String id) {
+        return sessions.auditEventsForSession(java.util.Objects.requireNonNull(id, "id não pode ser nulo"));
+    }
     @GetMapping("/sessoes") public List<SessionDto> activeSessions() {
         Instant now = Instant.now();
         return sessions.allSessions().stream().map(s -> new SessionDto(s.getId(), s.getActorId(), s.getActorName(), s.getRole(),

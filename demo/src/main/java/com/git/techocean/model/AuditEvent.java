@@ -15,6 +15,7 @@ import lombok.Setter;
 public class AuditEvent {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY) private Long id;
     private Long actorId;
+    private String sessionId;
     private String actorName;
     private String actorRole;
     private String eventCode;

@@ -418,10 +418,24 @@ function renderSessionsSection(records) {
     const sessionCode = sessionId ? `SES-${sessionId.slice(0, 8).toUpperCase()}` : "SES-—";
     const closing = record.loggedOutAt
       ? `Sessão encerrada<br><span class="muted">${formatAuditDate(record.loggedOutAt)}</span>`
-      : "Sessão ativa";
-    return `<tr><td><span class="audit-code">${esc(sessionCode)}</span></td><td>${esc(record.actorName || "—")}</td><td>${esc(record.role || "—")}</td><td>${formatAuditDate(record.startedAt)}</td><td>${formatAuditDate(record.lastActivityAt)}</td><td>${closing}</td><td>${esc(record.durationSeconds ?? 0)}</td></tr>`;
+      : `<button class="small-action" type="button" data-action="view-session" data-session-id="${esc(sessionId)}">Acessar</button>`;
+    return `<tr><td><span class="audit-code">${esc(sessionCode)}</span></td><td>${esc(record.actorName || "—")}</td><td>${esc(record.role || "—")}</td><td>${formatAuditDate(record.startedAt)}</td><td>${formatAuditDate(record.lastActivityAt)}</td><td>${record.loggedOutAt ? `${closing}<br><button class="small-action" type="button" data-action="view-session" data-session-id="${esc(sessionId)}">Verificar</button>` : closing}</td><td>${esc(record.durationSeconds ?? 0)}</td></tr>`;
   }).join("");
-  return `<section class="data-panel"><div class="panel-heading"><div><span class="eyebrow">ADMINISTRAÇÃO</span><h2>Sessões <span class="count-pill">${records.length}</span></h2></div><button class="button button-outline compact" data-reload>↻ Atualizar</button></div>${records.length ? `<div class="table-scroll"><table class="records-table"><thead><tr><th>Código</th><th>Profissional</th><th>Perfil</th><th>Início</th><th>Última atividade</th><th>Encerramento / ação</th><th>Duração (segundos)</th></tr></thead><tbody>${rows}</tbody></table></div>` : `<div class="empty-state"><span>▱</span><strong>Nenhuma sessão registrada</strong><p>Os acessos realizados aparecerão aqui.</p></div>`}</section>`;
+  return `<section class="data-panel"><div class="panel-heading"><div><span class="eyebrow">ADMINISTRAÇÃO</span><h2>Sessões <span class="count-pill">${records.length}</span></h2></div><button class="button button-outline compact" data-reload>↻ Atualizar</button></div>${records.length ? `<div class="table-scroll"><table class="records-table"><thead><tr><th>Código</th><th>Profissional</th><th>Perfil</th><th>Início</th><th>Última atividade</th><th>Verificar</th><th>Duração (segundos)</th></tr></thead><tbody>${rows}</tbody></table></div>` : `<div class="empty-state"><span>▱</span><strong>Nenhuma sessão registrada</strong><p>Os acessos realizados aparecerão aqui.</p></div>`}</section>`;
+}
+
+async function openSessionAudit(sessionId, opener) {
+  if (!sessionId) return;
+  try {
+    const records = await get(`/admin/sessoes/${encodeURIComponent(sessionId)}/auditoria`);
+    const content = records.length
+      ? `<p class="muted">Todas as ações realizadas nesta sessão, em ordem cronológica.</p><div class="table-scroll"><table class="records-table"><thead><tr><th>Código</th><th>O que foi feito</th><th>Data e hora</th><th>Recurso</th><th>Resultado</th><th>IP</th></tr></thead><tbody>${records.map((record) => { const metadata = auditMetadata(record); return `<tr><td><span class="audit-code">${esc(record.eventCode || `EVT-${record.id || "—"}`)}</span><br><span class="muted">${esc(metadata.code)}</span></td><td><strong>${esc(metadata.description)}</strong><br><span class="muted">${esc(record.method || "—")}</span></td><td>${formatAuditDate(record.occurredAt)}</td><td>${esc(record.resource || "—")} ${record.resourceId ? `#${esc(record.resourceId)}` : ""}</td><td>${esc(record.responseStatus ?? "—")}</td><td>${esc(record.ipAddress || "—")}</td></tr>`; }).join("")}</tbody></table></div>`
+      : `<div class="empty-state"><span>▱</span><strong>Nenhuma ação registrada</strong><p>As próximas ações desta sessão aparecerão aqui.</p></div>`;
+    modal("Verificar sessão", `<div class="detail-modal-content"><p><strong>Código da sessão:</strong> SES-${esc(String(sessionId).slice(0, 8).toUpperCase())}</p>${content}</div>`);
+  } catch (error) {
+    modal("Verificar sessão", `<div class="load-error" role="alert">${esc(error.message)}</div>`);
+  }
+  opener?.focus?.();
 }
 
 function resourceFieldMarkup(fieldDefinition, record, editing) {
@@ -918,6 +932,10 @@ if (app) app.addEventListener("click", async (event) => {
   if (target.hasAttribute("data-close-form")) { target.closest("form")?.remove(); return; }
   if (target.hasAttribute("data-reload")) { await reloadCurrentSection(); return; }
   if (target.dataset.action === "logout") { await logoutAdmin(); return; }
+  if (target.dataset.action === "view-session") {
+    await openSessionAudit(target.dataset.sessionId, target);
+    return;
+  }
   if (target.dataset.action === "backup") {
     const type = target.dataset.backupType;
     const endpoint = type === "completo" ? "/api/backup/admin/completo" : "/api/backup/operacional";

@@ -75,6 +75,14 @@ public class AuthSessionService {
         return all;
     }
     public java.util.List<AuditEvent> auditEvents() { return audits.findAll(); }
+    public java.util.List<AuditEvent> auditEventsForSession(@NonNull String sessionId) {
+        AuthSession session = sessions.findById(sessionId).orElse(null);
+        if (session == null) return java.util.List.of();
+        java.util.List<AuditEvent> linked = audits.findBySessionIdOrderByOccurredAtAsc(sessionId);
+        if (!linked.isEmpty()) return linked;
+        Instant end = session.getLoggedOutAt() == null ? Instant.now() : session.getLoggedOutAt();
+        return audits.findByActorIdAndOccurredAtBetweenOrderByOccurredAtAsc(session.getActorId(), session.getStartedAt(), end);
+    }
 
     private String normalizedRole(String role) {
         return role == null ? "" : role.trim().toUpperCase(java.util.Locale.ROOT);

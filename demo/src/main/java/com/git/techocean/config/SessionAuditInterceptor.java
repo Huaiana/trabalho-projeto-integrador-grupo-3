@@ -47,7 +47,8 @@ public class SessionAuditInterceptor implements HandlerInterceptor {
         AuthSession session = sid instanceof String sessionId ? sessions.findById(sessionId).orElse(null) : null;
         AuditEvent event = new AuditEvent();
         if (session != null) {
-            event.setActorId(session.getActorId()); event.setActorName(session.getActorName()); event.setActorRole(session.getRole());
+            event.setSessionId(session.getId()); event.setActorId(session.getActorId());
+            event.setActorName(session.getActorName()); event.setActorRole(session.getRole());
         }
         String method = request.getMethod(); String uri = request.getRequestURI();
         ActionMetadata metadata = actionMetadata(method, uri);
