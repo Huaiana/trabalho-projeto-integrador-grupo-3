@@ -316,7 +316,8 @@ export function renderCrudSection(records, section) {
   const guidance = isUserSettings
     ? `<p class="settings-guidance">Edite uma conta para atualizar nome, e-mail, perfil ou senha. Para manter a senha atual, deixe o campo senha em branco.</p>`
     : "";
-  return `<section class="data-panel"><div class="panel-heading"><div><span class="eyebrow">${panelEyebrow}</span><h2>${esc(panelTitle)} <span class="count-pill">${records.length}</span></h2></div>${actions}</div>${guidance}<div id="resource-form-slot"></div>${records.length ? renderResourceTable(records, section.slug) : `<div class="empty-state"><span>▱</span><strong>${emptyTitle}</strong><p>${emptyDescription}</p></div>`}</section>`;
+  const initialForm = isUserSettings ? renderResourceFormMarkup(section.slug) : "";
+  return `<section class="data-panel"><div class="panel-heading"><div><span class="eyebrow">${panelEyebrow}</span><h2>${esc(panelTitle)} <span class="count-pill">${records.length}</span></h2></div>${actions}</div>${guidance}<div id="resource-form-slot">${initialForm}</div>${records.length ? renderResourceTable(records, section.slug) : `<div class="empty-state"><span>▱</span><strong>${emptyTitle}</strong><p>${emptyDescription}</p></div>`}</section>`;
 }
 
 export function renderResourceTable(records, slug, role = userRole()) {

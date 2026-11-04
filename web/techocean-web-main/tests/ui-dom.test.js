@@ -234,6 +234,8 @@ describe("DOM interface helpers", () => {
     expect(admin).not.toContain("/admin/setup");
     expect(settings).toContain("Contas de acesso");
     expect(settings).toContain("Novo administrador");
+    expect(settings).toContain('data-resource="usuario"');
+    expect(settings).toContain("Criar registro");
     expect(settings).toContain("atualizar nome, e-mail, perfil ou senha");
   });
 
