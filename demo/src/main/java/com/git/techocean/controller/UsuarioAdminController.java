@@ -124,6 +124,6 @@ public class UsuarioAdminController {
     public record SetupStatus(boolean enabled) { }
 
     private boolean setupEnabled() {
-        return setupConfig.findById(1L).map(AdminSetupConfig::isEnabled).orElse(false);
+        return setupConfig.findById(1L).map(config -> config.isEnabled()).orElse(false);
     }
 }
