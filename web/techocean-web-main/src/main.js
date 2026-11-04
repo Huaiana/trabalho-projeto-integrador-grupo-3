@@ -201,7 +201,13 @@ export function loginScreenMarkup(portal = "admin", error = "", notice = "") {
     ? "Entre como supervisor ou funcionário para acompanhar e atualizar a operação."
     : "Entre como administrador para gerenciar a equipe, auditoria e controles.";
   const returnPortal = `<a href="/dashboard">← Voltar ao painel</a>`;
-  return `<main class="auth-page"><section class="auth-card ${teamPortal ? "auth-team" : "auth-admin"}"><a href="/dashboard" class="wordmark">Techocean</a><p class="eyebrow">${eyebrow} · PAINEL</p><h1>${title}</h1><p class="muted">${intro}</p>${notice ? `<p class="inline-success" role="status">${esc(notice)}</p>` : ""}<form class="form-grid" data-form="admin-login" data-login-portal="${teamPortal ? "team" : "admin"}">${field("E-mail", "email", "email", "username")}${field("Senha", "senha", "password", "current-password")}<p class="form-feedback" role="alert">${esc(error)}</p><button class="button button-primary form-submit">Entrar <span>↗</span></button></form><div class="auth-links"><a href="/esqueci-senha">Esqueci minha senha</a>${returnPortal}</div></section></main>`;
+  const firstAccess = teamPortal ? "" : `<span data-first-access-link><a href="/primeiro-acesso-admin">Primeiro acesso do administrador</a></span>`;
+  return `<main class="auth-page"><section class="auth-card ${teamPortal ? "auth-team" : "auth-admin"}"><a href="/dashboard" class="wordmark">Techocean</a><p class="eyebrow">${eyebrow} · PAINEL</p><h1>${title}</h1><p class="muted">${intro}</p>${notice ? `<p class="inline-success" role="status">${esc(notice)}</p>` : ""}<form class="form-grid" data-form="admin-login" data-login-portal="${teamPortal ? "team" : "admin"}">${field("E-mail", "email", "email", "username")}${field("Senha", "senha", "password", "current-password")}<p class="form-feedback" role="alert">${esc(error)}</p><button class="button button-primary form-submit">Entrar <span>↗</span></button></form><div class="auth-links"><a href="/esqueci-senha">Esqueci minha senha</a>${firstAccess}${returnPortal}</div></section></main>`;
+}
+
+function renderAdminFirstAccess() {
+  document.title = "Primeiro acesso — Techocean";
+  app.innerHTML = `<main class="auth-page"><section class="auth-card auth-admin"><a href="/dashboard" class="wordmark">Techocean</a><p class="eyebrow">CONFIGURAÇÃO INICIAL</p><h1>Criar administrador</h1><p class="muted">Use esta tela somente para criar o primeiro administrador em um banco ainda sem contas administrativas.</p><form class="form-grid" data-form="admin-first-access">${field("Nome completo", "nome", "text", "name")}${field("E-mail", "email", "email", "username")}${field("Senha", "senha", "password", "new-password", "minlength=\"8\"")} ${field("Token de configuração", "setupToken", "password", "off")}<p class="form-feedback" role="alert"></p><button class="button button-primary form-submit">Criar administrador <span>↗</span></button></form><div class="auth-links"><a href="/dashboard/acesso-admin">Voltar ao login</a></div></section></main>`;
 }
 
 function renderForgotPassword() {
@@ -218,6 +224,18 @@ function renderResetPassword() {
 function renderLogin(portal = "admin", error = "") {
   document.title = `${portal === "team" ? "Acesso da equipe" : "Acesso administrativo"} — Techocean`;
   app.innerHTML = loginScreenMarkup(portal, error, authNotice);
+  if (!portal || portal === "admin") void refreshFirstAccessLink();
+}
+
+async function refreshFirstAccessLink() {
+  const link = document.querySelector("[data-first-access-link]");
+  if (!link) return;
+  try {
+    const status = await get("/admin/setup-status");
+    link.hidden = status?.enabled !== true;
+  } catch {
+    link.hidden = true;
+  }
 }
 
 function portalRoleMismatchMessage(role, portal) {
@@ -292,10 +310,13 @@ async function loadSection(section) {
     return;
   }
   try {
-    const records = collectionFrom(await get(section.endpoint));
+    const payload = section.slug === "usuario"
+      ? await Promise.all([get(section.endpoint), get("/admin/setup-status")])
+      : await get(section.endpoint);
+    const records = collectionFrom(section.slug === "usuario" ? payload[0] : payload);
     if (!host.isConnected) return;
     cachedRecords.set(section.slug, records);
-    if (section.resource) host.innerHTML = renderCrudSection(records, section);
+    if (section.resource) host.innerHTML = renderCrudSection(records, section, section.slug === "usuario" ? payload[1] : null);
     else if (section.slug === "carga") host.innerHTML = renderCargas(records);
     else if (section.slug === "mensagens") host.innerHTML = renderMessages(records);
     else if (section.slug === "orcamento") host.innerHTML = renderBudgets(records);
@@ -313,7 +334,7 @@ function renderCargas(records) {
   return `<section class="data-panel"><div class="panel-heading"><div><span class="eyebrow">OPERAÇÕES / REGISTROS</span><h2>Cargas cadastradas <span class="count-pill">${records.length}</span></h2></div><div class="panel-actions"><button class="button button-outline compact" data-reload>↻ <span>Atualizar</span></button><button class="button button-primary compact" data-action="new-charge">＋ Nova carga</button></div></div><div id="charge-form-slot"></div>${records.length ? renderTable(records, ["id", ...chargeFields.map(([name]) => name)], "cargas") : `<div class="empty-state"><span>▱</span><strong>Nenhuma carga cadastrada</strong><p>Cadastre uma carga para começar a acompanhar as especificações.</p></div>`}</section>`;
 }
 
-export function renderCrudSection(records, section) {
+export function renderCrudSection(records, section, setupStatus = null) {
   const definition = resourceDefinitions[section.slug];
   const isUserSettings = section.slug === "usuario";
   const panelTitle = isUserSettings ? "Contas de acesso" : `${section.name}s`;
@@ -324,8 +345,9 @@ export function renderCrudSection(records, section) {
   const emptyDescription = isUserSettings
     ? "Crie uma conta para o administrador ou para outro integrante da equipe."
     : `Cadastre o primeiro ${definition.singular} para começar.`;
+  const setupEnabled = setupStatus?.enabled === true;
   const guidance = isUserSettings
-    ? `<p class="settings-guidance">Edite uma conta para atualizar nome, e-mail, perfil ou senha. Para manter a senha atual, deixe o campo senha em branco.</p>`
+    ? `<p class="settings-guidance">Edite uma conta para atualizar nome, e-mail, perfil ou senha. Para manter a senha atual, deixe o campo senha em branco.</p><div class="settings-guidance"><strong>Primeiro acesso para novos administradores</strong><p>Ative esta opção somente durante o cadastro de administradores adicionais e desative-a depois.</p><button class="button button-outline compact" data-action="toggle-admin-setup" data-enabled="${setupEnabled}">${setupEnabled ? "Desativar primeiro acesso" : "Ativar primeiro acesso"}</button></div>`
     : "";
   const initialForm = isUserSettings ? renderResourceFormMarkup(section.slug) : "";
   return `<section class="data-panel"><div class="panel-heading"><div><span class="eyebrow">${panelEyebrow}</span><h2>${esc(panelTitle)} <span class="count-pill">${records.length}</span></h2></div>${actions}</div>${guidance}<div id="resource-form-slot">${initialForm}</div>${records.length ? renderResourceTable(records, section.slug) : `<div class="empty-state"><span>▱</span><strong>${emptyTitle}</strong><p>${emptyDescription}</p></div>`}</section>`;
@@ -674,6 +696,15 @@ async function handleSubmit(event) {
         form.innerHTML = `<p class="success-message" role="status">Senha atualizada com sucesso. <a href="/dashboard/acesso-admin">Voltar ao login</a></p>`;
         break;
       }
+      case "admin-first-access": {
+        await postWithHeaders("/admin/setup", {
+          nome: fields.nome.trim(),
+          email: fields.email.trim(),
+          senha: fields.senha,
+        }, { "X-Admin-Setup-Token": fields.setupToken }, { authenticated: false });
+        form.innerHTML = `<p class="success-message" role="status">Administrador criado com sucesso. <a href="/dashboard/acesso-admin">Ir para o login</a></p>`;
+        break;
+      }
       case "register": await submitRegistration(form, fields); break;
       case "contact":
         await postPublic("/mensagens/contatos", fields);
@@ -819,6 +850,16 @@ if (app) app.addEventListener("click", async (event) => {
     await openResourceForm(target.dataset.resource);
     return;
   }
+  if (target.dataset.action === "toggle-admin-setup") {
+    try {
+      await put("/admin/setup-status", { enabled: target.dataset.enabled !== "true" });
+      await reloadCurrentSection();
+      await refreshFirstAccessLink();
+    } catch (error) {
+      target.insertAdjacentHTML("afterend", `<span class="field-error">${esc(error.message)}</span>`);
+    }
+    return;
+  }
   if (target.hasAttribute("data-status-id")) {
     const next = target.dataset.status;
     const slug = document.querySelector("#section-content")?.dataset.slug;
@@ -861,6 +902,7 @@ function renderRoute() {
   const path = routePath();
   if (path === "/") renderHome();
   else if (path === "/cadastro") renderCadastro();
+  else if (path === "/primeiro-acesso-admin") renderAdminFirstAccess();
   else if (path === "/esqueci-senha") renderForgotPassword();
   else if (path === "/redefinir-senha") renderResetPassword();
   else if (path === "/dashboard/acesso-admin") renderPortalLogin("admin");

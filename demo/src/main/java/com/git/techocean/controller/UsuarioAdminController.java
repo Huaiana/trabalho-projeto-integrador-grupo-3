@@ -3,6 +3,8 @@ package com.git.techocean.controller;
 import com.git.techocean.model.AuditEvent;
 import com.git.techocean.model.UsuarioAdmin;
 import com.git.techocean.repository.UsuarioAdminRepository;
+import com.git.techocean.repository.AdminSetupConfigRepository;
+import com.git.techocean.model.AdminSetupConfig;
 import com.git.techocean.service.AuthSessionService;
 import com.git.techocean.service.UsuarioAdminService;
 import java.time.Duration;
@@ -25,12 +27,14 @@ public class UsuarioAdminController {
     private final UsuarioAdminRepository users;
     private final AuthSessionService sessions;
     private final AdminBootstrapService bootstrap;
+    private final AdminSetupConfigRepository setupConfig;
     private final String setupToken;
 
     public UsuarioAdminController(UsuarioAdminService service, UsuarioAdminRepository users,
-            AuthSessionService sessions, AdminBootstrapService bootstrap,
+            AuthSessionService sessions, AdminBootstrapService bootstrap, AdminSetupConfigRepository setupConfig,
             @Value("${ADMIN_SETUP_TOKEN:}") String setupToken) {
         this.service = service; this.users = users; this.sessions = sessions; this.bootstrap = bootstrap;
+        this.setupConfig = setupConfig;
         this.setupToken = setupToken;
 
     }
@@ -39,10 +43,11 @@ public class UsuarioAdminController {
     @Transactional
     public ResponseEntity<UserDto> setup(@RequestHeader(value = "X-Admin-Setup-Token", required = false) String provided,
             @RequestBody StaffRequest request) {
-        if (setupToken.isBlank() || !constantTimeEquals(setupToken, provided) || users.countAdmins() != 0)
+        if (setupToken.isBlank() || !constantTimeEquals(setupToken, provided)
+                || (users.countAdmins() != 0 && !setupEnabled()))
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Setup indisponível.");
         try {
-            bootstrap.reserve();
+            if (users.countAdmins() == 0) bootstrap.reserve();
         } catch (DataIntegrityViolationException alreadyReserved) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Setup indisponível.");
         }
@@ -90,6 +95,19 @@ public class UsuarioAdminController {
                 Duration.between(s.getStartedAt(), s.getLoggedOutAt() == null ? now : s.getLoggedOutAt()).toSeconds())).toList();
     }
 
+    @GetMapping("/setup-status")
+    public SetupStatus setupStatus() {
+        return new SetupStatus(users.countAdmins() == 0 || setupEnabled());
+    }
+
+    @PutMapping("/setup-status")
+    public SetupStatus updateSetupStatus(@RequestBody SetupStatus request) {
+        AdminSetupConfig config = setupConfig.findById(1L).orElseGet(AdminSetupConfig::new);
+        config.setEnabled(request.enabled());
+        setupConfig.save(config);
+        return new SetupStatus(config.isEnabled());
+    }
+
     private static boolean constantTimeEquals(String expected, String actual) {
         if (actual == null) return false;
         return java.security.MessageDigest.isEqual(expected.getBytes(java.nio.charset.StandardCharsets.UTF_8), actual.getBytes(java.nio.charset.StandardCharsets.UTF_8));
@@ -103,4 +121,9 @@ public class UsuarioAdminController {
     public record LoginResponse(String accessToken, UserDto user) { }
     public record SessionDto(String id, Long actorId, String actorName, String role, Instant startedAt, Instant lastActivityAt,
             Instant loggedOutAt, long durationSeconds) { }
+    public record SetupStatus(boolean enabled) { }
+
+    private boolean setupEnabled() {
+        return setupConfig.findById(1L).map(AdminSetupConfig::isEnabled).orElse(false);
+    }
 }

@@ -63,6 +63,7 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.POST, "/admin/setup", "/admin/login").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/admin/setup-status").permitAll()
                         .requestMatchers(HttpMethod.POST, "/auth/password-reset/request", "/auth/password-reset/confirm").permitAll()
                         .requestMatchers(HttpMethod.POST, "/clientes", "/clientes/login", "/mensagens/contatos", "/agendamentos").permitAll()
                         .requestMatchers(HttpMethod.GET, "/servicos", "/servicos/*").permitAll()

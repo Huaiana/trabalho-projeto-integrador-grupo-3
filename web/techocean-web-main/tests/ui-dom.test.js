@@ -231,7 +231,7 @@ describe("DOM interface helpers", () => {
     expect(team).not.toContain("/admin/setup");
     expect(admin).toContain('data-login-portal="admin"');
     expect(admin).toContain("gerenciar a equipe, auditoria e controles");
-    expect(admin).not.toContain("/admin/setup");
+    expect(admin).toContain("/primeiro-acesso-admin");
     expect(settings).toContain("Contas de acesso");
     expect(settings).toContain("Novo administrador");
     expect(settings).toContain('data-resource="usuario"');

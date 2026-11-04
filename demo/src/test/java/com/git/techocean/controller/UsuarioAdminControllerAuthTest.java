@@ -5,6 +5,7 @@ import static org.mockito.Mockito.*;
 
 import com.git.techocean.model.UsuarioAdmin;
 import com.git.techocean.repository.UsuarioAdminRepository;
+import com.git.techocean.repository.AdminSetupConfigRepository;
 import com.git.techocean.service.AdminBootstrapService;
 import com.git.techocean.service.AuthSessionService;
 import com.git.techocean.service.UsuarioAdminService;
@@ -23,7 +24,9 @@ class UsuarioAdminControllerAuthTest {
     private final UsuarioAdminRepository users = mock(UsuarioAdminRepository.class);
     private final AuthSessionService sessions = mock(AuthSessionService.class);
     private final AdminBootstrapService bootstrap = mock(AdminBootstrapService.class);
-    private final UsuarioAdminController controller = new UsuarioAdminController(service, users, sessions, bootstrap, "onetime-test-token");
+    private final AdminSetupConfigRepository setupConfig = mock(AdminSetupConfigRepository.class);
+    private final UsuarioAdminController controller = new UsuarioAdminController(service, users, sessions, bootstrap, setupConfig,
+            "onetime-test-token");
 
     @Test void setupCreatesOnlyFirstAdminWithSecretHeader() {
         when(users.countAdmins()).thenReturn(0L);
