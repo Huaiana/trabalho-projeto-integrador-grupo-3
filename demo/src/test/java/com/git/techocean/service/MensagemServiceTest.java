@@ -1,5 +1,6 @@
 package com.git.techocean.service;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -16,6 +17,7 @@ import com.git.techocean.model.Mensagem;
 import com.git.techocean.repository.ClienteRepository;
 import com.git.techocean.repository.MensagemRepository;
 
+@SuppressWarnings("null")
 class MensagemServiceTest {
 
     private final MensagemRepository mensagemRepository = mock(MensagemRepository.class);
@@ -36,7 +38,9 @@ class MensagemServiceTest {
     void rejectsDeletingMissingCustomerMessage() {
         when(mensagemRepository.findById(9L)).thenReturn(Optional.empty());
 
-        assertThrows(ResponseStatusException.class, () -> service.deletar(9L));
+        ResponseStatusException exception = assertThrows(
+                ResponseStatusException.class, () -> service.deletar(9L));
+        assertEquals("Mensagem não encontrada.", exception.getReason());
 
         verify(mensagemRepository, never()).delete(any(Mensagem.class));
     }

@@ -18,6 +18,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
+@SuppressWarnings({"unused", "null"})
 class SolicitacaoServiceTest {
 
     private final SolicitacaoRepository solicitacaoRepository = mock(SolicitacaoRepository.class);
@@ -28,6 +29,7 @@ class SolicitacaoServiceTest {
             mock(ServicoRepository.class));
     private final Solicitacao solicitacao = new Solicitacao(null, null, null, "PENDENTE");
 
+    @SuppressWarnings("unused")
     @BeforeEach
     void prepararSolicitacao() {
         when(solicitacaoRepository.findById(1L)).thenReturn(Optional.of(solicitacao));

@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.server.ResponseStatusException;
 
+@SuppressWarnings("null")
 class UsuarioAdminServiceAuthTest {
     private final UsuarioAdminRepository repository = mock(UsuarioAdminRepository.class);
     private final AuthSessionRepository sessions = mock(AuthSessionRepository.class);
