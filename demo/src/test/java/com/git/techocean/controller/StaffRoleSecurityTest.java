@@ -9,7 +9,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.git.techocean.config.SecurityConfig;
 import com.git.techocean.model.UsuarioAdmin;
-import com.git.techocean.repository.ClienteRepository;
 import com.git.techocean.repository.UsuarioAdminRepository;
 import com.git.techocean.repository.AuthSessionRepository;
 import com.git.techocean.repository.AuditEventRepository;
@@ -29,16 +28,20 @@ import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest({UsuarioAdminController.class, ClienteController.class, ServicoController.class})
 @Import(SecurityConfig.class)
+@SuppressWarnings("null")
 class StaffRoleSecurityTest {
     @Autowired MockMvc mvc;
+    @SuppressWarnings("unused")
     @MockitoBean UsuarioAdminService service;
     @MockitoBean UsuarioAdminRepository users;
     @MockitoBean AuthSessionService sessions;
+    @SuppressWarnings("unused")
     @MockitoBean AuthSessionRepository sessionRepository;
+    @SuppressWarnings("unused")
     @MockitoBean AuditEventRepository auditRepository;
+    @SuppressWarnings("unused")
     @MockitoBean AdminBootstrapService bootstrap;
     @MockitoBean ClienteService clientes;
-    @MockitoBean ClienteRepository clienteRepository;
     @MockitoBean ServicoService servicos;
 
     @Test void supervisorCannotReadAdminAudit() throws Exception {

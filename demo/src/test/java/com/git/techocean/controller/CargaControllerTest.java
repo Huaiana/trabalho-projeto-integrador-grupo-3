@@ -14,10 +14,9 @@ import com.git.techocean.config.CorsConfig;
 import com.git.techocean.config.SecurityConfig;
 import com.git.techocean.config.SessionAuditInterceptor;
 import com.git.techocean.model.Carga;
-import com.git.techocean.repository.AuthSessionRepository;
-import com.git.techocean.repository.AuditEventRepository;
 import com.git.techocean.service.CargaService;
 import com.git.techocean.service.AuthSessionService;
+import java.util.Objects;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,6 +33,7 @@ import org.springframework.test.context.TestPropertySource;
 @WebMvcTest(CargaController.class)
 @Import({CorsConfig.class, SecurityConfig.class})
 @TestPropertySource(properties = "CORS_ALLOWED_ORIGIN_PATTERNS=https://extra-origin.example,https://techocean-web.pages.dev")
+@SuppressWarnings("null")
 class CargaControllerTest {
 
     @Autowired
@@ -44,12 +44,9 @@ class CargaControllerTest {
     @MockitoBean
     private AuthSessionService sessions;
     @MockitoBean
-    private AuthSessionRepository sessionRepository;
-    @MockitoBean
-    private AuditEventRepository auditRepository;
-    @MockitoBean
     private SessionAuditInterceptor sessionAuditInterceptor;
 
+    @SuppressWarnings({"unused", "null"})
     @BeforeEach
     void permitMockedAuditInterceptor() throws Exception {
         doReturn(true).when(sessionAuditInterceptor).preHandle(any(), any(), any());
@@ -63,7 +60,7 @@ class CargaControllerTest {
         when(sessions.touch("test-session", 1L, "ADMIN")).thenReturn(true);
 
         mockMvc.perform(post("/cargas")
-                        .contentType(MediaType.APPLICATION_JSON)
+                        .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
                         .with(SecurityMockMvcRequestPostProcessors.jwt()
                                 .jwt(token -> token.subject("1").claim("jti", "test-session").claim("role", "ADMIN"))
                                 .authorities(new SimpleGrantedAuthority("ROLE_ADMIN")))

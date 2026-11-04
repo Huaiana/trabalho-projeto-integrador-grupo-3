@@ -7,13 +7,14 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.never;
 
 import com.git.techocean.model.Cliente;
 import com.git.techocean.repository.ClienteRepository;
+import java.util.Objects;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.server.ResponseStatusException;
 
+@SuppressWarnings("null")
 class ClienteServiceTest {
 
     private final ClienteRepository clienteRepository = mock(ClienteRepository.class);
@@ -48,7 +49,7 @@ class ClienteServiceTest {
         existing.setId(3L);
         when(clienteRepository.findById(3L)).thenReturn(java.util.Optional.of(existing));
         when(clienteRepository.findByEmail("new@example.com")).thenReturn(null);
-        when(clienteRepository.save(existing)).thenReturn(existing);
+        when(clienteRepository.save(Objects.requireNonNull(existing))).thenReturn(existing);
 
         Cliente updated = service.atualizar(3L, "Nome novo", "22222222222", "11922220000", "new@example.com", "NovaSenha123");
 
@@ -57,7 +58,7 @@ class ClienteServiceTest {
         assertEquals("11922220000", updated.getTelefone());
         assertEquals("new@example.com", updated.getEmail());
         org.junit.jupiter.api.Assertions.assertTrue(new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder().matches("NovaSenha123", updated.getSenha()));
-        verify(clienteRepository).save(existing);
+        verify(clienteRepository).save(Objects.requireNonNull(existing));
     }
 
     @Test

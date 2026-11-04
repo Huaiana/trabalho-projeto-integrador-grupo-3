@@ -14,9 +14,11 @@ import com.git.techocean.model.Usuario;
 import com.git.techocean.repository.AgendamentoRepository;
 import com.git.techocean.repository.UsuarioRepository;
 import java.time.LocalDateTime;
+import java.util.Objects;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+@SuppressWarnings("null")
 class AgendamentoServiceTest {
 
     private final AgendamentoRepository agendamentoRepository = mock(AgendamentoRepository.class);
@@ -24,10 +26,11 @@ class AgendamentoServiceTest {
     private final AgendamentoService service =
             new AgendamentoService(agendamentoRepository, usuarioRepository);
 
+    @SuppressWarnings({"unused", "null"})
     @BeforeEach
     void configureRepositories() {
         when(agendamentoRepository.save(any(Agendamento.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
+                .thenAnswer(invocation -> Objects.requireNonNull(invocation.getArgument(0)));
         when(usuarioRepository.save(any(Usuario.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
     }
@@ -108,7 +111,7 @@ class AgendamentoServiceTest {
         assertEquals("Cliente existente", agendamento.getNome());
         assertEquals("cliente@example.com", agendamento.getEmail());
         assertEquals(false, agendamento.isStatus());
-        verify(agendamentoRepository).save(agendamento);
+        verify(agendamentoRepository).save(Objects.requireNonNull(agendamento));
         verify(usuarioRepository, never()).save(any(Usuario.class));
     }
 
@@ -130,7 +133,7 @@ class AgendamentoServiceTest {
                 44L, null, "11999990000", LocalDateTime.now().plusDays(3), true);
         assertEquals("11999990000", updated.getTelefone());
         assertEquals(true, updated.isStatus());
-        verify(agendamentoRepository).save(existing);
+        verify(agendamentoRepository).save(Objects.requireNonNull(existing));
 
         service.excluir(44L);
         verify(agendamentoRepository).delete(existing);

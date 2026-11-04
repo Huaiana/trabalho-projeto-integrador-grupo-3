@@ -12,6 +12,7 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 
 class SessionAuditInterceptorTest {
+    @SuppressWarnings("null")
     @Test void recordsRequestMetadataAndResponseWithoutReadingBody() throws Exception {
         AuditEventRepository auditEvents = mock(AuditEventRepository.class);
         SessionAuditInterceptor interceptor = new SessionAuditInterceptor(

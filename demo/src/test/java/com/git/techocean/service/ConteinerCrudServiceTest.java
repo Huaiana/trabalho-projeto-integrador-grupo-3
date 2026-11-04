@@ -10,6 +10,7 @@ import com.git.techocean.repository.ConteinerRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.server.ResponseStatusException;
 
+@SuppressWarnings("null")
 class ConteinerCrudServiceTest {
     private final ConteinerRepository repository = mock(ConteinerRepository.class);
     private final ConteinerService service = new ConteinerService(repository);
@@ -30,7 +31,9 @@ class ConteinerCrudServiceTest {
     @Test
     void rejectsMissingContainer() {
         when(repository.findById(99L)).thenReturn(Optional.empty());
-        assertThrows(ResponseStatusException.class, () -> service.excluir(99L));
+        ResponseStatusException exception = assertThrows(
+                ResponseStatusException.class, () -> service.excluir(99L));
+        assertEquals("Contêiner não encontrado.", exception.getReason());
         verify(repository, never()).delete(any(Conteiner.class));
     }
 }

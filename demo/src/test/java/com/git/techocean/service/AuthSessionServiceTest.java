@@ -22,6 +22,7 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
 
+@SuppressWarnings("null")
 class AuthSessionServiceTest {
     private final AuthSessionRepository sessions = mock(AuthSessionRepository.class);
     private final AuditEventRepository audits = mock(AuditEventRepository.class);

@@ -16,6 +16,7 @@ import org.springframework.web.server.ResponseStatusException;
 import com.git.techocean.model.ContatoMensagem;
 import com.git.techocean.repository.ContatoMensagemRepository;
 
+@SuppressWarnings("null")
 class ContatoMensagemServiceTest {
 
     private final ContatoMensagemRepository repository = mock(ContatoMensagemRepository.class);
@@ -36,7 +37,10 @@ class ContatoMensagemServiceTest {
 
     @Test
     void rejectsInvalidContactEmail() {
-        assertThrows(ResponseStatusException.class, () -> service.criar("Ana", "email-invalido", "Ajuda"));
+        ResponseStatusException exception = assertThrows(
+                ResponseStatusException.class,
+                () -> service.criar("Ana", "email-invalido", "Ajuda"));
+        assertEquals("Informe um e-mail válido.", exception.getReason());
     }
 
     @Test
@@ -66,8 +70,10 @@ class ContatoMensagemServiceTest {
     void rejectsDeletingMissingContactMessage() {
         when(repository.findById(7L)).thenReturn(Optional.empty());
 
-        assertThrows(ResponseStatusException.class, () -> service.deletar(7L));
+        ResponseStatusException exception = assertThrows(
+                ResponseStatusException.class, () -> service.deletar(7L));
 
+        assertEquals("Mensagem não encontrada.", exception.getReason());
         verify(repository, never()).delete(any(ContatoMensagem.class));
     }
 }
