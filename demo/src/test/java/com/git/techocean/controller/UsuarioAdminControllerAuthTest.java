@@ -33,8 +33,9 @@ class UsuarioAdminControllerAuthTest {
         var response = controller.setup("onetime-test-token",
                 new UsuarioAdminController.StaffRequest("Admin", "admin@example.com", "strong-pass", null));
         assertEquals(HttpStatus.CREATED, response.getStatusCode());
-        assertThrows(ResponseStatusException.class, () -> controller.setup("wrong",
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> controller.setup("wrong",
                 new UsuarioAdminController.StaffRequest("Other", "other@example.com", "strong-pass", null)));
+        assertEquals(HttpStatus.FORBIDDEN, exception.getStatusCode());
         verify(bootstrap).reserve();
     }
 
