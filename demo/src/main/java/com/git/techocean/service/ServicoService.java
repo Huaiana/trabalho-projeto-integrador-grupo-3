@@ -1,6 +1,7 @@
 package com.git.techocean.service;
 
 import java.util.List;
+import java.util.Objects;
 import org.springframework.http.HttpStatus;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
@@ -30,15 +31,16 @@ public class ServicoService {
     }
 
     public @NonNull Servico buscarPorId(@NonNull Long id) {
-        validarId(id);
-        return servicoRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Serviço não encontrado."));
+        id = validarId(id);
+        return Objects.requireNonNull(servicoRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Serviço não encontrado.")));
     }
 
     public List<Servico> listarTodos() { return servicoRepository.findAll(); }
 
     public Servico atualizar(Long id, String nome, String descricao, String categoria, Boolean disponivel) {
         validar(nome, descricao, categoria);
+        id = validarId(id);
         Servico servico = buscarPorId(id);
         servico.setNome(nome.trim()); servico.setDescricao(descricao.trim()); servico.setCategoria(categoria.trim());
         if (disponivel != null) servico.setDisponivel(disponivel);
@@ -52,7 +54,8 @@ public class ServicoService {
                 || categoria == null || categoria.trim().isEmpty())
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Nome, descrição e categoria são obrigatórios.");
     }
-    private void validarId(Long id) {
+    private @NonNull Long validarId(Long id) {
         if (id == null || id <= 0) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "ID inválido.");
+        return id;
     }
 }

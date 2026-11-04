@@ -1,6 +1,7 @@
 package com.git.techocean.service;
 
 import java.util.List;
+import java.util.Objects;
 import org.springframework.http.HttpStatus;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
@@ -28,13 +29,14 @@ public class ConteinerService {
     }
 
     public @NonNull Conteiner buscarPorId(@NonNull Long id) {
-        validarId(id);
-        return conteinerRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Contêiner não encontrado."));
+        id = validarId(id);
+        return Objects.requireNonNull(conteinerRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Contêiner não encontrado.")));
     }
 
     public Conteiner atualizar(Long id, String numeroConteiner, String tipo, String situacao) {
         validarObrigatorios(numeroConteiner, tipo, situacao);
+        id = validarId(id);
         Conteiner conteiner = buscarPorId(id);
         conteiner.setNumeroConteiner(numeroConteiner.trim());
         conteiner.setTipo(tipo.trim());
@@ -53,7 +55,8 @@ public class ConteinerService {
         }
     }
 
-    private void validarId(Long id) {
+    private @NonNull Long validarId(Long id) {
         if (id == null || id <= 0) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "ID inválido.");
+        return id;
     }
 }

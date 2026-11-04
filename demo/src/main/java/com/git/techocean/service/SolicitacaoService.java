@@ -2,6 +2,7 @@ package com.git.techocean.service;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Set;
 import org.springframework.http.HttpStatus;
 import org.springframework.lang.NonNull;
@@ -55,11 +56,12 @@ public class SolicitacaoService {
     }
 
     public @NonNull Solicitacao buscarPorId(@NonNull Long id) {
-        return solicitacaoRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Solicitação não encontrada."));
+        return Objects.requireNonNull(solicitacaoRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Solicitação não encontrada.")));
     }
 
     public Solicitacao atualizarStatus(Long id, String status) {
+        id = validarId(id);
         String statusNormalizado = status == null ? "" : status.trim().toUpperCase(Locale.ROOT);
         if (!STATUS_VALIDOS.contains(statusNormalizado)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
@@ -69,5 +71,12 @@ public class SolicitacaoService {
         Solicitacao solicitacao = buscarPorId(id);
         solicitacao.setStatus(statusNormalizado);
         return solicitacaoRepository.save(solicitacao);
+    }
+
+    private @NonNull Long validarId(Long id) {
+        if (id == null || id <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "ID inválido.");
+        }
+        return id;
     }
 }

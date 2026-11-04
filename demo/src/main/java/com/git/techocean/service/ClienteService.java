@@ -61,6 +61,7 @@ public class ClienteService {
 
     @Transactional
     public Cliente atualizar(Long id, String nome, String cpfCnpj, String telefone, String email, String senha) {
+        id = validarId(id);
         if (nome == null || nome.isBlank()) throw erro("O campo 'nome' é obrigatório.");
         if (cpfCnpj == null || cpfCnpj.isBlank()) throw erro("O campo 'cpf' é obrigatório.");
         if (telefone == null || telefone.isBlank()) throw erro("O campo 'telefone' é obrigatório.");
@@ -107,5 +108,10 @@ public class ClienteService {
 
     private ResponseStatusException erro(String mensagem) {
         return new ResponseStatusException(HttpStatus.BAD_REQUEST, mensagem);
+    }
+
+    private @NonNull Long validarId(Long id) {
+        if (id == null || id <= 0) throw erro("ID inválido.");
+        return id;
     }
 }
