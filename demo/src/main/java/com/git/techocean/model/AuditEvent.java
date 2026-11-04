@@ -17,6 +17,8 @@ public class AuditEvent {
     private Long actorId;
     private String actorName;
     private String actorRole;
+    private String actionCode;
+    private String actionDescription;
     @Column(nullable = false) private String action;
     @Column(nullable = false) private String method;
     @Column(nullable = false) private String resource;

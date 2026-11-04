@@ -50,9 +50,55 @@ public class SessionAuditInterceptor implements HandlerInterceptor {
             event.setActorId(session.getActorId()); event.setActorName(session.getActorName()); event.setActorRole(session.getRole());
         }
         String method = request.getMethod(); String uri = request.getRequestURI();
-        event.setAction(method); event.setMethod(method); event.setResource(uri);
+        ActionMetadata metadata = actionMetadata(method, uri);
+        event.setAction(method); event.setActionCode(metadata.code()); event.setActionDescription(metadata.description());
+        event.setMethod(method); event.setResource(uri);
         String[] segments = uri.split("/"); event.setResourceId(segments.length > 0 ? segments[segments.length - 1] : null);
         event.setOccurredAt(Instant.now()); event.setResponseStatus(response.getStatus()); event.setIpAddress(request.getRemoteAddr());
         audits.save(event);
     }
+
+    private ActionMetadata actionMetadata(String method, String uri) {
+        if ("POST".equals(method) && "/admin/login".equals(uri)) return new ActionMetadata("AUTH-001", "Login administrativo");
+        if ("POST".equals(method) && "/admin/logout".equals(uri)) return new ActionMetadata("AUTH-002", "Encerramento de sessão");
+        if ("POST".equals(method) && "/admin/setup".equals(uri)) return new ActionMetadata("ADM-001", "Criação do administrador inicial");
+        if (uri.startsWith("/admin/usuarios")) {
+            return switch (method) {
+                case "POST" -> new ActionMetadata("ADM-002", "Criação de usuário administrativo");
+                case "PUT" -> new ActionMetadata("ADM-003", "Atualização de usuário administrativo");
+                case "DELETE" -> new ActionMetadata("ADM-004", "Exclusão de usuário administrativo");
+                default -> new ActionMetadata("ADM-005", "Consulta de usuários administrativos");
+            };
+        }
+        if ("POST".equals(method) && "/api/backup/admin/completo".equals(uri)) return new ActionMetadata("BKP-001", "Geração de backup administrativo completo");
+        if ("POST".equals(method) && "/api/backup/operacional".equals(uri)) return new ActionMetadata("BKP-002", "Geração de backup operacional");
+        if ("GET".equals(method) && "/admin/auditoria".equals(uri)) return new ActionMetadata("AUD-001", "Consulta do histórico de auditoria");
+        if ("GET".equals(method) && "/admin/sessoes".equals(uri)) return new ActionMetadata("AUD-002", "Consulta de sessões administrativas");
+        return genericActionMetadata(method, uri);
+    }
+
+    private ActionMetadata genericActionMetadata(String method, String uri) {
+        String[] resource = switch (uri.startsWith("/") ? uri.substring(1).split("/") [0] : "") {
+            case "cargas" -> new String[] {"CARGA", "cargas"};
+            case "clientes" -> new String[] {"CLI", "clientes"};
+            case "conteineres" -> new String[] {"CNT", "contêineres"};
+            case "operacoes" -> new String[] {"OPR", "operações"};
+            case "orcamentos" -> new String[] {"ORC", "orçamentos"};
+            case "servicos" -> new String[] {"SRV", "serviços"};
+            case "solicitacoes" -> new String[] {"SOL", "solicitações"};
+            case "agendamentos" -> new String[] {"AGD", "agendamentos"};
+            case "mensagens" -> new String[] {"MSG", "mensagens"};
+            default -> new String[] {"SYS", "operação no sistema"};
+        };
+        String[] action = switch (method) {
+            case "GET" -> new String[] {"001", "Consulta de "};
+            case "POST" -> new String[] {"002", "Criação de "};
+            case "PUT", "PATCH" -> new String[] {"003", "Atualização de "};
+            case "DELETE" -> new String[] {"004", "Exclusão de "};
+            default -> new String[] {"999", "Execução de "};
+        };
+        return new ActionMetadata(resource[0] + "-" + action[0], action[1] + resource[1]);
+    }
+
+    private record ActionMetadata(String code, String description) { }
 }

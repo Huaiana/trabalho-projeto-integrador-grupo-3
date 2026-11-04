@@ -376,7 +376,38 @@ export function renderResourceTable(records, slug, role = userRole()) {
 }
 
 function renderReadOnlySection(records, title) {
+  if (title === "Auditoria") return renderAuditSection(records);
+  if (title === "Sessões") return renderSessionsSection(records);
   return `<section class="data-panel"><div class="panel-heading"><div><span class="eyebrow">ADMINISTRAÇÃO</span><h2>${esc(title)} <span class="count-pill">${records.length}</span></h2></div><button class="button button-outline compact" data-reload>↻ Atualizar</button></div>${renderTable(records, null, title)}</section>`;
+}
+
+function formatAuditDate(value) {
+  if (!value) return "—";
+  const date = new Date(value);
+  return Number.isNaN(date.valueOf()) ? valueText(value) : esc(date.toLocaleString("pt-BR"));
+}
+
+function auditMetadata(record) {
+  if (record.actionCode || record.actionDescription) {
+    return { code: record.actionCode || "SYS-001", description: record.actionDescription || record.action || "Operação registrada" };
+  }
+  const resource = String(record.resource || "");
+  const method = String(record.method || record.action || "GET").toUpperCase();
+  if (resource.includes("/api/backup/admin/completo")) return { code: "BKP-001", description: "Geração de backup administrativo completo" };
+  if (resource.includes("/api/backup/operacional")) return { code: "BKP-002", description: "Geração de backup operacional" };
+  const match = Object.entries({ cargas: ["CARGA", "cargas"], clientes: ["CLI", "clientes"], conteineres: ["CNT", "contêineres"], operacoes: ["OPR", "operações"], orcamentos: ["ORC", "orçamentos"], servicos: ["SRV", "serviços"], solicitacoes: ["SOL", "solicitações"], agendamentos: ["AGD", "agendamentos"], mensagens: ["MSG", "mensagens"] }).find(([resourceName]) => resource.includes(`/${resourceName}`));
+  const [prefix, label] = match?.[1] || ["SYS", "operação no sistema"];
+  const action = { GET: ["001", "Consulta de "], POST: ["002", "Criação de "], PUT: ["003", "Atualização de "], PATCH: ["003", "Atualização de "], DELETE: ["004", "Exclusão de "] }[method] || ["999", "Execução de "];
+  return { code: `${prefix}-${action[0]}`, description: `${action[1]}${label}` };
+}
+
+function renderAuditSection(records) {
+  const rows = records.map((record) => { const metadata = auditMetadata(record); return `<tr><td><span class="audit-code">${esc(metadata.code)}</span></td><td><strong>${esc(metadata.description)}</strong><br><span class="muted">${esc(record.method || "—")} · ${esc(record.resource || "—")}</span></td><td>${esc(record.actorName || "Sistema")}<br><span class="muted">${esc(record.actorRole || "Automático")}</span></td><td>${formatAuditDate(record.occurredAt)}</td><td>${esc(record.resourceId || "—")}</td><td><span class="status-pill">${esc(record.responseStatus ?? "—")}</span></td><td>${esc(record.ipAddress || "—")}</td></tr>`; }).join("");
+  return `<section class="data-panel audit-panel"><div class="panel-heading"><div><span class="eyebrow">ADMINISTRAÇÃO</span><h2>Auditoria <span class="count-pill">${records.length}</span></h2></div><button class="button button-outline compact" data-reload>↻ Atualizar</button></div>${records.length ? `<div class="table-scroll"><table class="records-table"><thead><tr><th>Código</th><th>Ação realizada</th><th>Profissional</th><th>Data e hora</th><th>Identificador</th><th>Resultado</th><th>IP</th></tr></thead><tbody>${rows}</tbody></table></div>` : `<div class="empty-state"><span>▱</span><strong>Nenhuma ação registrada</strong><p>As ações realizadas por profissionais aparecerão aqui.</p></div>`}</section>`;
+}
+
+function renderSessionsSection(records) {
+  return `<section class="data-panel"><div class="panel-heading"><div><span class="eyebrow">ADMINISTRAÇÃO</span><h2>Sessões <span class="count-pill">${records.length}</span></h2></div><button class="button button-outline compact" data-reload>↻ Atualizar</button></div>${renderTable(records, ["id", "actorName", "role", "startedAt", "lastActivityAt", "loggedOutAt", "durationSeconds"], "Sessões")}</section>`;
 }
 
 function resourceFieldMarkup(fieldDefinition, record, editing) {
@@ -451,7 +482,7 @@ function renderTable(records, columns, title) {
   return `<div class="table-scroll"><table class="records-table"><thead><tr>${keys.map((key) => `<th>${esc(labelFor(key))}</th>`).join("")}${title === "Agendamento" || title === "Solicitação" ? "<th>Ação</th>" : ""}</tr></thead><tbody>${records.map((item) => `<tr>${keys.map((key) => `<td>${statusPill(key, item[key])}</td>`).join("")}${title === "Agendamento" || title === "Solicitação" ? `<td>${item.id ? `<button class="small-action" data-status-id="${esc(item.id)}" data-status="${String(item.status).toLowerCase() === "true" || String(item.status).toLowerCase() === "confirmado" ? "pendente" : "confirmado"}">${String(item.status).toLowerCase() === "true" || String(item.status).toLowerCase() === "confirmado" ? "Marcar pendente" : "Confirmar"}</button>` : "—"}</td>` : ""}</tr>`).join("")}</tbody></table></div>`;
 }
 
-function labelFor(key) { return ({ id: "Código", cpf: "CPF / CNPJ", cpfcnpj: "CPF / CNPJ", cpfCnpj: "CPF / CNPJ", CPFCNPJ: "CPF / CNPJ", numeroConteiner: "Número do contêiner", tipoCarga: "Tipo de carga", dataHora: "Data e horário", criadoEm: "Recebida em", valorEstimado: "Valor estimado" })[key] || key.replace(/([A-Z])/g, " $1").replace(/^./, (char) => char.toUpperCase()); }
+function labelFor(key) { return ({ id: "Código", actorName: "Profissional", actorRole: "Perfil", startedAt: "Início", lastActivityAt: "Última atividade", loggedOutAt: "Encerramento", durationSeconds: "Duração (segundos)", cpf: "CPF / CNPJ", cpfcnpj: "CPF / CNPJ", cpfCnpj: "CPF / CNPJ", CPFCNPJ: "CPF / CNPJ", numeroConteiner: "Número do contêiner", tipoCarga: "Tipo de carga", dataHora: "Data e horário", criadoEm: "Recebida em", valorEstimado: "Valor estimado" })[key] || key.replace(/([A-Z])/g, " $1").replace(/^./, (char) => char.toUpperCase()); }
 
 function statusPill(key, value) {
   const rendered = valueText(value);
