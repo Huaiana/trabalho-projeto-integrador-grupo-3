@@ -41,6 +41,8 @@ class StaffRoleSecurityTest {
     @MockitoBean AuditEventRepository auditRepository;
     @SuppressWarnings("unused")
     @MockitoBean AdminBootstrapService bootstrap;
+    @SuppressWarnings("unused")
+    @MockitoBean com.git.techocean.repository.AdminSetupConfigRepository setupConfig;
     @MockitoBean ClienteService clientes;
     @MockitoBean ServicoService servicos;
 
