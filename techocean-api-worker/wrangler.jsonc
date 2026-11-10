@@ -1,0 +1,22 @@
+{
+  "name": "techocean-api",
+  "main": "src/index.js",
+  "compatibility_date": "2026-11-01",
+  "compatibility_flags": ["nodejs_compat"],
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "techocean-db",
+      "database_id": "892e162c-a794-4daf-be6b-166a92c0a2f8"
+    }
+  ],
+
+  "vars": {
+    "FRONTEND_URL": "https://techocean.pages.dev"
+  }
+
+  // APP_AUTH_SECRET deve ser definido como secret:
+  //   npx wrangler secret put APP_AUTH_SECRET
+  // (mínimo 32 bytes, string aleatória)
+}
