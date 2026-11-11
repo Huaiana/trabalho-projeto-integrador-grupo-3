@@ -1,11 +1,17 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   DATABASE_CATALOG_KEY,
+  readServiceValues,
+  readResourceDetails,
+  saveResourceDetails,
+  saveServiceValue,
   deleteDatabaseEntry,
   findDatabaseEntry,
   readDatabaseEntries,
   saveDatabaseEntry,
 } from "../src/database-catalog.js";
+import { parseTarifas } from "../src/tarifas-orcamento.js";
+import { catalogoOrcamentos } from "../src/catalogo-orcamentos.js";
 
 function installStorage() {
   const values = new Map();
@@ -20,6 +26,36 @@ afterEach(() => {
 });
 
 describe("Banco de dados do frontend", () => {
+  it("persists local descriptions independently by category and operational ID", () => {
+    installStorage();
+    saveResourceDetails("conteiner", 7, { referencia: "CTR-000001", descricao: "Dados editados" });
+    saveResourceDetails("operacao", 7, { referencia: "OPR-000001", descricao: "Operação" });
+    expect(readResourceDetails()["conteiner:7"].descricao).toBe("Dados editados");
+    expect(readResourceDetails()["operacao:7"].descricao).toBe("Operação");
+    saveResourceDetails("conteiner", 7, null);
+    expect(readResourceDetails()["conteiner:7"]).toBeUndefined();
+    expect(readResourceDetails()["operacao:7"].descricao).toBe("Operação");
+    expect(() => saveResourceDetails("carga", 7, {})).toThrow("inválido");
+  });
+  it("persists individual service values, timestamps and removal without changing reference tariffs", () => {
+    installStorage();
+    const reference = readDatabaseEntries("servico")[0];
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date("2026-11-10T12:00:00Z"));
+      saveServiceValue(42, "0");
+      expect(readServiceValues()[42]).toEqual({ valor: 0, atualizadoEm: "2026-11-10T12:00:00.000Z" });
+      vi.setSystemTime(new Date("2026-11-11T12:00:00Z"));
+      saveServiceValue(42, "0");
+      expect(readServiceValues()[42].atualizadoEm).toBe("2026-11-10T12:00:00.000Z");
+      saveServiceValue(42, "15.50");
+      expect(readServiceValues()[42]).toEqual({ valor: 15.5, atualizadoEm: "2026-11-11T12:00:00.000Z" });
+      expect(findDatabaseEntry("servico", "codigo", reference.codigo).valor).toBe(reference.valor);
+      expect(() => saveServiceValue(42, "-1")).toThrow("válido");
+      saveServiceValue(42, "");
+      expect(readServiceValues()[42]).toBeUndefined();
+    } finally { vi.useRealTimers(); }
+  });
   it("seeds service references and stores editable category entries locally", () => {
     installStorage();
 
@@ -106,6 +142,19 @@ describe("Banco de dados do frontend", () => {
     expect(findDatabaseEntry("carga", "tipoCarga", "Teste").conteineres).toBe("CTR-000001, CTR-000002");
   });
 
+  it("validates and protects explicit cargo-service links", () => {
+    installStorage();
+    const cargo = findDatabaseEntry("carga", "codigo", "CRG-000002");
+    const service = readDatabaseEntries("servico")[0];
+    expect(() => saveDatabaseEntry("carga", { ...cargo, servicos: "SRV-999999" }, cargo.id)).toThrow("ID de serviço não encontrado");
+    saveDatabaseEntry("carga", { ...cargo, servicos: `${service.codigo.toLowerCase()}, ${service.codigo}` }, cargo.id);
+    expect(findDatabaseEntry("carga", "codigo", cargo.codigo).servicos).toBe(service.codigo);
+    expect(() => deleteDatabaseEntry("servico", service.id)).toThrow("vinculado a cargas");
+    const saved = findDatabaseEntry("carga", "codigo", cargo.codigo);
+    saveDatabaseEntry("carga", { ...saved, servicos: "" }, saved.id);
+    expect(findDatabaseEntry("carga", "codigo", cargo.codigo).servicos).toBe("");
+  });
+
   it("migrates existing cargo without overwriting fields and does not restore deleted references", () => {
     installStorage();
     localStorage.setItem(DATABASE_CATALOG_KEY, JSON.stringify({
@@ -172,6 +221,100 @@ describe("Banco de dados do frontend", () => {
     expect(findDatabaseEntry("operacao", "codigo", operation.codigo)).toMatchObject({ cargas: "", conteineres: "" });
     deleteDatabaseEntry("carga", cargo.id);
     expect(findDatabaseEntry("operacao", "codigo", operation.codigo).cargas).toBe("");
+  });
+
+  it("migrates historical budget references once and allows values and links to be edited", () => {
+    installStorage();
+    localStorage.setItem(DATABASE_CATALOG_KEY, JSON.stringify({
+      orcamento: [{ id: "original", servico: "Serviço próprio", valorEstimado: 50 }],
+      servico: [], conteiner: [], carga: [], operacao: [],
+    }));
+    const records = readDatabaseEntries("orcamento");
+    const original = records.find((entry) => entry.id === "original");
+    const historic = records.find((entry) => entry.servico.startsWith("2.1.2.1.1 —"));
+    expect(records.length).toBeGreaterThan(50);
+    expect(original).toMatchObject({ codigo: "ORC-000001", valorEstimado: 50 });
+    expect(historic).toMatchObject({ codigo: "ORC-000002", historico: true });
+    expect(historic.fonte).toContain("31/12/2017");
+    expect(historic.regras).toContain("0,48% CIF");
+    expect(historic.regras).toContain("R$ 1.466,88");
+    const container = findDatabaseEntry("conteiner", "tipo", "Dry Box 20'");
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date("2026-11-10T12:00:00Z"));
+      saveDatabaseEntry("orcamento", { ...historic, valorEstimado: "100.50", conteineres: container.codigo }, historic.id);
+      expect(findDatabaseEntry("orcamento", "codigo", historic.codigo)).toMatchObject({
+        valorEstimado: 100.5, conteineres: container.codigo, historico: true, fonte: historic.fonte,
+        valorAtualizadoEm: "2026-11-10T12:00:00.000Z",
+      });
+      expect(() => saveDatabaseEntry("orcamento", { ...historic, cargas: "CRG-999999" }, historic.id)).toThrow("ID de carga não encontrado");
+      expect(() => saveDatabaseEntry("orcamento", { ...historic, valorEstimado: -1 }, historic.id)).toThrow("não pode ser negativo");
+      deleteDatabaseEntry("orcamento", historic.id);
+      expect(findDatabaseEntry("orcamento", "codigo", historic.codigo)).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("prevents deleting services and operations linked to budget references", () => {
+    installStorage();
+    const service = readDatabaseEntries("servico")[0];
+    const operation = readDatabaseEntries("operacao")[0];
+    saveDatabaseEntry("orcamento", { servico: "Referência vinculada", servicos: service.codigo, operacoes: operation.codigo });
+    expect(() => deleteDatabaseEntry("servico", service.id)).toThrow("vinculada a orçamentos");
+    expect(() => deleteDatabaseEntry("operacao", operation.id)).toThrow("vinculada a orçamentos");
+    const budget = findDatabaseEntry("orcamento", "servico", "Referência vinculada");
+    deleteDatabaseEntry("orcamento", budget.id);
+    expect(() => deleteDatabaseEntry("servico", service.id)).not.toThrow();
+    expect(() => deleteDatabaseEntry("operacao", operation.id)).not.toThrow();
+  });
+
+  it("migrates only unmodified historical tariffs and unambiguous links without overwriting user edits", () => {
+    installStorage();
+    const original = readDatabaseEntries("orcamento").find((entry) => entry.servico.includes("Monitoramento de contêiner refrigerado"));
+    expect(original.conteineres).toBe("CTR-000004, CTR-000005");
+    expect(original.valorEstimado).toBe(200.46);
+    expect(original.observacoes).toContain("2017");
+    expect(parseTarifas(original.tarifas)).toEqual([{ label: "Por unidade e dia ou fração", value: 200.46 }]);
+    const multi = readDatabaseEntries("orcamento").find((entry) => entry.servico.includes("Desunitização mecanizada"));
+    expect(multi.valorEstimado).toBeUndefined();
+    expect(parseTarifas(multi.tarifas)).toHaveLength(4);
+    saveDatabaseEntry("orcamento", { ...original, valorEstimado: "0", conteineres: "", observacoes: "Minha observação", tarifas: "Outro | 0" }, original.id);
+    expect(findDatabaseEntry("orcamento", "codigo", original.codigo)).toMatchObject({ valorEstimado: 0, conteineres: "", observacoes: "Minha observação", tarifas: "Outro | 0" });
+    expect(() => saveDatabaseEntry("orcamento", { ...original, tarifas: "Inválida | não é número" }, original.id)).toThrow("formato");
+    expect(parseTarifas("Manual | 12,50\nGrátis | 0")).toEqual([{ label: "Manual", value: 12.5 }, { label: "Grátis", value: 0 }]);
+  });
+
+  it("preserves edited legacy budget fields and deleted records during detail migration", () => {
+    installStorage();
+    const records = readDatabaseEntries("orcamento");
+    const modified = records.find((entry) => entry.servico.includes("Monitoramento de contêiner refrigerado"));
+    const deleted = records.find((entry) => entry.servico.includes("Desunitização mecanizada"));
+    const stored = JSON.parse(localStorage.getItem(DATABASE_CATALOG_KEY));
+    delete stored.budgetDetailsVersion;
+    stored.orcamento = stored.orcamento.filter((entry) => entry.id !== deleted.id);
+    const legacy = stored.orcamento.find((entry) => entry.id === modified.id);
+    Object.assign(legacy, { regras: "Condições personalizadas", valorEstimado: 0, conteineres: "", observacoes: "Minha observação" });
+    delete legacy.tarifas;
+    localStorage.setItem(DATABASE_CATALOG_KEY, JSON.stringify(stored));
+    const migrated = findDatabaseEntry("orcamento", "codigo", modified.codigo);
+    expect(migrated).toMatchObject({ regras: "Condições personalizadas", valorEstimado: 0, conteineres: "", observacoes: "Minha observação" });
+    expect(migrated.tarifas).toBeUndefined();
+    expect(findDatabaseEntry("orcamento", "codigo", deleted.codigo)).toBeNull();
+  });
+
+  it("offers each monetary tariff in the reference conditions without treating CIF thresholds as prices", () => {
+    installStorage();
+    const records = readDatabaseEntries("orcamento");
+    for (const [item, nome, , rules] of catalogoOrcamentos) {
+      const entry = records.find((record) => record.servico === `${item} — ${nome}`);
+      const values = parseTarifas(entry.tarifas).map((tariff) => tariff.value);
+      for (const match of rules.matchAll(/R\$\s*([\d.]+,\d{2})/g)) {
+        const value = Number(match[1].replaceAll(".", "").replace(",", "."));
+        if (item === "2.1.2.1.4" && [300000, 300001].includes(value)) continue;
+        expect(values, `${item}: ${value}`).toContain(value);
+      }
+    }
   });
 
   it("migrates existing services once and keeps unique codes through edits and deletion", () => {

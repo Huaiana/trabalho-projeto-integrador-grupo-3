@@ -11,6 +11,18 @@
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   </head>
   <body>
+    <div class="brasilia-clock" hidden>
+      <div class="brasilia-clock-inner">
+        <span class="brasilia-clock-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5v4.8l3.1 1.8" /></svg>
+        </span>
+        <div class="brasilia-clock-copy">
+          <span class="brasilia-clock-label">Horário de Brasília</span>
+          <span class="brasilia-clock-note">Relógio do dispositivo</span>
+        </div>
+        <time id="brasilia-clock">Carregando data e hora…</time>
+      </div>
+    </div>
     <div id="app"></div>
     <script type="module" src="/src/main.js"></script>
   </body>
