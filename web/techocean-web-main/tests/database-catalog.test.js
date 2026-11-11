@@ -26,6 +26,68 @@ afterEach(() => {
 });
 
 describe("Banco de dados do frontend", () => {
+  it("initializes seven stable solicitation references with only explicit service links", () => {
+    installStorage();
+    const entries = readDatabaseEntries("solicitacao");
+    expect(entries).toHaveLength(7);
+    expect(new Set(entries.map((entry) => entry.codigo)).size).toBe(7);
+    expect(entries.every((entry) => /^SOL-\d{6}$/.test(entry.codigo) && entry.descricao)).toBe(true);
+    const rsm = entries.find((entry) => entry.categoria === "Serviços e Materiais (RSM)");
+    expect(rsm.servicos.split(", ")).toEqual([
+      findDatabaseEntry("servico", "nome", "Fornecimento de água").codigo,
+      findDatabaseEntry("servico", "nome", "Fornecimento de energia elétrica").codigo,
+    ]);
+    expect(entries.filter((entry) => entry.id !== rsm.id).every((entry) => !entry.servicos && !entry.cargas && !entry.conteineres && !entry.operacoes && !entry.orcamentos)).toBe(true);
+    expect(readDatabaseEntries("solicitacao").map((entry) => entry.codigo)).toEqual(entries.map((entry) => entry.codigo));
+  });
+
+  it("migrates legacy solicitation references once without overriding edits or restoring deletions", () => {
+    installStorage();
+    localStorage.setItem(DATABASE_CATALOG_KEY, JSON.stringify({
+      servico: [],
+      solicitacao: [
+        { id: "original", servico: "Operações e Navios", descricao: "Descrição própria", categoria: "Própria", servicos: "" },
+        { id: "custom", servico: "Solicitação antiga", status: "PENDENTE" },
+      ],
+    }));
+    const entries = readDatabaseEntries("solicitacao");
+    expect(entries).toHaveLength(8);
+    expect(entries[0]).toMatchObject({ id: "original", descricao: "Descrição própria", categoria: "Própria", servicos: "", codigo: "SOL-000001" });
+    expect(entries[1]).toMatchObject({ id: "custom", status: "PENDENTE", codigo: "SOL-000002" });
+    saveDatabaseEntry("solicitacao", { ...entries[0], descricao: "Editada" }, entries[0].id);
+    deleteDatabaseEntry("solicitacao", entries[2].id);
+    expect(readDatabaseEntries("solicitacao")).toHaveLength(7);
+    expect(findDatabaseEntry("solicitacao", "codigo", entries[0].codigo).descricao).toBe("Editada");
+    saveDatabaseEntry("solicitacao", { servico: "Nova referência" });
+    expect(findDatabaseEntry("solicitacao", "servico", "Nova referência").codigo).toBe("SOL-000009");
+  });
+
+  it("validates and protects manually linked solicitation reference IDs", () => {
+    installStorage();
+    const reference = readDatabaseEntries("solicitacao")[0];
+    const links = { servicos: "servico", cargas: "carga", conteineres: "conteiner", operacoes: "operacao", orcamentos: "orcamento" };
+    const newEntries = {
+      servico: { nome: "Serviço isolado", categoria: "Teste" },
+      carga: { tipoCarga: "Carga isolada" },
+      conteiner: { tipo: "Contêiner isolado" },
+      operacao: { categoria: "Operação isolada" },
+      orcamento: { servico: "Orçamento isolado" },
+    };
+    const selected = Object.fromEntries(Object.entries(links).map(([field, category]) => {
+      const entries = saveDatabaseEntry(category, newEntries[category]);
+      return [field, entries[entries.length - 1].codigo];
+    }));
+    for (const field of Object.keys(links)) {
+      expect(() => saveDatabaseEntry("solicitacao", { ...reference, [field]: "INVALIDO" }, reference.id)).toThrow("não encontrado");
+    }
+    saveDatabaseEntry("solicitacao", { ...reference, ...selected }, reference.id);
+    for (const [field, category] of Object.entries(links)) {
+      const linked = findDatabaseEntry(category, "codigo", selected[field]);
+      expect(() => deleteDatabaseEntry(category, linked.id)).toThrow("vinculada a solicitações");
+    }
+    expect(findDatabaseEntry("solicitacao", "codigo", reference.codigo)).toMatchObject(selected);
+  });
+
   it("persists local descriptions independently by category and operational ID", () => {
     installStorage();
     saveResourceDetails("conteiner", 7, { referencia: "CTR-000001", descricao: "Dados editados" });
@@ -35,7 +97,9 @@ describe("Banco de dados do frontend", () => {
     saveResourceDetails("conteiner", 7, null);
     expect(readResourceDetails()["conteiner:7"]).toBeUndefined();
     expect(readResourceDetails()["operacao:7"].descricao).toBe("Operação");
-    expect(() => saveResourceDetails("carga", 7, {})).toThrow("inválido");
+    saveResourceDetails("carga", 7, { referencia: "CRG-000002" });
+    expect(readResourceDetails()["carga:7"].referencia).toBe("CRG-000002");
+    expect(() => saveResourceDetails("invalida", 7, {})).toThrow("inválido");
   });
   it("persists individual service values, timestamps and removal without changing reference tariffs", () => {
     installStorage();
@@ -106,6 +170,9 @@ describe("Banco de dados do frontend", () => {
     saveDatabaseEntry("conteiner", { ...original, largura: "2,30 m" }, original.id);
     expect(findDatabaseEntry("conteiner", "tipo", original.tipo)).toMatchObject({ codigo: original.codigo, largura: "2,30 m", comprimento: "5,90 m" });
     for (const cargo of readDatabaseEntries("carga").filter((entry) => entry.conteineres === original.codigo)) deleteDatabaseEntry("carga", cargo.id);
+    for (const budget of readDatabaseEntries("orcamento").filter((entry) => String(entry.conteineres || "").split(",").map((code) => code.trim()).includes(original.codigo))) {
+      saveDatabaseEntry("orcamento", { ...budget, conteineres: String(budget.conteineres).split(",").map((code) => code.trim()).filter((code) => code !== original.codigo).join(", ") }, budget.id);
+    }
     deleteDatabaseEntry("conteiner", original.id);
     expect(readDatabaseEntries("conteiner").some((entry) => entry.id === original.id)).toBe(false);
     saveDatabaseEntry("conteiner", { tipo: "Novo" });
@@ -247,6 +314,7 @@ describe("Banco de dados do frontend", () => {
         valorEstimado: 100.5, conteineres: container.codigo, historico: true, fonte: historic.fonte,
         valorAtualizadoEm: "2026-11-10T12:00:00.000Z",
       });
+
       expect(() => saveDatabaseEntry("orcamento", { ...historic, cargas: "CRG-999999" }, historic.id)).toThrow("ID de carga não encontrado");
       expect(() => saveDatabaseEntry("orcamento", { ...historic, valorEstimado: -1 }, historic.id)).toThrow("não pode ser negativo");
       deleteDatabaseEntry("orcamento", historic.id);
@@ -254,6 +322,31 @@ describe("Banco de dados do frontend", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("adds only explicitly named container links to unmodified historical budgets", () => {
+    installStorage();
+    const special = findDatabaseEntry("orcamento", "servico", "2.1.2.1.7 — Armazenagem OOG, Flat Rack ou Open Top");
+    const dry = findDatabaseEntry("orcamento", "servico", "2.1.2.1.8 — Armazenagem de vazios");
+    const ids = (names) => names.map((name) => findDatabaseEntry("conteiner", "tipo", name).codigo).join(", ");
+    expect(special.conteineres).toBe(ids(["Open Top 20'", "Open Top 40'", "Flat Rack 20'", "Flat Rack 40'"]));
+    expect(dry.conteineres).toBe(ids(["Dry Box 20'", "Dry Box 40'"]));
+    saveDatabaseEntry("orcamento", { ...special, conteineres: "" }, special.id);
+    expect(findDatabaseEntry("orcamento", "codigo", special.codigo).conteineres).toBe("");
+  });
+
+  it("preserves edited links and changed conditions during explicit link migration", () => {
+    installStorage();
+    const special = findDatabaseEntry("orcamento", "servico", "2.1.2.1.7 — Armazenagem OOG, Flat Rack ou Open Top");
+    const dry = findDatabaseEntry("orcamento", "servico", "2.1.2.1.8 — Armazenagem de vazios");
+    saveDatabaseEntry("orcamento", { ...special, conteineres: "" }, special.id);
+    saveDatabaseEntry("orcamento", { ...dry, conteineres: "", regras: "Condições personalizadas" }, dry.id);
+    const stored = JSON.parse(localStorage.getItem(DATABASE_CATALOG_KEY));
+    delete stored.explicitBudgetContainerLinksVersion;
+    delete stored.orcamento.find((entry) => entry.id === dry.id).conteineres;
+    localStorage.setItem(DATABASE_CATALOG_KEY, JSON.stringify(stored));
+    expect(findDatabaseEntry("orcamento", "codigo", special.codigo).conteineres).toBe("");
+    expect(findDatabaseEntry("orcamento", "codigo", dry.codigo).conteineres).toBeUndefined();
   });
 
   it("prevents deleting services and operations linked to budget references", () => {

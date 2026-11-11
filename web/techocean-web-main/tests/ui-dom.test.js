@@ -12,13 +12,19 @@ import {
   renderResourceTable,
   renderBudgets,
   renderSolicitacoes,
+  renderSharedSolicitations,
+  renderSharedRequestPanel,
+  renderSharedSolicitationsError,
+  sharedRequestForm,
   filterSolicitations,
+  filterSolicitationReferences,
   solicitationDescription,
   renderDatabaseSection,
   renderDatabaseEntryForm,
   renderContainerReferenceSection,
   renderOperationReferenceSection,
   updateOperationReference,
+  operationReferenceFields,
   updateLocalReferenceDescription,
   renderBudgetReferenceSection,
   budgetReferenceMatches,
@@ -239,6 +245,93 @@ describe("DOM interface helpers", () => {
     expect(markup).toContain('data-solicitation-action="view"');
   });
 
+  it("shows separate searchable local solicitation references even without received requests", () => {
+    const markup = renderSolicitacoes([]);
+    expect(markup).toContain("Nenhuma solicitação recebida");
+    for (const name of ["Operações e Navios", "Serviços e Materiais (RSM)", "Trânsito e Segurança (SSPP)", "Serviços de Terceiros", "Infraestrutura e Engenharia", "Financeiro e Faturamento", "Meio Ambiente e SSO"]) expect(markup).toContain(name);
+    expect(markup).toContain("SOL-000001");
+    expect(markup).toContain("Descrição e exemplos");
+    expect(markup).toContain("Serviços vinculados");
+    expect(markup).toContain("Orçamentos vinculados");
+    expect(markup).toContain("Fornecimento de água");
+    expect(markup).not.toContain("Sistema ou Canal");
+    expect(markup).not.toContain("Público-Alvo");
+    const database = renderDatabaseSection("solicitacao");
+    const form = renderDatabaseEntryForm("solicitacao");
+    expect(database).toContain("Vincular IDs");
+    expect(database).toContain("SOL-000001");
+    for (const field of ["servicos", "cargas", "conteineres", "operacoes", "orcamentos"]) expect(form).toContain(`data-budget-link="${field}"`);
+  });
+
+  it("renders server-backed solicitation fields and actions independently of local references", () => {
+    const request = {
+      id: 12, nomeServico: "Atracação", categoria: "Operações e Navios", descricao: "Pedido de atracação",
+      servicoReferencia: { codigo: "SRV-000001", nome: "Manobra", descricao: "Dados do serviço" },
+      cargaReferencia: { codigo: "CRG-000002", nome: "Grãos" },
+      conteinerReferencia: { codigo: "CTR-000003", nome: "Dry" },
+      operacaoReferencia: { codigo: "OPR-000004", nome: "Embarque" },
+      orcamentoReferencia: { codigo: "ORC-000005", nome: "Tarifa" },
+      solicitante: { id: 7, nome: "Cliente" }, prestador: { id: 9, nome: "Funcionário", cargo: "FUNCIONARIO" },
+      statusSolicitacao: "EM_ANALISE", valor: 125.5, criadoEm: "2026-11-10T12:00:00Z",
+    };
+    const markup = renderSharedSolicitations([request], [], false);
+    for (const text of ["Pedido de atracação", "SRV-000001", "Dados do serviço", "CRG-000002", "CTR-000003", "OPR-000004", "ORC-000005", "125,50", "7 · Cliente", "9 · Funcionário", "Em análise"]) expect(markup).toContain(text);
+    expect(markup).toContain("10/11/2026, 09:00:00 (Brasília)");
+    for (const action of ["new", "view", "edit", "print"]) expect(markup).toContain(`data-shared-request-action="${action}"`);
+    expect(markup).not.toContain('data-shared-reference-action="new"');
+    expect(renderSharedSolicitations([], [], true)).toContain('data-shared-reference-action="new"');
+  });
+
+  it("renders editable request fields with shared references and operational selections", () => {
+    const ref = { id: 8, tipo: "CTR", codigo: "CTR-000008", nome: "Reefer", descricao: "Refrigerado", versao: 0 };
+    const record = { id: 3, versao: 2, categoria: "Operações e Navios", descricao: "Resumo", conteinerReferencia: ref, solicitante: { id: 1 }, prestador: { id: 2 }, cargaOperacional: { id: 4 }, servicoOperacional: { id: 5 } };
+    const markup = sharedRequestForm(record, [{ id: 1, nome: "Cliente" }], [{ id: 4, descricao: "Carga" }], [{ id: 5, nome: "Serviço" }], [{ id: 2, nome: "Supervisor", cargo: "SUPERVISOR" }], [ref]);
+    expect(markup).toContain('data-version="2"');
+    expect(markup).toContain('name="conteinerReferenciaId"');
+    expect(markup).toContain("CTR-000008 · Reefer · Refrigerado");
+    for (const field of ["nomeServico", "categoria", "descricao", "valor", "clienteId", "prestadorId", "cargaOperacionalId", "servicoOperacionalId", "statusSolicitacao"]) expect(markup).toContain(`name="${field}"`);
+    expect(markup).toContain("Em análise");
+    expect(markup).toContain("Supervisor");
+  });
+
+  it("places the solicitation form directly in the panel, including when server data is unavailable", () => {
+    const markup = renderSharedRequestPanel();
+    expect(markup).toContain('id="shared-request-slot"');
+    expect(markup).toContain('data-form="shared-request"');
+    expect(markup).toContain("<fieldset disabled");
+    for (const label of ["ID da solicitação", "Nome do serviço para a solicitação", "Categoria", "Descrição do pedido", "Tipo de serviço oferecido", "Carga vinculada", "Contêiner vinculado", "Operação vinculada", "Orçamento vinculado", "Solicitante (cliente)", "Prestador de serviço", "Status da solicitação"]) expect(markup).toContain(label);
+    expect(markup).toContain("Criar nova solicitação");
+    expect(markup).toContain("Salvar solicitação");
+    expect(markup).not.toContain('role="dialog"');
+  });
+
+  it("does not display refresh buttons in solicitations or the shared API error", () => {
+    expect(renderSolicitacoes([])).not.toContain("data-reload");
+    const error = renderSharedSolicitationsError("HTTP 404");
+    expect(error).toContain("HTTP 404");
+    expect(error).toContain('role="alert"');
+    expect(error).not.toContain("data-reload");
+    expect(renderSharedSolicitations([], [], true)).not.toContain("data-reload");
+  });
+
+  it("filters local solicitation references by category and linked IDs", () => {
+    const first = { textContent: "SOL-000001 Operações e Navios CTR-000001", hidden: false };
+    const second = { textContent: "SOL-000002 Serviços e Materiais SRV-000002", hidden: false };
+    const status = { textContent: "" };
+    const panel = { querySelectorAll: () => [first, second], querySelector: () => status };
+    filterSolicitationReferences(panel, "operacoes");
+    expect(first.hidden).toBe(false);
+    expect(second.hidden).toBe(true);
+    filterSolicitationReferences(panel, "srv-000002");
+    expect(first.hidden).toBe(true);
+    expect(second.hidden).toBe(false);
+    filterSolicitationReferences(panel, "inexistente");
+    expect(status.textContent).toContain("Nenhuma referência");
+    filterSolicitationReferences(panel, "");
+    expect(first.hidden || second.hidden).toBe(false);
+    expect(status.textContent).toBe("");
+  });
+
   it("shows service tariff data only in the admin database manager", () => {
     const markup = renderDatabaseSection("servico");
 
@@ -350,8 +443,9 @@ describe("DOM interface helpers", () => {
       getItem: (key) => values.get(key) ?? null,
       setItem: (key, value) => values.set(key, String(value)),
     });
+
     try {
-      const inputs = Object.fromEntries(["codigoOperacao", "andamento", "responsavel", "observacoes", "descricaoLocal", "categoriaReferencia", "conteineresReferencia", "cargasReferencia", "cargasPrincipaisReferencia", "bercosReferencia", "produtividadeReferencia", "embarqueLocal", "desembarqueLocal", "conteinerId"].map((key) => [key, { value: "", dataset: {} }]));
+      const inputs = Object.fromEntries(["codigoOperacao", "andamento", "responsavel", "observacoes", "descricaoLocal", "categoriaReferencia", "conteineresReferencia", "conteineresDasCargasReferencia", "cargasReferencia", "cargasPrincipaisReferencia", "bercosReferencia", "produtividadeReferencia", "embarqueLocal", "desembarqueLocal", "conteinerId"].map((key) => [key, { value: "", dataset: {} }]));
       inputs.codigoOperacao.value = "opr-000001";
       inputs.andamento.value = "Em andamento";
       const details = { innerHTML: "" };
@@ -384,7 +478,8 @@ describe("DOM interface helpers", () => {
       inputs.codigoOperacao.value = "OPR-000004";
       updateOperationReference(form);
       expect(inputs.cargasReferencia.value).toContain("CRG-000021 · Produtos químicos");
-      expect(inputs.conteineresReferencia.value).toContain("CTR-000010");
+      expect(inputs.conteineresReferencia.value).toContain("CTR-000010 · Isotank 20'");
+      expect(inputs.conteineresDasCargasReferencia.value).toContain("CRG-000021 · Produtos químicos: CTR-000010 · Isotank 20'");
       expect(details.innerHTML).toBe("");
       expect(inputs.conteinerId.value).toBe("42");
       expect(inputs.desembarqueLocal.value).toBe("2026-11-12T10:15");
@@ -397,6 +492,7 @@ describe("DOM interface helpers", () => {
       expect(details.innerHTML).not.toContain("350 t/hora");
       expect(inputs.andamento.value).toBe("Em andamento");
       expect(inputs.cargasReferencia.value).toBe("");
+      expect(inputs.conteineresDasCargasReferencia.value).toBe("");
       inputs.codigoOperacao.value = "OPR-00000";
       updateOperationReference(form);
       expect(details.innerHTML).toContain('data-select-operation="OPR-000004"');
@@ -406,6 +502,17 @@ describe("DOM interface helpers", () => {
     }
   });
 
+  it("keeps each cargo's container types separate from operation links", () => {
+    const cargos = [
+      { codigo: "CRG-1", tipoCarga: "Frutas", conteineres: "CTR-1" },
+      { codigo: "CRG-2", tipoCarga: "Caixas", conteineres: "CTR-2" },
+    ];
+    const containers = [{ codigo: "CTR-1", tipo: "Reefer" }, { codigo: "CTR-2", tipo: "Dry" }];
+    const fields = operationReferenceFields({ cargas: "CRG-1, CRG-2, CRG-3", conteineres: "CTR-9" }, cargos, containers);
+    expect(fields.conteineresDasCargasReferencia).toBe("CRG-1 · Frutas: CTR-1 · Reefer\nCRG-2 · Caixas: CTR-2 · Dry\nCRG-3 · carga não encontrada");
+    expect(fields.conteineresReferencia).toBe("CTR-9 · referência não encontrada");
+  });
+
   it("searches cargo by its ID or lists all cargo linked to a container ID", () => {
     const values = new Map();
     vi.stubGlobal("localStorage", {
@@ -413,7 +520,7 @@ describe("DOM interface helpers", () => {
       setItem: (key, value) => values.set(key, String(value)),
     });
     try {
-      const inputs = Object.fromEntries(["buscaReferencia", "tipoCarga", "descricao", "peso", "volume", "origem", "destino"].map((name) => [name, { value: "", dataset: {} }]));
+      const inputs = Object.fromEntries(["buscaReferencia", "tipoCarga", "descricao", "peso", "volume", "origem", "destino", "cargaReferencia", "conteineresCargaReferencia", "servicosCargaReferencia"].map((name) => [name, { value: "", dataset: {} }]));
       inputs.buscaReferencia.value = "ctr-000001";
       const result = { innerHTML: "" };
       const suggestions = { innerHTML: "" };
@@ -430,6 +537,9 @@ describe("DOM interface helpers", () => {
       updateCargoReference(form);
       expect(result.innerHTML).toBe("");
       expect(inputs.tipoCarga.value).toBe("Caixas");
+      expect(inputs.cargaReferencia.value).toBe("CRG-000002");
+      expect(inputs.conteineresCargaReferencia.value).toBe("CTR-000001 · Dry Box 20'");
+      expect(inputs.servicosCargaReferencia.value).toBe("");
       expect(inputs.descricao.value).toContain("Produto/carga: Caixas.");
       expect(inputs.descricao.value).toContain("Serviços vinculados: não informados.");
       expect(inputs.peso.value).toBe("");
@@ -440,6 +550,7 @@ describe("DOM interface helpers", () => {
       expect(result.innerHTML).toContain("ID não encontrado");
       expect(result.innerHTML).not.toContain("Caixas");
       expect(inputs.tipoCarga.value).toBe("");
+      expect(inputs.conteineresCargaReferencia.value).toBe("");
       expect(inputs.descricao.value).toBe("Editado manualmente");
       expect(inputs.origem.value).toBe("Santos");
     } finally {
@@ -457,7 +568,7 @@ describe("DOM interface helpers", () => {
       const cargo = findDatabaseEntry("carga", "codigo", "CRG-000002");
       const service = findDatabaseEntry("servico", "codigo", "SRV-000001");
       saveDatabaseEntry("carga", { ...cargo, descricao: "Mercadoria embalada", peso: 12, servicos: service.codigo }, cargo.id);
-      const inputs = Object.fromEntries(["buscaReferencia", "tipoCarga", "descricao", "peso", "volume", "origem", "destino"].map((name) => [name, { value: "", dataset: {} }]));
+      const inputs = Object.fromEntries(["buscaReferencia", "tipoCarga", "descricao", "peso", "volume", "origem", "destino", "cargaReferencia", "conteineresCargaReferencia", "servicosCargaReferencia"].map((name) => [name, { value: "", dataset: {} }]));
       inputs.buscaReferencia.value = cargo.codigo;
       const result = { innerHTML: "" };
       const suggestions = { innerHTML: "" };
@@ -470,6 +581,7 @@ describe("DOM interface helpers", () => {
       updateCargoReference(form);
       expect(inputs.descricao.value).toContain("Mercadoria embalada");
       expect(inputs.descricao.value).toContain(`${service.nome} (${service.codigo})`);
+      expect(inputs.servicosCargaReferencia.value).toContain(`${service.codigo} · ${service.nome}`);
       expect(inputs.peso.value).toBe("12");
       expect(inputs.volume.value).toBe("");
       inputs.buscaReferencia.value = "CRG-000003";
@@ -477,6 +589,7 @@ describe("DOM interface helpers", () => {
       expect(inputs.peso.value).toBe("");
       expect(inputs.descricao.value).toContain("Paletes");
       expect(inputs.descricao.value).not.toContain(service.codigo);
+      expect(inputs.servicosCargaReferencia.value).toBe("");
       expect(renderDatabaseEntryForm("carga", cargo)).toContain('data-budget-link="servicos"');
       saveDatabaseEntry("carga", { ...cargo, descricao: "A".repeat(256) }, cargo.id);
       inputs.buscaReferencia.value = cargo.codigo;
@@ -695,6 +808,23 @@ describe("DOM interface helpers", () => {
     expect(operationMarkup).toContain('data-catalog-lookup="andamento"');
     expect(serviceMarkup).toContain('data-catalog-lookup="nome"');
     expect(serviceMarkup).toContain('name="codigoReferencia"');
+  });
+
+  it("offers ID selection for cargo and operation references", () => {
+    const values = new Map();
+    vi.stubGlobal("localStorage", {
+      getItem: (key) => values.get(key) ?? null,
+      setItem: (key, value) => values.set(key, String(value)),
+    });
+    try {
+      expect(renderDatabaseSection("operacao")).toContain('data-database-action="edit-links"');
+      expect(renderDatabaseSection("carga")).toContain('data-database-action="edit-links"');
+      const operation = renderDatabaseEntryForm("operacao");
+      expect(operation).toContain('data-budget-link="cargas"');
+      expect(operation).toContain('data-budget-link="conteineres"');
+      expect(operation).toContain("CRG-000021");
+      expect(operation).toContain("CTR-000010");
+    } finally { vi.unstubAllGlobals(); }
   });
 
   it("fills the CPF/CNPJ field when the Java entity serializes its uppercase property", () => {

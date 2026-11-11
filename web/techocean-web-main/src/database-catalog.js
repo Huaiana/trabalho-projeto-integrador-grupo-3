@@ -2,6 +2,7 @@ import { catalogoServicos } from "./catalogo-servicos.js";
 import { catalogoConteineres } from "./catalogo-conteineres.js";
 import { catalogoCargas } from "./catalogo-cargas.js";
 import { catalogoOperacoes } from "./catalogo-operacoes.js";
+import { catalogoSolicitacoes } from "./catalogo-solicitacoes.js";
 import { catalogoOrcamentos, fonteTarifariaHistorica } from "./catalogo-orcamentos.js";
 import { parseTarifas, tarifasPadrao } from "./tarifas-orcamento.js";
 
@@ -94,6 +95,12 @@ export const databaseCategories = [
     fields: [
       { name: "servico", label: "Nome do serviço", required: true },
       { name: "categoria", label: "Categoria" },
+      { name: "descricao", label: "Descrição e exemplos", type: "textarea" },
+      { name: "servicos", label: "IDs dos serviços (separados por vírgula)" },
+      { name: "cargas", label: "IDs das cargas (separados por vírgula)" },
+      { name: "conteineres", label: "IDs dos contêineres (separados por vírgula)" },
+      { name: "operacoes", label: "IDs das operações (separados por vírgula)" },
+      { name: "orcamentos", label: "IDs dos orçamentos (separados por vírgula)" },
       { name: "solicitado", label: "Serviço solicitado?", type: "select", options: ["Sim", "Não"] },
       { name: "prestado", label: "Serviço prestado?", type: "select", options: ["Sim", "Não"] },
       { name: "status", label: "Status padrão", type: "select", options: ["PENDENTE", "CONFIRMADO", "CONCLUÍDO", "CANCELADO"] },
@@ -171,6 +178,10 @@ function operationCode(number) {
 
 function budgetCode(number) {
   return `ORC-${String(number).padStart(6, "0")}`;
+}
+
+function solicitationCode(number) {
+  return `SOL-${String(number).padStart(6, "0")}`;
 }
 
 function createId() {
@@ -300,6 +311,41 @@ export function readDatabaseCatalog() {
     changed = true;
   }
   catalog.nextServiceCode = next;
+  if (data.solicitationReferenceVersion !== 1) {
+    for (const reference of catalogoSolicitacoes) {
+      const serviceCodes = (reference.servicos || []).flatMap((name) => {
+        const matches = catalog.servico.filter((service) => normalize(service.nome) === normalize(name));
+        return matches.length === 1 ? [matches[0].codigo] : [];
+      });
+      const existing = catalog.solicitacao.find((entry) => normalize(entry.servico) === normalize(reference.categoria));
+      if (existing) {
+        if (existing.categoria == null) existing.categoria = reference.categoria;
+        if (existing.descricao == null) existing.descricao = reference.descricao;
+        if (existing.servicos == null) existing.servicos = serviceCodes.join(", ");
+      } else {
+        catalog.solicitacao.push({
+          id: createId(), servico: reference.categoria, categoria: reference.categoria,
+          descricao: reference.descricao, servicos: serviceCodes.join(", "),
+        });
+      }
+    }
+    changed = true;
+  }
+  catalog.solicitationReferenceVersion = 1;
+  const solicitationCodes = new Set(catalog.solicitacao.map((entry) => entry.codigo).filter(Boolean));
+  let nextSolicitation = Number.isSafeInteger(data.nextSolicitationCode) && data.nextSolicitationCode > 0 ? data.nextSolicitationCode : 1;
+  for (const code of solicitationCodes) {
+    const match = /^SOL-(\d+)$/i.exec(code);
+    if (match) nextSolicitation = Math.max(nextSolicitation, Number(match[1]) + 1);
+  }
+  for (const entry of catalog.solicitacao) {
+    if (entry.codigo) continue;
+    while (solicitationCodes.has(solicitationCode(nextSolicitation))) nextSolicitation++;
+    entry.codigo = solicitationCode(nextSolicitation++);
+    solicitationCodes.add(entry.codigo);
+    changed = true;
+  }
+  catalog.nextSolicitationCode = nextSolicitation;
   if (data.budgetReferenceVersion !== 1) {
     for (const [item, nome, categoria, regras] of catalogoOrcamentos) {
       if (catalog.orcamento.some((entry) => normalize(entry.servico) === normalize(`${item} — ${nome}`))) continue;
@@ -335,6 +381,21 @@ export function readDatabaseCatalog() {
     changed = true;
   }
   catalog.budgetDetailsVersion = 1;
+  if (data.explicitBudgetContainerLinksVersion !== 1) {
+    const explicitLinks = {
+      "2.1.2.1.7": ["Open Top 20'", "Open Top 40'", "Flat Rack 20'", "Flat Rack 40'"],
+      "2.1.2.1.8": ["Dry Box 20'", "Dry Box 40'"],
+    };
+    for (const [item, nome, , regras] of catalogoOrcamentos) {
+      if (!explicitLinks[item]) continue;
+      const entry = catalog.orcamento.find((record) => record.historico && normalize(record.servico) === normalize(`${item} — ${nome}`));
+      if (!entry || entry.conteineres != null || entry.regras !== regras) continue;
+      const codes = explicitLinks[item].map((tipo) => catalog.conteiner.find((container) => normalize(container.tipo) === normalize(tipo))?.codigo).filter(Boolean);
+      if (codes.length) entry.conteineres = codes.join(", ");
+    }
+    changed = true;
+  }
+  catalog.explicitBudgetContainerLinksVersion = 1;
   const budgetCodes = new Set(catalog.orcamento.map((entry) => entry.codigo).filter(Boolean));
   let nextBudget = Number.isSafeInteger(data.nextBudgetCode) && data.nextBudgetCode > 0 ? data.nextBudgetCode : 1;
   for (const code of budgetCodes) {
@@ -386,9 +447,9 @@ export function saveDatabaseEntry(categoryId, values, id = "") {
       record[field] = [...new Set(codes)].join(", ");
     }
   }
-  if (categoryId === "operacao" || categoryId === "orcamento") {
-    const links = categoryId === "orcamento"
-      ? [["servicos", "servico"], ["cargas", "carga"], ["conteineres", "conteiner"], ["operacoes", "operacao"]]
+  if (["operacao", "orcamento", "solicitacao"].includes(categoryId)) {
+    const links = categoryId !== "operacao"
+      ? [["servicos", "servico"], ["cargas", "carga"], ["conteineres", "conteiner"], ["operacoes", "operacao"], ...(categoryId === "solicitacao" ? [["orcamentos", "orcamento"]] : [])]
       : [["cargas", "carga"], ["conteineres", "conteiner"]];
     for (const [field, linkedCategory] of links) {
       const codes = String(record[field] || "").split(",").map((code) => code.trim().toUpperCase()).filter(Boolean);
@@ -411,6 +472,7 @@ export function saveDatabaseEntry(categoryId, values, id = "") {
     if (categoryId === "conteiner") record.codigo = previous.codigo;
     if (categoryId === "carga") record.codigo = previous.codigo;
     if (categoryId === "operacao") record.codigo = previous.codigo;
+    if (categoryId === "solicitacao") record.codigo = previous.codigo;
     if (categoryId === "orcamento") {
       record.codigo = previous.codigo;
       record.historico = previous.historico;
@@ -426,6 +488,7 @@ export function saveDatabaseEntry(categoryId, values, id = "") {
     if (categoryId === "conteiner") record.codigo = containerCode(catalog.nextContainerCode++);
     if (categoryId === "carga") record.codigo = cargoCode(catalog.nextCargoCode++);
     if (categoryId === "operacao") record.codigo = operationCode(catalog.nextOperationCode++);
+    if (categoryId === "solicitacao") record.codigo = solicitationCode(catalog.nextSolicitationCode++);
     if (categoryId === "orcamento") {
       record.codigo = budgetCode(catalog.nextBudgetCode++);
       if (record.valorEstimado !== "") record.valorAtualizadoEm = new Date().toISOString();
@@ -459,6 +522,13 @@ export function deleteDatabaseEntry(categoryId, id) {
     const field = categoryId === "carga" ? "cargas" : "conteineres";
     if (catalog.operacao.some((entry) => String(entry[field] || "").split(",").some((value) => normalize(value) === normalize(code)))) {
       throw new Error("Esta referência está vinculada a operações. Remova os vínculos nas referências de operação antes de excluí-la.");
+    }
+  }
+  const solicitationLinkFields = { servico: "servicos", carga: "cargas", conteiner: "conteineres", operacao: "operacoes", orcamento: "orcamentos" };
+  if (solicitationLinkFields[categoryId]) {
+    const code = entries.find((entry) => String(entry.id) === String(id)).codigo;
+    if (catalog.solicitacao.some((entry) => String(entry[solicitationLinkFields[categoryId]] || "").split(",").some((value) => normalize(value) === normalize(code)))) {
+      throw new Error("Esta referência está vinculada a solicitações. Remova os vínculos nas referências de solicitação antes de excluí-la.");
     }
   }
   const budgetLinkFields = { servico: "servicos", carga: "cargas", conteiner: "conteineres", operacao: "operacoes" };
@@ -506,7 +576,7 @@ export function readResourceDetails() {
 }
 
 export function saveResourceDetails(categoryId, id, details) {
-  if (!["conteiner", "operacao"].includes(categoryId) || id == null || !String(id).trim()) throw new Error("Identificador de registro inválido.");
+  if (!["carga", "conteiner", "operacao"].includes(categoryId) || id == null || !String(id).trim()) throw new Error("Identificador de registro inválido.");
   const data = readResourceDetails();
   const key = `${categoryId}:${id}`;
   if (details === null) delete data[key];

@@ -1,6 +1,7 @@
 import { apiRequest, get, post, postPublic, postWithHeaders, postParams, put, putParams, del, getAppointmentAccounts, createManagedAppointment, updateManagedAppointment, setAccessToken, clearAccessToken, getAccessToken, ApiError } from "./api.js";
 import { formatarTarifaServico, localizarTarifaServico } from "./catalogo-servicos.js";
 import { parseTarifas } from "./tarifas-orcamento.js";
+import { catalogoSolicitacoes } from "./catalogo-solicitacoes.js";
 import { startBrasiliaClock, updateClockVisibility } from "./brasilia-clock.js";
 import {
   databaseCategories,
@@ -353,6 +354,9 @@ async function loadSection(section, databaseCategory = "servico") {
     host.innerHTML = `<div class="notice-panel"><span class="notice-mark">i</span><div><strong>Consulta ainda não disponível</strong><p>O servidor não oferece uma rota para listar usuários administrativos. Nenhum dado de exemplo é exibido aqui.</p></div></div>`;
     return;
   }
+  if (section.slug === "solicitacao") {
+    host.innerHTML = `${renderSharedRequestPanel()}<p class="loading-state">Carregando solicitações…</p>`;
+  }
   try {
     const payload = section.slug === "usuario"
       ? await Promise.all([get(section.endpoint), get("/admin/setup-status")])
@@ -365,13 +369,34 @@ async function loadSection(section, databaseCategory = "servico") {
     else if (section.slug === "carga") host.innerHTML = renderCargas(records);
     else if (section.slug === "mensagens") host.innerHTML = renderMessages(records);
     else if (section.slug === "orcamento") host.innerHTML = renderBudgets(records);
-    else if (section.slug === "agendamento" || section.slug === "solicitacao") host.innerHTML = renderAppointments(records, section.slug);
+    else if (section.slug === "agendamento" || section.slug === "solicitacao") {
+      if (section.slug === "solicitacao") {
+        try {
+          host.innerHTML = renderAppointments(records, section.slug);
+        } catch (error) {
+          host.innerHTML = `<div class="load-error" role="alert">Não foi possível carregar os dados locais das solicitações: ${esc(error.message)}</div>`;
+        }
+      } else host.innerHTML = renderAppointments(records, section.slug);
+      if (section.slug === "solicitacao") {
+        host.insertAdjacentHTML("afterbegin", '<div id="shared-solicitations"><p class="loading-state">Carregando solicitações compartilhadas…</p></div>');
+        await loadSharedSolicitations(host.querySelector("#shared-solicitations"));
+      }
+    }
     else if (["auditoria", "sessoes"].includes(section.slug)) host.innerHTML = renderReadOnlySection(records, section.name);
     else host.innerHTML = renderTable(records, section.columns, section.name);
   } catch (error) {
     if (host.isConnected) {
-      const references = section.slug === "conteiner" ? renderContainerReferenceSection() : section.slug === "carga" ? renderCargoReferenceSection() : section.slug === "operacao" ? renderOperationReferenceSection() : section.slug === "orcamento" ? renderBudgetReferenceSection() : "";
-      host.innerHTML = `<div class="load-error" role="alert"><p>${esc(error.message)}</p><button class="button button-outline" data-reload>Atualizar</button></div>${references}`;
+      let references;
+      try {
+        references = section.slug === "conteiner" ? renderContainerReferenceSection() : section.slug === "carga" ? renderCargoReferenceSection() : section.slug === "operacao" ? renderOperationReferenceSection() : section.slug === "orcamento" ? renderBudgetReferenceSection() : section.slug === "solicitacao" ? renderSolicitationReferenceSection() : "";
+      } catch (referenceError) {
+        references = `<div class="load-error" role="alert">Não foi possível carregar as referências locais: ${esc(referenceError.message)}</div>`;
+      }
+      host.innerHTML = `<div class="load-error" role="alert"><p>${esc(error.message)}</p>${section.slug === "solicitacao" ? "" : '<button class="button button-outline" data-reload>Atualizar</button>'}</div>${references}`;
+      if (section.slug === "solicitacao") {
+        host.insertAdjacentHTML("afterbegin", '<div id="shared-solicitations"><p class="loading-state">Carregando solicitações compartilhadas…</p></div>');
+        await loadSharedSolicitations(host.querySelector("#shared-solicitations"));
+      }
     }
   }
 }
@@ -466,9 +491,9 @@ export function renderDatabaseSection(categoryId = "servico") {
   const records = readDatabaseEntries(category.id);
   const displayFields = category.id === "servico"
     ? [{ name: "codigo", label: "Código" }, ...category.fields, { name: "valorAtualizadoEm", label: "Data e hora do valor", type: "datetime" }]
-    : ["conteiner", "carga", "operacao", "orcamento"].includes(category.id) ? [{ name: "codigo", label: "ID" }, ...category.fields, ...(category.id === "orcamento" ? [{ name: "valorAtualizadoEm", label: "Data e hora do valor", type: "datetime" }] : [])] : category.fields;
+    : ["conteiner", "carga", "operacao", "orcamento", "solicitacao"].includes(category.id) ? [{ name: "codigo", label: "ID" }, ...category.fields, ...(category.id === "orcamento" ? [{ name: "valorAtualizadoEm", label: "Data e hora do valor", type: "datetime" }] : [])] : category.fields;
   const categoryOptions = databaseCategories.map((item) => `<option value="${esc(item.id)}" ${item.id === category.id ? "selected" : ""}>${esc(item.label)}</option>`).join("");
-  const rows = records.map((record) => `<tr>${displayFields.map((field) => `<td>${category.id === "orcamento" ? budgetDatabaseFieldText(field, record) : databaseFieldText(field, record[field.name])}</td>`).join("")}<td><div class="row-actions"><button class="small-action" type="button" data-database-action="view" data-category="${category.id}" data-id="${esc(record.id)}">Ver</button><button class="small-action" type="button" data-database-action="edit" data-category="${category.id}" data-id="${esc(record.id)}">Editar</button>${category.id === "orcamento" ? `<button class="small-action" type="button" data-database-action="edit-value" data-category="${category.id}" data-id="${esc(record.id)}">Editar valor</button><button class="small-action" type="button" data-database-action="edit-links" data-category="${category.id}" data-id="${esc(record.id)}">Vincular IDs</button>` : ""}<button class="small-action danger-action" type="button" data-database-action="delete" data-category="${category.id}" data-id="${esc(record.id)}">Excluir</button></div></td></tr>`).join("");
+  const rows = records.map((record) => `<tr>${displayFields.map((field) => `<td>${category.id === "orcamento" ? budgetDatabaseFieldText(field, record) : databaseFieldText(field, record[field.name])}</td>`).join("")}<td><div class="row-actions"><button class="small-action" type="button" data-database-action="view" data-category="${category.id}" data-id="${esc(record.id)}">Ver</button><button class="small-action" type="button" data-database-action="edit" data-category="${category.id}" data-id="${esc(record.id)}">Editar</button>${category.id === "orcamento" ? `<button class="small-action" type="button" data-database-action="edit-value" data-category="${category.id}" data-id="${esc(record.id)}">Editar valor</button>` : ""}${["orcamento", "carga", "operacao", "solicitacao"].includes(category.id) ? `<button class="small-action" type="button" data-database-action="edit-links" data-category="${category.id}" data-id="${esc(record.id)}">Vincular IDs</button>` : ""}<button class="small-action danger-action" type="button" data-database-action="delete" data-category="${category.id}" data-id="${esc(record.id)}">Excluir</button></div></td></tr>`).join("");
   const table = records.length
     ? `<div class="table-scroll"><table class="records-table"><thead><tr>${displayFields.map((field) => `<th>${esc(field.label)}</th>`).join("")}<th>Ações</th></tr></thead><tbody>${rows}</tbody></table></div>`
     : `<div class="empty-state"><span>▱</span><strong>Nenhum dado cadastrado nesta categoria</strong><p>Adicione um padrão para preencher automaticamente os formulários dos painéis.</p></div>`;
@@ -524,7 +549,7 @@ export function renderDatabaseEntryForm(categoryId, record = null) {
       return `<label class="field-label" for="${id}">${esc(field.label)}<select id="${id}" name="${field.name}">${field.options.map((option) => `<option value="${esc(option)}" ${String(value) === option ? "selected" : ""}>${esc(option)}</option>`).join("")}</select></label>`;
     }
     if (field.type === "textarea") return `<label class="field-label" for="${id}">${esc(field.label)}<textarea id="${id}" name="${field.name}" rows="3">${esc(value)}</textarea></label>`;
-    const linked = (categoryId === "orcamento" || categoryId === "carga") && { servicos: "servico", cargas: "carga", conteineres: "conteiner", operacoes: "operacao" }[field.name];
+    const linked = ["orcamento", "carga", "operacao", "solicitacao"].includes(categoryId) && { servicos: "servico", cargas: "carga", conteineres: "conteiner", operacoes: "operacao", orcamentos: "orcamento" }[field.name];
     if (linked) {
       const selected = String(value).split(",").map((code) => code.trim().toUpperCase());
       const linkedCategory = getDatabaseCategory(linked);
@@ -535,7 +560,7 @@ export function renderDatabaseEntryForm(categoryId, record = null) {
   }).join("");
   const codeInfo = categoryId === "servico"
     ? `<p class="muted small">${record ? `Código: ${esc(record.codigo)}. ` : "O código único será gerado ao salvar. "}A data e hora do valor são registradas automaticamente quando a tarifa é alterada.</p>`
-    : ["conteiner", "carga", "operacao", "orcamento"].includes(categoryId) ? `<p class="muted small">${record ? `ID: ${esc(record.codigo)}` : "O ID único será gerado ao salvar."}${categoryId === "carga" ? " Selecione os IDs dos contêineres e serviços ou digite-os separados por vírgula." : ""}${categoryId === "operacao" ? " Consulte os IDs nas categorias Carga e Contêiner. Os vínculos são sugestões; confirme a compatibilidade e as pranchas oficiais." : ""}${categoryId === "orcamento" ? " Selecione os IDs ou digite-os separados por vírgula. Edite as tarifas e condições em conjunto. A alteração do valor é datada." : ""}${record?.historico ? " Valores de 2017: confirme as condições antes do uso." : ""}</p>` : "";
+    : ["conteiner", "carga", "operacao", "orcamento", "solicitacao"].includes(categoryId) ? `<p class="muted small">${record ? `ID: ${esc(record.codigo)}` : "O ID único será gerado ao salvar."}${categoryId === "carga" ? " Selecione os IDs dos contêineres e serviços ou digite-os separados por vírgula." : ""}${categoryId === "operacao" ? " Selecione os IDs das cargas e contêineres ou digite-os separados por vírgula. Confirme a compatibilidade e as pranchas oficiais." : ""}${categoryId === "orcamento" ? " Selecione os IDs ou digite-os separados por vírgula. Edite as tarifas e condições em conjunto. A alteração do valor é datada." : ""}${categoryId === "solicitacao" ? " Selecione os IDs vinculados ou digite-os separados por vírgula." : ""}${record?.historico ? " Valores de 2017: confirme as condições antes do uso." : ""}</p>` : "";
   const tariffControl = categoryId === "orcamento" ? `<div data-budget-tariff-slot>${budgetTariffSelectMarkup(record?.tarifas)}</div>` : "";
   return `<form class="inline-form" data-form="database-entry" data-database-category="${category.id}" ${record ? `data-database-id="${esc(record.id)}"` : ""}><div class="inline-form-title"><div><span class="eyebrow">${record ? "EDIÇÃO" : "NOVO DADO"}</span><h3>${record ? "Editar" : "Cadastrar"} referência de ${esc(category.label.toLowerCase())}</h3></div><button type="button" class="icon-button" aria-label="Fechar" data-close-form>×</button></div>${codeInfo}${tariffControl}<div class="inline-form-grid">${controls}</div><p class="form-feedback" role="alert"></p><div class="form-actions"><button class="button button-primary compact">Salvar dados</button><button type="button" class="button button-outline compact" data-close-form>Cancelar</button></div></form>`;
 }
@@ -641,7 +666,7 @@ export function renderResourceFormMarkup(slug, record = null, appointmentAccount
   const containerCode = slug === "conteiner" ? `<label class="field-label">ID do tipo de contêiner<input name="codigoReferencia" value="${esc(localDetails?.referencia || "")}" list="container-code-suggestions" autocomplete="off" placeholder="Ex.: CTR-000001"></label><datalist id="container-code-suggestions"></datalist>` : "";
   const containerDetails = slug === "conteiner" ? `<div data-container-reference aria-live="polite"></div>` : "";
   const operationReference = slug === "operacao" ? `<label class="field-label">Buscar por ID da operação, carga ou contêiner<input name="codigoOperacao" value="${esc(localDetails?.referencia || "")}" list="operation-code-suggestions" autocomplete="off" placeholder="Ex.: OPR-000001, CRG-000001 ou CTR-000001"></label><datalist id="operation-code-suggestions"></datalist><div data-operation-reference aria-live="polite"></div>` : "";
-  const operationDetails = slug === "operacao" ? `<div class="inline-form-grid"><label class="field-label">Categoria da operação<input name="categoriaReferencia" readonly placeholder="Não informada"></label><label class="field-label">IDs de referência dos contêineres<input name="conteineresReferencia" readonly placeholder="Nenhum vínculo cadastrado"></label><label class="field-label">IDs e tipos das cargas vinculadas<textarea name="cargasReferencia" rows="3" readonly placeholder="Nenhum vínculo cadastrado"></textarea></label><label class="field-label">Principais cargas<textarea name="cargasPrincipaisReferencia" rows="3" readonly placeholder="Não informadas"></textarea></label><label class="field-label">Berços<input name="bercosReferencia" readonly placeholder="Não informados"></label><label class="field-label">Produtividade de referência<textarea name="produtividadeReferencia" rows="3" readonly placeholder="Não informada"></textarea></label><label class="field-label">Embarque — data e hora de Brasília<input type="datetime-local" name="embarqueLocal" value="${esc(localDetails?.embarqueLocal || "")}"></label><label class="field-label">Desembarque — data e hora de Brasília<input type="datetime-local" name="desembarqueLocal" value="${esc(localDetails?.desembarqueLocal || "")}"></label></div><p class="muted small">Os IDs acima são referências locais, não substituem o código do contêiner operacional. Embarque e desembarque são opcionais e salvos neste navegador como horário de Brasília.</p>` : "";
+  const operationDetails = slug === "operacao" ? `<div class="inline-form-grid"><label class="field-label">Categoria da operação<input name="categoriaReferencia" readonly placeholder="Não informada"></label><label class="field-label">IDs e tipos dos contêineres da operação<textarea name="conteineresReferencia" rows="3" readonly placeholder="Nenhum vínculo cadastrado"></textarea></label><label class="field-label">IDs e tipos das cargas vinculadas<textarea name="cargasReferencia" rows="3" readonly placeholder="Nenhum vínculo cadastrado"></textarea></label><label class="field-label">Contêineres vinculados às cargas<textarea name="conteineresDasCargasReferencia" rows="3" readonly placeholder="Nenhum vínculo cadastrado"></textarea></label><label class="field-label">Principais cargas<textarea name="cargasPrincipaisReferencia" rows="3" readonly placeholder="Não informadas"></textarea></label><label class="field-label">Berços<input name="bercosReferencia" readonly placeholder="Não informados"></label><label class="field-label">Produtividade de referência<textarea name="produtividadeReferencia" rows="3" readonly placeholder="Não informada"></textarea></label><label class="field-label">Embarque — data e hora de Brasília<input type="datetime-local" name="embarqueLocal" value="${esc(localDetails?.embarqueLocal || "")}"></label><label class="field-label">Desembarque — data e hora de Brasília<input type="datetime-local" name="desembarqueLocal" value="${esc(localDetails?.desembarqueLocal || "")}"></label></div><p class="muted small">Os contêineres das cargas são referências de tipo, não substituem o código do contêiner operacional. Embarque e desembarque são opcionais e salvos neste navegador como horário de Brasília.</p>` : "";
   const localDescription = ["conteiner", "operacao"].includes(slug) ? `<label class="field-label">Descrição da referência (salva neste navegador)<textarea name="descricaoLocal" rows="5">${esc(localDetails?.descricao || "")}</textarea><small>Preenchida com dados da referência e editável manualmente; não altera o cadastro no servidor.</small></label>` : "";
   const serviceValue = slug === "servico" && editing ? readServiceValues()[record.id]?.valor : null;
   const serviceFields = slug === "servico" ? `<div class="service-form-grid">${fields.map((item) => `<div class="service-field service-field-${esc(item.name)}">${resourceFieldMarkup(item, resourceFormRecord, editing, lookupField)}</div>`).join("")}<label class="field-label service-field service-field-valor">Valor do serviço neste navegador (R$)<input type="number" name="valorLocal" min="0" step="0.01" value="${esc(serviceValue ?? "")}"><small>Opcional. Salvo com o serviço apenas neste navegador; não altera a tarifa da referência.</small></label></div>${role === "ADMIN" ? `<div class="service-reference-value"><label class="field-label">Editar tarifa da referência (R$)<input type="number" name="valorReferencia" min="0" step="0.01" disabled></label><button class="button button-outline compact" type="button" data-save-service-reference-value disabled>Salvar tarifa da referência</button><p class="muted small">Selecione um código. Esta alteração é salva separadamente no Banco de dados deste navegador.</p></div>` : ""}` : `<div class="inline-form-grid">${fields.map((item) => resourceFieldMarkup(item, resourceFormRecord, editing, lookupField)).join("")}</div>`;
@@ -709,7 +734,7 @@ function renderTable(records, columns, title) {
   return `<div class="table-scroll"><table class="records-table"><thead><tr>${keys.map((key) => `<th>${esc(labelFor(key))}</th>`).join("")}${title === "Agendamento" || title === "Solicitação" ? "<th>Ação</th>" : ""}</tr></thead><tbody>${records.map((item) => `<tr>${keys.map((key) => `<td>${statusPill(key, item[key])}</td>`).join("")}${title === "Agendamento" || title === "Solicitação" ? `<td>${item.id ? `<button class="small-action" data-status-id="${esc(item.id)}" data-status="${String(item.status).toLowerCase() === "true" || String(item.status).toLowerCase() === "confirmado" ? "pendente" : "confirmado"}">${String(item.status).toLowerCase() === "true" || String(item.status).toLowerCase() === "confirmado" ? "Marcar pendente" : "Confirmar"}</button>` : "—"}</td>` : ""}</tr>`).join("")}</tbody></table></div>`;
 }
 
-function labelFor(key) { return ({ id: "Código", actorName: "Profissional", actorRole: "Perfil", startedAt: "Início", lastActivityAt: "Última atividade", loggedOutAt: "Encerramento", durationSeconds: "Duração (segundos)", cpf: "CPF / CNPJ", cpfcnpj: "CPF / CNPJ", cpfCnpj: "CPF / CNPJ", CPFCNPJ: "CPF / CNPJ", numeroConteiner: "Número do contêiner", tipoCarga: "Tipo de carga", dataHora: "Data e horário", criadoEm: "Data e hora do cadastro", valorEstimado: "Valor estimado", categoriaReferencia: "Categoria da operação", conteineresReferencia: "IDs de referência dos contêineres", cargasReferencia: "IDs e tipos das cargas vinculadas", cargasPrincipaisReferencia: "Principais cargas", bercosReferencia: "Berços", produtividadeReferencia: "Produtividade de referência", embarqueBrasilia: "Embarque", desembarqueBrasilia: "Desembarque" })[key] || key.replace(/([A-Z])/g, " $1").replace(/^./, (char) => char.toUpperCase()); }
+function labelFor(key) { return ({ id: "Código", actorName: "Profissional", actorRole: "Perfil", startedAt: "Início", lastActivityAt: "Última atividade", loggedOutAt: "Encerramento", durationSeconds: "Duração (segundos)", cpf: "CPF / CNPJ", cpfcnpj: "CPF / CNPJ", cpfCnpj: "CPF / CNPJ", CPFCNPJ: "CPF / CNPJ", numeroConteiner: "Número do contêiner", tipoCarga: "Tipo de carga", dataHora: "Data e horário", criadoEm: "Data e hora do cadastro", valorEstimado: "Valor estimado", categoriaReferencia: "Categoria da operação", cargaReferencia: "ID de referência da carga", conteineresCargaReferencia: "IDs e tipos dos contêineres vinculados", servicosCargaReferencia: "IDs e nomes dos serviços vinculados", conteineresReferencia: "IDs e tipos dos contêineres da operação", conteineresDasCargasReferencia: "Contêineres vinculados às cargas", cargasReferencia: "IDs e tipos das cargas vinculadas", cargasPrincipaisReferencia: "Principais cargas", bercosReferencia: "Berços", produtividadeReferencia: "Produtividade de referência", embarqueBrasilia: "Embarque", desembarqueBrasilia: "Desembarque" })[key] || key.replace(/([A-Z])/g, " $1").replace(/^./, (char) => char.toUpperCase()); }
 
 function statusPill(key, value) {
   const rendered = valueText(value);
@@ -760,7 +785,153 @@ export function renderSolicitacoes(records) {
   const content = records.length
     ? categoriesMarkup
     : `<div class="empty-state"><span>▱</span><strong>Nenhuma solicitação recebida</strong><p>As solicitações serão organizadas aqui conforme a categoria do serviço prestado.</p></div>`;
-  return `<section class="data-panel"><div class="panel-heading"><div><span class="eyebrow">GESTÃO / SERVIÇOS</span><h2>Solicitações <span class="count-pill">${records.length}</span></h2><p class="dash-description">Solicitações agrupadas pela categoria do serviço prestado.</p></div><button class="button button-outline compact" data-reload>↻ Atualizar</button></div>${records.length ? `<label class="field-label">Buscar solicitação por ID<input type="search" data-solicitation-search placeholder="Digite o ID da solicitação"></label><p class="muted small" data-solicitation-search-status aria-live="polite"></p>` : ""}${content}</section>`;
+  return `<section class="data-panel"><div class="panel-heading"><div><span class="eyebrow">GESTÃO / SERVIÇOS</span><h2>Solicitações <span class="count-pill">${records.length}</span></h2><p class="dash-description">Solicitações agrupadas pela categoria do serviço prestado.</p></div></div>${records.length ? `<label class="field-label">Buscar solicitação por ID<input type="search" data-solicitation-search placeholder="Digite o ID da solicitação"></label><p class="muted small" data-solicitation-search-status aria-live="polite"></p>` : ""}${content}</section>${renderSolicitationReferenceSection()}`;
+}
+
+export function renderSolicitationReferenceSection() {
+  const references = readDatabaseEntries("solicitacao");
+  const linked = [
+    ["servicos", "servico", "nome"],
+    ["cargas", "carga", "tipoCarga"],
+    ["conteineres", "conteiner", "tipo"],
+    ["operacoes", "operacao", "categoria"],
+    ["orcamentos", "orcamento", "servico"],
+  ].map(([field, category, name]) => [field, readDatabaseEntries(category), name]);
+  const rows = references.map((reference) => `<tr data-solicitation-reference-row><td>${valueText(reference.codigo)}</td><td>${valueText(reference.servico)}</td><td>${valueText(reference.categoria)}</td><td>${valueText(reference.descricao)}</td>${linked.map(([field, entries, name]) => `<td>${valueText(linkedReferences(reference[field], entries, name))}</td>`).join("")}</tr>`).join("");
+  return `<section class="data-panel" data-solicitation-references><div class="panel-heading"><div><span class="eyebrow">REFERÊNCIAS LOCAIS</span><h2>Categorias de solicitação <span class="count-pill">${references.length}</span></h2></div></div><p class="dash-description">Referências deste navegador. O ID SOL identifica a categoria de referência, não uma solicitação recebida. Os vínculos podem ser editados no Banco de dados.</p><label class="field-label">Buscar categoria ou ID<input type="search" data-solicitation-reference-search placeholder="Digite a categoria ou um ID"></label><p class="muted small" data-solicitation-reference-status aria-live="polite"></p>${references.length ? `<div class="table-scroll"><table class="records-table"><thead><tr><th>ID</th><th>Nome</th><th>Categoria</th><th>Descrição e exemplos</th><th>Serviços vinculados</th><th>Cargas vinculadas</th><th>Contêineres vinculados</th><th>Operações vinculadas</th><th>Orçamentos vinculados</th></tr></thead><tbody>${rows}</tbody></table></div>` : `<div class="empty-state"><strong>Nenhuma referência cadastrada</strong></div>`}</section>`;
+}
+
+export function filterSolicitationReferences(panel, query) {
+  const search = normalizeServiceSearch(query);
+  let visible = 0;
+  panel.querySelectorAll("[data-solicitation-reference-row]").forEach((row) => {
+    row.hidden = Boolean(search) && !normalizeServiceSearch(row.textContent).includes(search);
+    if (!row.hidden) visible++;
+  });
+  panel.querySelector("[data-solicitation-reference-status]").textContent = search && !visible ? "Nenhuma referência encontrada." : "";
+}
+
+async function loadSharedSolicitations(host) {
+  if (!host) return;
+  cachedRecords.delete("solicitacoes-compartilhadas");
+  cachedRecords.delete("referencias-compartilhadas");
+  try {
+    const [requests, references] = await Promise.all([get("/solicitacoes/compartilhadas"), get("/referencias-compartilhadas")]);
+    if (!host.isConnected) return;
+    cachedRecords.set("solicitacoes-compartilhadas", collectionFrom(requests));
+    cachedRecords.set("referencias-compartilhadas", collectionFrom(references));
+    host.innerHTML = `${renderSharedRequestPanel()}${renderSharedSolicitations(collectionFrom(requests), collectionFrom(references), isAdmin())}`;
+    await openSharedRequest(null, false);
+  } catch (error) {
+    if (host.isConnected) host.innerHTML = `${renderSharedRequestPanel()}${renderSharedSolicitationsError(error.message)}`;
+  }
+}
+
+export function renderSharedSolicitationsError(message) {
+  return `<div class="load-error" role="alert"><p>Não foi possível carregar as solicitações compartilhadas: ${esc(message)}</p><p>Verifique se a API atualizada está publicada e recarregue a página.</p></div>`;
+}
+
+export function renderSharedRequestPanel() {
+  return `<section class="data-panel shared-request-panel"><div class="panel-heading"><div><span class="eyebrow">SOLICITAÇÃO / CADASTRO</span><h2>Dados da solicitação</h2></div><button class="button button-outline compact" data-shared-request-action="new">＋ Criar nova solicitação</button></div><div id="shared-request-slot"><p class="muted small" role="status">Os campos serão habilitados quando os dados do servidor estiverem disponíveis.</p><fieldset disabled class="shared-request-unavailable">${sharedRequestForm(null, [], [], [], [], [])}</fieldset></div></section>`;
+}
+
+function sharedReferenceText(reference) {
+  if (!reference) return "Não vinculado";
+  return [reference.codigo, reference.nome, reference.categoria, reference.descricao].filter(Boolean).join(" · ");
+}
+
+function sharedCreatedAt(value) {
+  if (!value) return "—";
+  const date = new Date(value);
+  return Number.isNaN(date.valueOf()) ? String(value) : `${date.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })} (Brasília)`;
+}
+
+export function renderSharedSolicitations(requests, references, admin) {
+  const rows = requests.map((r) => `<tr data-shared-request-row><td>${valueText(r.id)}</td><td>${valueText(r.nomeServico)}</td><td>${valueText(r.categoria)}</td><td>${valueText(r.descricao)}</td><td>${valueText(sharedReferenceText(r.servicoReferencia))}</td><td>${valueText(sharedReferenceText(r.cargaReferencia))}</td><td>${valueText(sharedReferenceText(r.conteinerReferencia))}</td><td>${valueText(sharedReferenceText(r.operacaoReferencia))}</td><td>${valueText(`${sharedReferenceText(r.orcamentoReferencia)} · ${r.valor == null ? "Valor não informado" : formatarTarifaServico({ valor: Number(r.valor) })}`)}</td><td>${valueText(`${r.solicitante.id} · ${r.solicitante.nome}`)}</td><td>${valueText(`${r.prestador.id} · ${r.prestador.nome} · ${r.prestador.cargo}`)}</td><td>${valueText(sharedStatus(r.statusSolicitacao))}</td><td>${valueText(sharedCreatedAt(r.criadoEm))}</td><td><div class="row-actions"><button class="small-action" data-shared-request-action="view" data-id="${esc(r.id)}">Ver</button><button class="small-action" data-shared-request-action="edit" data-id="${esc(r.id)}">Editar</button><button class="small-action" data-shared-request-action="print" data-id="${esc(r.id)}">Imprimir</button></div></td></tr>`).join("");
+  const refs = references.map((r) => `<tr><td>${valueText(r.codigo)}</td><td>${valueText(r.nome)}</td><td>${valueText(r.categoria)}</td><td>${valueText(r.descricao)}</td><td>${valueText(r.valor == null ? "—" : formatarTarifaServico({ valor: Number(r.valor) }))}</td>${admin ? `<td><button class="small-action" data-shared-reference-action="edit" data-id="${esc(r.id)}">Editar</button></td>` : ""}</tr>`).join("");
+  return `<section class="data-panel" data-shared-requests><div class="panel-heading"><div><span class="eyebrow">DADOS COMPARTILHADOS</span><h2>Solicitações da equipe <span class="count-pill">${requests.length}</span></h2></div><button class="button button-primary compact" data-shared-request-action="new">＋ Criar nova solicitação</button></div><p class="dash-description">Salvas no servidor e disponíveis para a equipe. Estas solicitações também aparecem na lista operacional abaixo.</p>${requests.length ? `<label class="field-label">Buscar por ID ou nome<input type="search" data-shared-request-search></label><p class="muted small" data-shared-search-status aria-live="polite"></p><div class="table-scroll"><table class="records-table"><thead><tr><th>ID</th><th>Nome do serviço</th><th>Categoria</th><th>Descrição</th><th>Serviço oferecido</th><th>Carga</th><th>Contêiner</th><th>Operação</th><th>Orçamento</th><th>Solicitante</th><th>Prestador</th><th>Solicitação</th><th>Data e hora</th><th>Ações</th></tr></thead><tbody>${rows}</tbody></table></div>` : `<div class="empty-state"><strong>Nenhuma solicitação compartilhada</strong></div>`}</section><section class="data-panel"><div class="panel-heading"><div><span class="eyebrow">CATÁLOGO DO SERVIDOR</span><h2>Referências compartilhadas</h2></div>${admin ? `<button class="button button-outline compact" data-shared-reference-action="new">＋ Nova referência</button>` : ""}</div><p class="dash-description">Catálogo novo, separado dos dados locais deste navegador. O administrador pode cadastrar e editar referências aqui.</p>${references.length ? `<div class="table-scroll"><table class="records-table"><thead><tr><th>ID</th><th>Nome</th><th>Categoria</th><th>Descrição</th><th>Valor</th>${admin ? "<th>Ações</th>" : ""}</tr></thead><tbody>${refs}</tbody></table></div>` : `<div class="empty-state"><strong>Nenhuma referência compartilhada cadastrada</strong><p>O administrador pode cadastrar referências para vincular às solicitações.</p></div>`}</section>`;
+}
+
+function sharedStatus(status) {
+  return { SIM: "Sim", NAO: "Não", EM_ANALISE: "Em análise" }[status] || status || "Não informado";
+}
+
+function sharedDetails(record) {
+  return {
+    id: record.id,
+    nomeServico: record.nomeServico,
+    categoria: record.categoria,
+    descricao: record.descricao,
+    servicoOferecido: sharedReferenceText(record.servicoReferencia),
+    carga: sharedReferenceText(record.cargaReferencia),
+    conteiner: sharedReferenceText(record.conteinerReferencia),
+    operacao: sharedReferenceText(record.operacaoReferencia),
+    orcamento: `${sharedReferenceText(record.orcamentoReferencia)} · ${record.valor == null ? "Valor não informado" : formatarTarifaServico({ valor: Number(record.valor) })}`,
+    solicitante: `${record.solicitante.id} · ${record.solicitante.nome}`,
+    prestador: `${record.prestador.id} · ${record.prestador.nome} · ${record.prestador.cargo}`,
+    statusSolicitacao: sharedStatus(record.statusSolicitacao),
+    statusOperacional: record.statusOperacional,
+    cargaOperacional: `${record.cargaOperacional.id} · ${record.cargaOperacional.descricao}`,
+    servicoOperacional: `${record.servicoOperacional.id} · ${record.servicoOperacional.nome}`,
+    criadoEm: sharedCreatedAt(record.criadoEm),
+  };
+}
+
+function referenceForm(reference = null) {
+  const options = [["SRV", "Serviço"], ["CRG", "Carga"], ["CTR", "Contêiner"], ["OPR", "Operação"], ["ORC", "Orçamento"]];
+  return `<form class="form-grid" data-form="shared-reference" ${reference ? `data-id="${esc(reference.id)}" data-version="${esc(reference.versao)}"` : ""}><label class="field-label">Tipo<select name="tipo" ${reference ? "disabled" : ""} required>${options.map(([id, name]) => `<option value="${id}" ${reference?.tipo === id ? "selected" : ""}>${name}</option>`).join("")}</select></label>${reference ? `<input type="hidden" name="tipo" value="${esc(reference.tipo)}">` : ""}<label class="field-label">Nome<input name="nome" maxlength="255" required value="${esc(reference?.nome || "")}"></label><label class="field-label">Categoria<input name="categoria" maxlength="255" value="${esc(reference?.categoria || "")}"></label><label class="field-label">Descrição e dados<textarea name="descricao" maxlength="2000">${esc(reference?.descricao || "")}</textarea></label><label class="field-label">Valor (R$), quando aplicável<input name="valor" type="number" step="0.01" min="0" value="${esc(reference?.valor ?? "")}"></label><p class="form-feedback" role="alert"></p><button class="button button-primary compact">Salvar referência</button></form>`;
+}
+
+export function sharedRequestForm(record, clients, cargos, services, staff, references) {
+  const options = (items, selected, label) => `<option value="">Selecione</option>${items.map((item) => `<option value="${esc(item.id)}" ${String(item.id) === String(selected ?? "") ? "selected" : ""}>${esc(label(item))}</option>`).join("")}`;
+  const referenceControl = (field, label, type, selected) => `<label class="field-label">${label}<select name="${field}" data-shared-ref>${options(references.filter((ref) => ref.tipo === type), selected?.id, (ref) => `${ref.codigo} · ${ref.nome}`)}</select><textarea data-shared-ref-details="${field}" rows="3" readonly aria-label="Dados de ${label}">${esc(selected ? sharedReferenceText(selected) : "")}</textarea></label>`;
+  const categories = catalogoSolicitacoes.map(({ categoria }) => ({ id: categoria, nome: categoria }));
+  if (record?.categoria && !categories.some((item) => item.id === record.categoria)) categories.push({ id: record.categoria, nome: record.categoria });
+  return `<form class="inline-form shared-request-form" data-form="shared-request" ${record ? `data-id="${esc(record.id)}" data-version="${esc(record.versao)}"` : ""}><div class="inline-form-grid"><label class="field-label">ID da solicitação<input value="${record ? esc(record.id) : "Gerado ao salvar"}" readonly></label><label class="field-label">Nome do serviço para a solicitação<input name="nomeServico" required maxlength="255" value="${esc(record?.nomeServico || "")}"></label><label class="field-label">Categoria<select name="categoria" required>${options(categories, record?.categoria, (item) => item.nome)}</select></label><label class="field-label">Descrição do pedido<textarea name="descricao" required maxlength="2000">${esc(record?.descricao || "")}</textarea></label>${referenceControl("servicoReferenciaId", "Tipo de serviço oferecido", "SRV", record?.servicoReferencia)}${referenceControl("cargaReferenciaId", "Carga vinculada", "CRG", record?.cargaReferencia)}${referenceControl("conteinerReferenciaId", "Contêiner vinculado", "CTR", record?.conteinerReferencia)}${referenceControl("operacaoReferenciaId", "Operação vinculada", "OPR", record?.operacaoReferencia)}${referenceControl("orcamentoReferenciaId", "Orçamento vinculado", "ORC", record?.orcamentoReferencia)}<label class="field-label">Valor do orçamento (R$)<input name="valor" type="number" min="0" step="0.01" value="${esc(record?.valor ?? "")}"></label><label class="field-label">Solicitante (cliente)<select name="clienteId" required>${options(clients, record?.solicitante?.id, (item) => `${item.id} · ${item.nome}`)}</select></label><label class="field-label">Prestador de serviço<select name="prestadorId" required>${options(staff, record?.prestador?.id, (item) => `${item.id} · ${item.nome} · ${item.cargo}`)}</select></label><label class="field-label">Carga operacional para uso em operações<select name="cargaOperacionalId" required>${options(cargos, record?.cargaOperacional?.id, (item) => `${item.id} · ${item.descricao}`)}</select></label><label class="field-label">Serviço operacional para uso em operações<select name="servicoOperacionalId" required>${options(services, record?.servicoOperacional?.id, (item) => `${item.id} · ${item.nome}`)}</select></label><label class="field-label">Status da solicitação<select name="statusSolicitacao" required>${[["EM_ANALISE", "Em análise"], ["SIM", "Sim"], ["NAO", "Não"]].map(([value, name]) => `<option value="${value}" ${(record?.statusSolicitacao || "EM_ANALISE") === value ? "selected" : ""}>${name}</option>`).join("")}</select></label></div><p class="muted small">Este status é separado do status operacional existente.</p><p class="form-feedback" role="alert"></p><button class="button button-primary compact">Salvar solicitação</button></form>`;
+}
+
+async function openSharedRequest(record = null, focus = true) {
+  const slot = document.querySelector("#shared-request-slot");
+  if (!slot) return;
+  if (slot.dataset.loading) return;
+  slot.dataset.loading = "true";
+  const requestId = String(Number(slot.dataset.requestId || 0) + 1);
+  slot.dataset.requestId = requestId;
+  if (focus) slot.scrollIntoView({ behavior: "smooth", block: "start" });
+  const status = document.createElement("p");
+  status.className = "muted small";
+  status.setAttribute("role", "status");
+  status.textContent = "Carregando dados para o formulário…";
+  slot.prepend(status);
+  const controls = [...slot.querySelectorAll("input, select, textarea, button")].map((control) => [control, control.disabled]);
+  controls.forEach(([control]) => { control.disabled = true; });
+  try {
+    const [clients, cargos, services, staff, references] = await Promise.all([get("/clientes"), get("/cargas"), get("/servicos/todos"), get("/referencias-compartilhadas/prestadores"), get("/referencias-compartilhadas")]);
+    if (!slot.isConnected || slot.dataset.requestId !== requestId) return;
+    cachedRecords.set("referencias-compartilhadas", collectionFrom(references));
+    slot.innerHTML = `<h3>${record ? `Editar solicitação ${esc(record.id)}` : "Nova solicitação"}</h3>${sharedRequestForm(record, collectionFrom(clients), collectionFrom(cargos), collectionFrom(services), collectionFrom(staff), collectionFrom(references))}`;
+    if (focus) slot.querySelector('[name="nomeServico"]')?.focus({ preventScroll: true });
+  } catch (error) {
+    if (slot.isConnected && slot.dataset.requestId === requestId) {
+      status.className = "inline-error";
+      status.setAttribute("role", "alert");
+      status.textContent = `Não foi possível carregar os dados para o formulário: ${error.message}. Atualize o painel para tentar novamente.`;
+      controls.forEach(([control, disabled]) => { control.disabled = disabled; });
+    }
+  } finally {
+    if (slot.isConnected && slot.dataset.requestId === requestId) delete slot.dataset.loading;
+  }
+}
+
+async function handleSharedRequestAction(action, record) {
+  if (action === "edit") {
+    const form = document.querySelector('#shared-request-slot form[data-form="shared-request"]');
+    if (form?.dataset.dirty && !window.confirm("Descartar alterações não salvas no formulário?")) return;
+    if (document.querySelector("#modal-root .modal-card")) dismissModal();
+    await openSharedRequest(record);
+  }
+  else if (action === "view") modal(`Solicitação · ${record.id}`, `<div class="detail-modal-content">${recordDetailsMarkup(sharedDetails(record))}<div class="form-actions"><button class="button button-outline compact" data-shared-request-action="print" data-id="${esc(record.id)}">Imprimir</button><button class="button button-primary compact" data-shared-request-action="edit" data-id="${esc(record.id)}">Editar</button></div></div>`);
+  else if (action === "print" && !printRecord(sharedDetails(record), `Solicitação ${record.id}`)) showSectionError("Permita a abertura da janela de impressão para continuar.");
 }
 
 export function filterSolicitations(panel, query) {
@@ -957,8 +1128,8 @@ async function handleResourceAction(action, slug, id, label = "") {
         if (slug === "operacao") {
           const entry = findDatabaseEntry("operacao", "codigo", local.referencia);
           if (entry) {
-            const fields = operationReferenceFields(entry, readDatabaseEntries("carga"));
-            record = { ...record, categoriaReferencia: fields.categoriaReferencia, conteineresReferencia: fields.conteineresReferencia, cargasReferencia: fields.cargasReferencia, cargasPrincipaisReferencia: fields.cargasPrincipaisReferencia, bercosReferencia: fields.bercosReferencia, produtividadeReferencia: fields.produtividadeReferencia };
+            const fields = operationReferenceFields(entry, readDatabaseEntries("carga"), readDatabaseEntries("conteiner"));
+            record = { ...record, ...fields };
           } else if (local.referencia) {
             record = { ...record, situacaoReferencia: "Referência local não encontrada." };
           }
@@ -1024,7 +1195,7 @@ function handleDatabaseAction(action, categoryId, id) {
   try {
     const record = readDatabaseEntries(categoryId).find((entry) => String(entry.id) === String(id));
     if (!record) throw new Error("O registro não foi encontrado. Atualize o Banco de dados e tente novamente.");
-    if (action === "edit" || (["edit-value", "edit-links"].includes(action) && categoryId === "orcamento")) {
+    if (action === "edit" || (action === "edit-value" && categoryId === "orcamento") || (action === "edit-links" && ["orcamento", "carga", "operacao", "solicitacao"].includes(categoryId))) {
       openDatabaseForm(categoryId, id, action === "edit-value" ? "value" : action === "edit-links" ? "links" : "");
     } else if (action === "view") {
       const details = categoryId === "servico" ? serviceReferenceMarkup(record) : categoryId === "orcamento" ? budgetReferenceSelectionMarkup(record, false) : recordDetailsMarkup(record);
@@ -1083,7 +1254,7 @@ export function solicitationDescription(record) {
 }
 
 async function handleChargeAction(action, id) {
-  const record = (cachedRecords.get("carga") || []).find((item) => String(item.id) === String(id));
+  let record = (cachedRecords.get("carga") || []).find((item) => String(item.id) === String(id));
   if (!record) {
     showSectionError("Atualize a lista antes de abrir esta carga.");
     return;
@@ -1091,19 +1262,42 @@ async function handleChargeAction(action, id) {
   if (action === "edit") {
     showChargeForm(record);
   } else if (action === "print") {
-    if (!printRecord(record, `Carga ${record.id}`)) showSectionError("Permita a abertura da janela de impressão para continuar.");
+    try {
+      record = chargeWithReference(record);
+      if (!printRecord(record, `Carga ${record.id}`)) showSectionError("Permita a abertura da janela de impressão para continuar.");
+    } catch (error) { showSectionError(error.message); }
   } else if (action === "delete") {
     if (!canDeleteOperational()) return;
     if (!window.confirm(`Excluir a carga ${record.id}? Esta ação não pode ser desfeita.`)) return;
     try {
       await del(`/cargas/${encodeURIComponent(id)}`);
-      await reloadCurrentSection("Carga excluída com sucesso.");
+      let warning = "";
+      try { saveResourceDetails("carga", id, null); }
+      catch (error) { warning = `Carga excluída, mas a referência local não foi removida: ${error.message}`; }
+      await reloadCurrentSection(warning ? "" : "Carga excluída com sucesso.");
+      if (warning) showSectionError(warning);
     } catch (error) {
       showSectionError(error.message);
     }
   } else {
-    modal(`Carga · ${record.id}`, `<div class="detail-modal-content">${recordDetailsMarkup(record)}<div class="form-actions"><button class="button button-outline compact" data-charge-action="print" data-id="${esc(record.id)}">Imprimir ficha</button><button class="button button-primary compact" data-charge-action="edit" data-id="${esc(record.id)}">Editar</button></div></div>`);
+    try {
+      record = chargeWithReference(record);
+      modal(`Carga · ${record.id}`, `<div class="detail-modal-content">${recordDetailsMarkup(record)}<div class="form-actions"><button class="button button-outline compact" data-charge-action="print" data-id="${esc(record.id)}">Imprimir ficha</button><button class="button button-primary compact" data-charge-action="edit" data-id="${esc(record.id)}">Editar</button></div></div>`);
+    } catch (error) { showSectionError(error.message); }
   }
+}
+
+function chargeWithReference(record) {
+  const code = readResourceDetails()[`carga:${record.id}`]?.referencia;
+  if (!code) return record;
+  const cargo = findDatabaseEntry("carga", "codigo", code);
+  if (!cargo) return { ...record, cargaReferencia: code, situacaoReferencia: "Referência local não encontrada." };
+  return {
+    ...record,
+    cargaReferencia: cargo.codigo,
+    conteineresCargaReferencia: linkedReferences(cargo.conteineres, readDatabaseEntries("conteiner"), "tipo"),
+    servicosCargaReferencia: linkedReferences(cargo.servicos, readDatabaseEntries("servico"), "nome"),
+  };
 }
 
 function cargoReferenceDescription(entry) {
@@ -1249,15 +1443,26 @@ export function updateContainerReference(form, byCode = false) {
   details.innerHTML = `<p class="muted small">Confira e edite a descrição da referência no campo acima.</p>`;
 }
 
-export function operationReferenceFields(entry, cargos) {
+function linkedReferences(codes, entries, field) {
+  return String(codes || "").split(",").map((code) => code.trim()).filter(Boolean).map((code) => {
+    const linked = entries.find((item) => item.codigo.toUpperCase() === code.toUpperCase());
+    return linked ? `${linked.codigo} · ${linked[field]}` : `${code} · referência não encontrada`;
+  }).join("\n");
+}
+
+export function operationReferenceFields(entry, cargos, containers) {
   const cargoCodes = String(entry?.cargas || "").split(",").map((code) => code.trim()).filter(Boolean);
+  const cargoContainers = cargoCodes.map((code) => {
+    const cargo = cargos.find((item) => item.codigo.toUpperCase() === code.toUpperCase());
+    if (!cargo) return `${code} · carga não encontrada`;
+    const linked = linkedReferences(cargo.conteineres, containers, "tipo");
+    return `${cargo.codigo} · ${cargo.tipoCarga}: ${linked ? linked.replaceAll("\n", "; ") : "nenhum contêiner vinculado"}`;
+  });
   return {
     categoriaReferencia: entry?.categoria || "",
-    conteineresReferencia: entry?.conteineres || "",
-    cargasReferencia: cargoCodes.map((code) => {
-      const cargo = cargos.find((item) => item.codigo.toUpperCase() === code.toUpperCase());
-      return cargo ? `${cargo.codigo} · ${cargo.tipoCarga}` : `${code} · referência não encontrada`;
-    }).join("\n"),
+    conteineresReferencia: linkedReferences(entry?.conteineres, containers, "tipo"),
+    cargasReferencia: linkedReferences(entry?.cargas, cargos, "tipoCarga"),
+    conteineresDasCargasReferencia: cargoContainers.join("\n"),
     cargasPrincipaisReferencia: entry?.cargasPrincipais || "",
     bercosReferencia: entry?.bercos || "",
     produtividadeReferencia: entry?.produtividade || "",
@@ -1277,7 +1482,7 @@ export function updateOperationReference(form) {
   ].join("");
   const entry = findDatabaseEntry("operacao", "codigo", input.value);
   updateLocalReferenceDescription(form, "operacao", entry);
-  for (const [name, value] of Object.entries(operationReferenceFields(entry, cargos))) {
+  for (const [name, value] of Object.entries(operationReferenceFields(entry, cargos, containers))) {
     const field = form.elements.namedItem(name);
     if (field) field.value = value;
   }
@@ -1289,8 +1494,8 @@ export function updateOperationReference(form) {
       field.value = String(entry[name]);
       field.dataset.operationAutofilledValue = field.value;
     }
-    form.dataset.operationSearchValue = input.value;
   }
+  form.dataset.operationSearchValue = input.value;
   if (!entry) {
     const search = input.value.trim().toUpperCase();
     const linked = [...cargos, ...containers].find((item) => item.codigo.toUpperCase() === search);
@@ -1421,11 +1626,30 @@ function showChargeForm(record = null) {
   if (!slot) return;
   slot.innerHTML = `<form class="inline-form" data-form="charge" data-catalog-entity="carga" data-catalog-lookup="tipoCarga" ${record ? `data-charge-id="${esc(record.id)}"` : ""}><div class="inline-form-title"><h3>${record ? "Editar carga" : "Nova carga"}</h3><button type="button" class="icon-button" aria-label="Fechar cadastro" data-close-form>×</button></div><label class="field-label">Buscar por ID da carga ou do contêiner<input name="buscaReferencia" list="cargo-reference-suggestions" autocomplete="off" placeholder="Ex.: CRG-000001 ou CTR-000001"></label><datalist id="cargo-reference-suggestions"></datalist><div data-cargo-reference aria-live="polite"></div><div class="inline-form-grid">${chargeFields.map(([name, title, type]) => `<label class="field-label">${title}${name === "descricao" ? `<textarea name="descricao" rows="4" maxlength="255" required>${esc(record?.descricao ?? "")}</textarea>` : `<input name="${name}" type="${type}" value="${esc(record?.[name] ?? "")}" ${name === "tipoCarga" ? 'data-catalog-lookup list="catalog-suggestions-carga"' : ""} ${type === "number" ? 'step="any"' : ""} required>`}</label>`).join("")}</div><datalist id="catalog-suggestions-carga"></datalist><p class="muted small">Selecione uma carga de referência para preencher os campos disponíveis. Todos podem ser editados; peso, volume, origem e destino devem corresponder à carga real. A descrição aceita até 255 caracteres.</p><p class="form-feedback" role="alert"></p><div class="form-actions"><button class="button button-primary compact">${record ? "Salvar alterações" : "Salvar carga"} <span>↗</span></button><button class="button button-outline compact" type="button" data-close-form>Cancelar</button></div></form>`;
   try {
-    updateCargoReference(slot.querySelector("form"));
+    const form = slot.querySelector("form");
+    form.querySelector("#catalog-suggestions-carga").insertAdjacentHTML("afterend", `<div class="inline-form-grid"><label class="field-label">ID de referência da carga<input name="cargaReferencia" readonly placeholder="Nenhuma referência selecionada"></label><label class="field-label">IDs e tipos dos contêineres vinculados<textarea name="conteineresCargaReferencia" rows="3" readonly placeholder="Nenhum vínculo cadastrado"></textarea></label><label class="field-label">IDs e nomes dos serviços vinculados<textarea name="servicosCargaReferencia" rows="3" readonly placeholder="Nenhum vínculo cadastrado"></textarea></label></div><p class="muted small">Estes vínculos são referências locais; confirme a adequação para a carga real.</p>`);
+    const savedReference = record ? readResourceDetails()[`carga:${record.id}`]?.referencia : "";
+    if (savedReference) {
+      form.elements.namedItem("buscaReferencia").value = savedReference;
+      form.dataset.cargoReference = savedReference;
+    }
+    updateCargoReference(form);
   } catch (error) {
     setFeedback(slot.querySelector("form"), error.message);
   }
   slot.querySelector(record ? "[name='tipoCarga']" : "input")?.focus();
+}
+
+function updateCargoLinkedFields(form, cargo, containers, services) {
+  const fields = {
+    cargaReferencia: cargo?.codigo || "",
+    conteineresCargaReferencia: linkedReferences(cargo?.conteineres, containers, "tipo"),
+    servicosCargaReferencia: linkedReferences(cargo?.servicos, services, "nome"),
+  };
+  for (const [name, value] of Object.entries(fields)) {
+    const input = form.elements.namedItem(name);
+    if (input) input.value = value;
+  }
 }
 
 export function updateCargoReference(form) {
@@ -1439,6 +1663,7 @@ export function updateCargoReference(form) {
   ].join("");
   form.querySelector("#catalog-suggestions-carga").innerHTML = cargos.map((entry) => `<option value="${esc(entry.tipoCarga)}"></option>`).join("");
   const cargo = cargos.find((entry) => entry.codigo.toUpperCase() === search);
+  updateCargoLinkedFields(form, cargo, containers, readDatabaseEntries("servico"));
   if (form.dataset.cargoReference && form.dataset.cargoReference !== cargo?.codigo) {
     for (const [name] of chargeFields) {
       const input = form.elements.namedItem(name);
@@ -1668,15 +1893,48 @@ async function handleSubmit(event) {
         if (String(fields.descricao).length > 255) throw new Error("A descrição da carga deve ter no máximo 255 caracteres. Edite o texto antes de salvar.");
         const numeric = Object.fromEntries(chargeFields.map(([name]) => [name, ["peso", "volume"].includes(name) ? Number(fields[name]) : fields[name]]));
         const id = form.dataset.chargeId;
-        if (id) await put(`/cargas/${encodeURIComponent(id)}`, numeric);
-        else await post("/cargas", numeric);
-        await reloadCurrentSection(`Carga ${id ? "atualizada" : "cadastrada"} com sucesso.`);
+        const response = id ? await put(`/cargas/${encodeURIComponent(id)}`, numeric) : await post("/cargas", numeric);
+        const savedId = id || response?.id || response?.data?.id;
+        const referencia = String(fields.buscaReferencia || "").trim();
+        let warning = "";
+        if (savedId != null) {
+          try { saveResourceDetails("carga", savedId, referencia ? { referencia } : null); }
+          catch (error) { warning = `Carga salva, mas a referência local não foi salva: ${error.message}`; }
+        } else if (referencia) warning = "Carga criada, mas o servidor não retornou o ID necessário para salvar a referência neste navegador.";
+        await reloadCurrentSection(warning ? "" : `Carga ${id ? "atualizada" : "cadastrada"} com sucesso.`);
+        if (warning) showSectionError(warning);
         break;
       }
       case "database-entry": {
         if (!isAdmin()) throw new Error("Somente o administrador pode alterar o Banco de dados.");
         saveDatabaseEntry(form.dataset.databaseCategory, fields, form.dataset.databaseId || "");
         await reloadCurrentSection("Banco de dados atualizado com sucesso.");
+        break;
+      }
+      case "shared-reference": {
+        const payload = { tipo: fields.tipo, nome: fields.nome.trim(), categoria: fields.categoria.trim(), descricao: fields.descricao.trim(), valor: fields.valor === "" ? null : Number(fields.valor), versao: form.dataset.id ? Number(form.dataset.version) : null };
+        if (form.dataset.id) await put(`/referencias-compartilhadas/${encodeURIComponent(form.dataset.id)}`, payload);
+        else await post("/referencias-compartilhadas", payload);
+        dismissModal();
+        await reloadCurrentSection("Referência compartilhada salva.");
+        break;
+      }
+      case "shared-request": {
+        const numberOrNull = (value) => value ? Number(value) : null;
+        const payload = {
+          clienteId: numberOrNull(fields.clienteId), cargaOperacionalId: numberOrNull(fields.cargaOperacionalId),
+          servicoOperacionalId: numberOrNull(fields.servicoOperacionalId), nomeServico: fields.nomeServico.trim(),
+          categoria: fields.categoria, descricao: fields.descricao.trim(),
+          servicoReferenciaId: numberOrNull(fields.servicoReferenciaId), cargaReferenciaId: numberOrNull(fields.cargaReferenciaId),
+          conteinerReferenciaId: numberOrNull(fields.conteinerReferenciaId), operacaoReferenciaId: numberOrNull(fields.operacaoReferenciaId),
+          orcamentoReferenciaId: numberOrNull(fields.orcamentoReferenciaId), valor: fields.valor === "" ? null : Number(fields.valor),
+          prestadorId: numberOrNull(fields.prestadorId), statusSolicitacao: fields.statusSolicitacao,
+          versao: form.dataset.id ? Number(form.dataset.version) : null,
+        };
+        if (form.dataset.id) await put(`/solicitacoes/compartilhadas/${encodeURIComponent(form.dataset.id)}`, payload);
+        else await post("/solicitacoes/compartilhadas", payload);
+        dismissModal();
+        await reloadCurrentSection("Solicitação compartilhada salva.");
         break;
       }
       case "solicitation-description": {
@@ -1812,6 +2070,30 @@ function navigateTo(path, { replace = false } = {}) {
 }
 
 if (app) app.addEventListener("click", async (event) => {
+  const sharedRequestAction = event.target.closest("[data-shared-request-action]");
+  if (sharedRequestAction) {
+    const action = sharedRequestAction.dataset.sharedRequestAction;
+    const record = (cachedRecords.get("solicitacoes-compartilhadas") || []).find((item) => String(item.id) === sharedRequestAction.dataset.id);
+    if (action === "new") {
+      const form = document.querySelector('#shared-request-slot form[data-form="shared-request"]');
+      if (form?.dataset.dirty && !window.confirm("Descartar alterações não salvas no formulário?")) return;
+      if (document.querySelector("#modal-root .modal-card")) dismissModal();
+      await openSharedRequest();
+    }
+    else if (!record) showSectionError("Solicitação não encontrada. Atualize o painel.");
+    else await handleSharedRequestAction(action, record);
+    return;
+  }
+  const sharedReferenceAction = event.target.closest("[data-shared-reference-action]");
+  if (sharedReferenceAction) {
+    if (!isAdmin()) return;
+    const reference = sharedReferenceAction.dataset.sharedReferenceAction === "edit"
+      ? (cachedRecords.get("referencias-compartilhadas") || []).find((item) => String(item.id) === sharedReferenceAction.dataset.id)
+      : null;
+    if (sharedReferenceAction.dataset.sharedReferenceAction === "edit" && !reference) showSectionError("Referência não encontrada. Atualize o painel.");
+    else modal(reference ? `Editar referência ${reference.codigo}` : "Nova referência compartilhada", referenceForm(reference));
+    return;
+  }
   const saveReferenceValue = event.target.closest("[data-save-service-reference-value]");
   if (saveReferenceValue) {
     const form = saveReferenceValue.closest('form[data-resource="servico"]');
@@ -1889,7 +2171,9 @@ if (app) app.addEventListener("click", async (event) => {
   }
   const solicitationAction = event.target.closest("[data-solicitation-action]");
   if (solicitationAction) {
-    handleSolicitationAction(solicitationAction.dataset.solicitationAction, solicitationAction.dataset.id);
+    const shared = (cachedRecords.get("solicitacoes-compartilhadas") || []).find((item) => String(item.id) === solicitationAction.dataset.id);
+    if (shared) await handleSharedRequestAction(solicitationAction.dataset.solicitationAction, shared);
+    else handleSolicitationAction(solicitationAction.dataset.solicitationAction, solicitationAction.dataset.id);
     return;
   }
   const budgetService = event.target.closest("[data-budget-service]");
@@ -2045,8 +2329,25 @@ if (app) app.addEventListener("click", async (event) => {
 
 if (app) app.addEventListener("submit", (event) => { void handleSubmit(event); });
 if (app) app.addEventListener("input", (event) => {
+  const sharedRequestFormElement = event.target.closest('form[data-form="shared-request"]');
+  if (sharedRequestFormElement) sharedRequestFormElement.dataset.dirty = "true";
+  if (event.target.matches("[data-shared-request-search]")) {
+    const panel = event.target.closest("[data-shared-requests]");
+    const search = normalizeServiceSearch(event.target.value);
+    let visible = 0;
+    panel.querySelectorAll("[data-shared-request-row]").forEach((row) => {
+      row.hidden = Boolean(search) && !normalizeServiceSearch(row.textContent).includes(search);
+      if (!row.hidden) visible++;
+    });
+    panel.querySelector("[data-shared-search-status]").textContent = search && !visible ? "Nenhuma solicitação encontrada." : "";
+    return;
+  }
   if (event.target.matches("[data-solicitation-search]")) {
     filterSolicitations(event.target.closest(".data-panel"), event.target.value);
+    return;
+  }
+  if (event.target.matches("[data-solicitation-reference-search]")) {
+    filterSolicitationReferences(event.target.closest("[data-solicitation-references]"), event.target.value);
     return;
   }
   const formWithCatalog = event.target.closest("form[data-catalog-entity]");
@@ -2061,7 +2362,7 @@ if (app) app.addEventListener("input", (event) => {
     }
     return;
   }
-  if (databaseForm && ["servicos", "cargas", "conteineres", "operacoes"].includes(event.target.name)) {
+  if (databaseForm && ["servicos", "cargas", "conteineres", "operacoes", "orcamentos"].includes(event.target.name)) {
     const codes = String(event.target.value).split(",").map((code) => code.trim().toUpperCase());
     databaseForm.querySelectorAll(`[data-budget-link="${event.target.name}"]`).forEach((checkbox) => { checkbox.checked = codes.includes(checkbox.value.toUpperCase()); });
   }
@@ -2134,6 +2435,16 @@ if (app) app.addEventListener("input", (event) => {
   }
   if (formWithCatalog && event.target.hasAttribute("data-catalog-lookup")) {
     applyDatabaseTemplate(formWithCatalog, event.target.name);
+    if (formWithCatalog.dataset.form === "charge" && event.target.name === "tipoCarga") {
+      try {
+        const cargo = findDatabaseEntry("carga", "tipoCarga", event.target.value);
+        formWithCatalog.elements.namedItem("buscaReferencia").value = cargo?.codigo || "";
+        if (cargo) formWithCatalog.dataset.cargoReference = cargo.codigo;
+        updateCargoLinkedFields(formWithCatalog, cargo, readDatabaseEntries("conteiner"), readDatabaseEntries("servico"));
+      } catch (error) {
+        setFeedback(formWithCatalog, error.message);
+      }
+    }
   }
   const form = event.target.closest('form[data-form="budget"]');
   if (form && event.target.name === "valorEstimado") {
@@ -2150,6 +2461,15 @@ if (app) app.addEventListener("input", (event) => {
   }
 });
 if (app) app.addEventListener("change", (event) => {
+  const sharedRequestFormElement = event.target.closest('form[data-form="shared-request"]');
+  if (sharedRequestFormElement) sharedRequestFormElement.dataset.dirty = "true";
+  if (event.target.matches("[data-shared-ref]")) {
+    const form = event.target.closest('form[data-form="shared-request"]');
+    const reference = (cachedRecords.get("referencias-compartilhadas") || []).find((item) => String(item.id) === event.target.value);
+    form.querySelector(`[data-shared-ref-details="${event.target.name}"]`).value = reference ? sharedReferenceText(reference) : "";
+    if (event.target.name === "orcamentoReferenciaId" && reference?.valor != null) form.elements.valor.value = reference.valor;
+    return;
+  }
   const operationForm = event.target.closest('form[data-resource="operacao"]');
   if (operationForm && event.target.name === "codigoOperacao") {
     if (operationForm.dataset.operationSearchValue === event.target.value) return;
