@@ -1,4 +1,17 @@
 import { apiRequest, get, post, postPublic, postWithHeaders, postParams, put, putParams, del, getAppointmentAccounts, createManagedAppointment, updateManagedAppointment, setAccessToken, clearAccessToken, getAccessToken, ApiError } from "./api.js";
+import { formatarTarifaServico, localizarTarifaServico } from "./catalogo-servicos.js";
+import {
+  databaseCategories,
+  deleteDatabaseEntry,
+  findDatabaseEntry,
+  getDatabaseCategory,
+  readDatabaseEntries,
+  readBudgetMetadata,
+  readSolicitationStates,
+  saveBudgetMetadata,
+  saveDatabaseEntry,
+  saveSolicitationState,
+} from "./database-catalog.js";
 import lashingImage from "./assets/lashing.jpg";
 import "./vanilla.css";
 import "./admin.css";
@@ -9,19 +22,21 @@ let modalReturnFocus = null;
 let currentUser = null;
 let authNotice = "";
 const cachedRecords = new Map();
+const budgetServiceOptions = new WeakMap();
 const sections = [
   { slug: "carga", name: "Carga", description: "Cadastro e consulta de cargas.", endpoint: "/cargas", columns: ["id", "descricao", "peso", "volume", "tipoCarga", "origem", "destino"] },
   { slug: "cliente", name: "Cliente", description: "Clientes cadastrados.", endpoint: "/clientes", columns: ["id", "nome", "email", "telefone", "cpfcnpj"], resource: true },
   { slug: "conteiner", name: "Contêiner", description: "Contêineres em operação.", endpoint: "/conteineres", columns: ["id", "numeroConteiner", "tipo", "situacao"], resource: true },
   { slug: "mensagens", name: "Mensagens", description: "Mensagens recebidas pelo Fale conosco.", endpoint: "/mensagens/contatos" },
   { slug: "operacao", name: "Operação", description: "Operações em andamento.", endpoint: "/operacoes", columns: ["id", "solicitacao", "conteiner", "responsavel", "andamento", "observacoes"], resource: true },
-  { slug: "orcamento", name: "Orçamento", description: "Orçamentos e solicitações comerciais.", endpoint: "/orcamentos", columns: ["id", "cliente", "carga", "servico", "valorEstimado", "status"] },
+  { slug: "orcamento", name: "Orçamento", description: "Orçamentos e solicitações comerciais.", endpoint: "/orcamentos", columns: ["id", "cliente", "carga", "servico", "valorEstimado", "status", "criadoEm"] },
   { slug: "backup", name: "Backup", description: "Gere cópias de segurança dos dados da operação.", endpoint: null },
   { slug: "usuario", name: "Configurações", description: "Atualize seus dados e gerencie contas de administradores e equipe.", endpoint: "/admin/usuarios", columns: ["id", "nome", "email", "cargo"], resource: true, adminOnly: true },
   { slug: "auditoria", name: "Auditoria", description: "Registro de atividades administrativas.", endpoint: "/admin/auditoria", adminOnly: true },
   { slug: "sessoes", name: "Sessões", description: "Sessões administrativas ativas e recentes.", endpoint: "/admin/sessoes", adminOnly: true },
   { slug: "servico", name: "Serviço", description: "Serviços oferecidos.", endpoint: "/servicos/todos", columns: ["id", "nome", "descricao", "categoria", "disponivel"], resource: true },
   { slug: "solicitacao", name: "Solicitação", description: "Solicitações recebidas.", endpoint: "/solicitacoes", columns: ["id", "cliente", "carga", "servico", "status"] },
+  { slug: "banco-dados", name: "Banco de dados", description: "Cadastros de referência usados para preencher automaticamente os formulários.", adminOnly: true },
   { slug: "agendamento", name: "Agendamento", description: "Solicitações de visita técnica.", endpoint: "/agendamentos", columns: ["id", "nome", "email", "telefone", "dataHora", "status"], resource: true },
 ];
 
@@ -307,9 +322,17 @@ function collectionFrom(payload) {
   return [];
 }
 
-async function loadSection(section) {
+async function loadSection(section, databaseCategory = "servico") {
   const host = document.querySelector("#section-content");
   if (!host) return;
+  if (section.slug === "banco-dados") {
+    try {
+      host.innerHTML = renderDatabaseSection(databaseCategory);
+    } catch (error) {
+      host.innerHTML = `<div class="load-error" role="alert">${esc(error.message)}</div>`;
+    }
+    return;
+  }
   if (section.slug === "backup") {
     try {
       host.innerHTML = renderBackupSection(await get("/api/backup/historico"));
@@ -329,7 +352,8 @@ async function loadSection(section) {
     const records = collectionFrom(section.slug === "usuario" ? payload[0] : payload);
     if (!host.isConnected) return;
     cachedRecords.set(section.slug, records);
-    if (section.resource) host.innerHTML = renderCrudSection(records, section, section.slug === "usuario" ? payload[1] : null);
+    if (section.slug === "servico") host.innerHTML = renderServiceSection(records, section);
+    else if (section.resource) host.innerHTML = renderCrudSection(records, section, section.slug === "usuario" ? payload[1] : null);
     else if (section.slug === "carga") host.innerHTML = renderCargas(records);
     else if (section.slug === "mensagens") host.innerHTML = renderMessages(records);
     else if (section.slug === "orcamento") host.innerHTML = renderBudgets(records);
@@ -337,7 +361,10 @@ async function loadSection(section) {
     else if (["auditoria", "sessoes"].includes(section.slug)) host.innerHTML = renderReadOnlySection(records, section.name);
     else host.innerHTML = renderTable(records, section.columns, section.name);
   } catch (error) {
-    if (host.isConnected) host.innerHTML = `<div class="load-error" role="alert"><p>${esc(error.message)}</p><button class="button button-outline" data-reload>Atualizar</button></div>`;
+    if (host.isConnected) {
+      const references = section.slug === "conteiner" ? renderContainerReferenceSection() : section.slug === "carga" ? renderCargoReferenceSection() : section.slug === "operacao" ? renderOperationReferenceSection() : "";
+      host.innerHTML = `<div class="load-error" role="alert"><p>${esc(error.message)}</p><button class="button button-outline" data-reload>Atualizar</button></div>${references}`;
+    }
   }
 }
 
@@ -350,7 +377,21 @@ export function renderBackupSection(records = []) {
 const chargeFields = [["descricao", "Descrição", "text"], ["peso", "Peso (t)", "number"], ["volume", "Volume (m³)", "number"], ["tipoCarga", "Tipo de carga", "text"], ["origem", "Origem", "text"], ["destino", "Destino", "text"]];
 
 function renderCargas(records) {
-  return `<section class="data-panel"><div class="panel-heading"><div><span class="eyebrow">OPERAÇÕES / REGISTROS</span><h2>Cargas cadastradas <span class="count-pill">${records.length}</span></h2></div><div class="panel-actions"><button class="button button-outline compact" data-reload>↻ <span>Atualizar</span></button><button class="button button-primary compact" data-action="new-charge">＋ Nova carga</button></div></div><div id="charge-form-slot"></div>${records.length ? renderTable(records, ["id", ...chargeFields.map(([name]) => name)], "cargas") : `<div class="empty-state"><span>▱</span><strong>Nenhuma carga cadastrada</strong><p>Cadastre uma carga para começar a acompanhar as especificações.</p></div>`}</section>`;
+  const rows = records.map((record) => `<tr><td>${valueText(record.id)}</td>${chargeFields.map(([name]) => `<td>${valueText(record[name])}</td>`).join("")}<td><div class="row-actions"><button class="small-action" data-charge-action="view" data-id="${esc(record.id)}">Ver</button><button class="small-action" data-charge-action="edit" data-id="${esc(record.id)}">Editar</button><button class="small-action" data-charge-action="print" data-id="${esc(record.id)}">Imprimir</button>${canDeleteOperational() ? `<button class="small-action danger-action" data-charge-action="delete" data-id="${esc(record.id)}">Excluir</button>` : ""}</div></td></tr>`).join("");
+  const table = records.length
+    ? `<div class="table-scroll"><table class="records-table"><thead><tr><th>Código</th>${chargeFields.map(([, title]) => `<th>${esc(title)}</th>`).join("")}<th>Ações</th></tr></thead><tbody>${rows}</tbody></table></div>`
+    : `<div class="empty-state"><span>▱</span><strong>Nenhuma carga cadastrada</strong><p>Cadastre uma carga para começar a acompanhar as especificações.</p></div>`;
+  return `<section class="data-panel"><div class="panel-heading"><div><span class="eyebrow">OPERAÇÕES / REGISTROS</span><h2>Cargas cadastradas <span class="count-pill">${records.length}</span></h2></div><div class="panel-actions"><button class="button button-outline compact" data-reload>↻ <span>Atualizar</span></button><button class="button button-primary compact" data-action="new-charge">＋ Nova carga</button></div></div><div id="charge-form-slot"></div>${table}</section>${renderCargoReferenceSection()}`;
+}
+
+export function renderCargoReferenceSection() {
+  try {
+    const records = readDatabaseEntries("carga");
+    const rows = records.map((entry) => `<tr><td>${valueText(entry.codigo)}</td><td>${valueText(entry.tipoCarga)}</td><td>${valueText(entry.conteineres)}</td><td>${valueText(entry.descricao)}</td></tr>`).join("");
+    return `<section class="data-panel" id="cargo-reference-section"><div class="panel-heading"><div><span class="eyebrow">CONSULTA / REFERÊNCIAS</span><h2>Tipos de carga</h2></div></div><p class="dash-description">Referências locais baseadas no uso principal dos contêineres. Verifique a compatibilidade e os limites do equipamento antes da operação.</p>${rows ? `<div class="table-scroll"><table class="records-table"><thead><tr><th>ID da carga</th><th>Tipo de carga</th><th>IDs dos contêineres</th><th>Descrição</th></tr></thead><tbody>${rows}</tbody></table></div>` : `<p class="muted">Nenhuma referência de carga cadastrada neste navegador.</p>`}</section>`;
+  } catch (error) {
+    return `<div id="cargo-reference-section" class="load-error" role="alert">Não foi possível carregar as referências de carga: ${esc(error.message)}</div>`;
+  }
 }
 
 export function renderCrudSection(records, section, setupStatus = null) {
@@ -369,7 +410,32 @@ export function renderCrudSection(records, section, setupStatus = null) {
     ? `<p class="settings-guidance">Edite uma conta para atualizar nome, e-mail, perfil ou senha. Para manter a senha atual, deixe o campo senha em branco.</p><div class="settings-guidance"><strong>Primeiro acesso para novos administradores</strong><p>Ative esta opção somente durante o cadastro de administradores adicionais e desative-a depois.</p><button class="button button-outline compact" data-action="toggle-admin-setup" data-enabled="${setupEnabled}">${setupEnabled ? "Desativar primeiro acesso" : "Ativar primeiro acesso"}</button></div>`
     : "";
   const initialForm = isUserSettings ? renderResourceFormMarkup(section.slug) : "";
-  return `<section class="data-panel"><div class="panel-heading"><div><span class="eyebrow">${panelEyebrow}</span><h2>${esc(panelTitle)} <span class="count-pill">${records.length}</span></h2></div>${actions}</div>${guidance}<div id="resource-form-slot">${initialForm}</div>${records.length ? renderResourceTable(records, section.slug) : `<div class="empty-state"><span>▱</span><strong>${emptyTitle}</strong><p>${emptyDescription}</p></div>`}</section>`;
+  const references = section.slug === "conteiner" ? renderContainerReferenceSection() : section.slug === "operacao" ? renderOperationReferenceSection() : "";
+  return `<section class="data-panel"><div class="panel-heading"><div><span class="eyebrow">${panelEyebrow}</span><h2>${esc(panelTitle)} <span class="count-pill">${records.length}</span></h2></div>${actions}</div>${guidance}<div id="resource-form-slot">${initialForm}</div>${records.length ? renderResourceTable(records, section.slug) : `<div class="empty-state"><span>▱</span><strong>${emptyTitle}</strong><p>${emptyDescription}</p></div>`}</section>${references}`;
+}
+
+export function renderContainerReferenceSection() {
+  try {
+    const records = readDatabaseEntries("conteiner");
+    const fields = [{ name: "codigo", label: "ID" }, ...getDatabaseCategory("conteiner").fields.filter((field) => field.name !== "situacao")];
+    const table = records.length
+      ? `<div class="table-scroll"><table class="records-table"><thead><tr>${fields.map((field) => `<th>${esc(field.label)}</th>`).join("")}</tr></thead><tbody>${records.map((record) => `<tr>${fields.map((field) => `<td>${valueText(record[field.name])}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`
+      : `<p class="muted">Nenhuma referência de contêiner cadastrada neste navegador.</p>`;
+    return `<section class="data-panel" id="container-reference-section"><div class="panel-heading"><div><span class="eyebrow">CONSULTA / REFERÊNCIAS</span><h2>Tipos de contêiner</h2></div></div><p class="dash-description">Especificações de referência armazenadas neste navegador. Confira as medidas e capacidades do equipamento utilizado antes da operação.</p>${table}</section>`;
+  } catch (error) {
+    return `<div id="container-reference-section" class="load-error" role="alert">Não foi possível carregar as referências de contêiner: ${esc(error.message)}</div>`;
+  }
+}
+
+export function renderOperationReferenceSection() {
+  try {
+    const records = readDatabaseEntries("operacao");
+    const fields = [{ name: "codigo", label: "ID" }, ...getDatabaseCategory("operacao").fields.filter((field) => ["categoria", "cargasPrincipais", "cargas", "conteineres", "bercos", "produtividade"].includes(field.name))];
+    const rows = records.map((entry) => `<tr>${fields.map((field) => `<td>${valueText(entry[field.name]).replaceAll("\n", "<br>")}</td>`).join("")}</tr>`).join("");
+    return `<section class="data-panel" id="operation-reference-section"><div class="panel-heading"><div><span class="eyebrow">CONSULTA / REFERÊNCIAS</span><h2>Categorias de operação</h2></div></div><p class="dash-description">Vínculos por ID são sugestões, não uma confirmação de compatibilidade. Dados armazenados neste navegador. Confirme os valores exatos por berço na tabela oficial de Pranchas Mínimas Operacionais.</p>${rows ? `<div class="table-scroll"><table class="records-table"><thead><tr>${fields.map((field) => `<th>${esc(field.label)}</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table></div>` : `<p class="muted">Nenhuma referência de operação cadastrada neste navegador.</p>`}</section>`;
+  } catch (error) {
+    return `<div id="operation-reference-section" class="load-error" role="alert">Não foi possível carregar as referências de operação: ${esc(error.message)}</div>`;
+  }
 }
 
 export function renderResourceTable(records, slug, role = userRole()) {
@@ -379,6 +445,55 @@ export function renderResourceTable(records, slug, role = userRole()) {
   const columns = (preferred.length ? preferred : Object.keys(records[0])).filter((key) => !["senha", "password"].includes(key.toLowerCase())).slice(0, 7);
   const allowDelete = roleCapabilities(role).canDeleteOperational;
   return `<div class="table-scroll"><table class="records-table"><thead><tr>${columns.map((key) => `<th>${esc(labelFor(key))}</th>`).join("")}<th>Ações</th></tr></thead><tbody>${records.map((record) => `<tr>${columns.map((key) => `<td>${statusPill(key, record[key])}</td>`).join("")}<td><div class="row-actions"><button class="small-action" type="button" data-resource-action="view" data-resource="${slug}" data-id="${esc(record.id)}">Ver</button><button class="small-action" type="button" data-resource-action="edit" data-resource="${slug}" data-id="${esc(record.id)}">Editar</button><button class="small-action" type="button" data-resource-action="print" data-resource="${slug}" data-id="${esc(record.id)}">Imprimir</button>${slug === "agendamento" ? `<button class="small-action" type="button" data-status-id="${esc(record.id)}" data-status="${String(record.status).toLowerCase() === "true" || String(record.status).toLowerCase() === "confirmado" ? "pendente" : "confirmado"}">${String(record.status).toLowerCase() === "true" || String(record.status).toLowerCase() === "confirmado" ? "Marcar pendente" : "Confirmar"}</button>` : ""}${allowDelete ? `<button class="small-action danger-action" type="button" data-resource-action="delete" data-resource="${slug}" data-id="${esc(record.id)}" data-label="${esc(record[columns[1]] ?? definition.singular)}">Excluir</button>` : ""}</div></td></tr>`).join("")}</tbody></table></div>`;
+}
+
+function renderServiceSection(records, section) {
+  return renderCrudSection(records, section);
+}
+
+export function renderDatabaseSection(categoryId = "servico") {
+  const category = getDatabaseCategory(categoryId) || databaseCategories[0];
+  const records = readDatabaseEntries(category.id);
+  const displayFields = category.id === "servico"
+    ? [{ name: "codigo", label: "Código" }, ...category.fields, { name: "valorAtualizadoEm", label: "Data e hora do valor", type: "datetime" }]
+    : ["conteiner", "carga", "operacao"].includes(category.id) ? [{ name: "codigo", label: "ID" }, ...category.fields] : category.fields;
+  const categoryOptions = databaseCategories.map((item) => `<option value="${esc(item.id)}" ${item.id === category.id ? "selected" : ""}>${esc(item.label)}</option>`).join("");
+  const rows = records.map((record) => `<tr>${displayFields.map((field) => `<td>${databaseFieldText(field, record[field.name])}</td>`).join("")}<td><div class="row-actions"><button class="small-action" type="button" data-database-action="view" data-category="${category.id}" data-id="${esc(record.id)}">Ver</button><button class="small-action" type="button" data-database-action="edit" data-category="${category.id}" data-id="${esc(record.id)}">Editar</button><button class="small-action danger-action" type="button" data-database-action="delete" data-category="${category.id}" data-id="${esc(record.id)}">Excluir</button></div></td></tr>`).join("");
+  const table = records.length
+    ? `<div class="table-scroll"><table class="records-table"><thead><tr>${displayFields.map((field) => `<th>${esc(field.label)}</th>`).join("")}<th>Ações</th></tr></thead><tbody>${rows}</tbody></table></div>`
+    : `<div class="empty-state"><span>▱</span><strong>Nenhum dado cadastrado nesta categoria</strong><p>Adicione um padrão para preencher automaticamente os formulários dos painéis.</p></div>`;
+  return `<section class="data-panel"><div class="panel-heading"><div><span class="eyebrow">ADMINISTRAÇÃO / REFERÊNCIAS</span><h2>Banco de dados</h2></div><div class="panel-actions"><label class="field-label database-category-label">Categoria<select id="database-category">${categoryOptions}</select></label><button class="button button-primary compact" data-action="new-database-entry" data-category="${category.id}">＋ Novo dado</button></div></div><p class="dash-description">Os dados são salvos neste navegador e usados para sugerir e preencher os formulários da equipe e da administração. Para sincronizar outros dispositivos, é necessário armazenamento no servidor.</p><div id="database-form-slot"></div><h3 class="database-category-title">${esc(category.label)} <span class="count-pill">${records.length}</span></h3>${table}</section>`;
+}
+
+function databaseFieldText(field, value) {
+  if (field.type === "datetime") return formatAuditDate(value);
+  if (field.type === "textarea") return valueText(value).replaceAll("\n", "<br>");
+  if (field.type === "number" && value !== "" && value != null && Number.isFinite(Number(value))) {
+    const formatted = Number(value).toLocaleString("pt-BR", {
+      minimumFractionDigits: ["valor", "valorEstimado"].includes(field.name) ? 2 : 0,
+      maximumFractionDigits: 2,
+    });
+    return esc(formatted);
+  }
+  return valueText(value);
+}
+
+function renderDatabaseEntryForm(categoryId, record = null) {
+  const category = getDatabaseCategory(categoryId);
+  if (!category) throw new Error("Categoria do Banco de dados inválida.");
+  const controls = category.fields.map((field) => {
+    const id = `database-field-${field.name}`;
+    const value = record?.[field.name] ?? "";
+    if (field.type === "select") {
+      return `<label class="field-label" for="${id}">${esc(field.label)}<select id="${id}" name="${field.name}">${field.options.map((option) => `<option value="${esc(option)}" ${String(value) === option ? "selected" : ""}>${esc(option)}</option>`).join("")}</select></label>`;
+    }
+    if (field.type === "textarea") return `<label class="field-label" for="${id}">${esc(field.label)}<textarea id="${id}" name="${field.name}" rows="3">${esc(value)}</textarea></label>`;
+    return `<label class="field-label" for="${id}">${esc(field.label)}<input id="${id}" name="${field.name}" type="${field.type || "text"}" ${field.type === "number" ? 'min="0" step="any"' : ""} value="${esc(value)}" ${field.required ? "required" : ""}></label>`;
+  }).join("");
+  const codeInfo = categoryId === "servico"
+    ? `<p class="muted small">${record ? `Código: ${esc(record.codigo)}. ` : "O código único será gerado ao salvar. "}A data e hora do valor são registradas automaticamente quando a tarifa é alterada.</p>`
+    : ["conteiner", "carga", "operacao"].includes(categoryId) ? `<p class="muted small">${record ? `ID: ${esc(record.codigo)}` : "O ID único será gerado ao salvar."}${categoryId === "carga" ? " Informe os IDs dos contêineres separados por vírgula; consulte-os na categoria Contêiner." : ""}${categoryId === "operacao" ? " Consulte os IDs nas categorias Carga e Contêiner. Os vínculos são sugestões; confirme a compatibilidade e as pranchas oficiais." : ""}</p>` : "";
+  return `<form class="inline-form" data-form="database-entry" data-database-category="${category.id}" ${record ? `data-database-id="${esc(record.id)}"` : ""}><div class="inline-form-title"><div><span class="eyebrow">${record ? "EDIÇÃO" : "NOVO DADO"}</span><h3>${record ? "Editar" : "Cadastrar"} referência de ${esc(category.label.toLowerCase())}</h3></div><button type="button" class="icon-button" aria-label="Fechar" data-close-form>×</button></div>${codeInfo}<div class="inline-form-grid">${controls}</div><p class="form-feedback" role="alert"></p><div class="form-actions"><button class="button button-primary compact">Salvar dados</button><button type="button" class="button button-outline compact" data-close-form>Cancelar</button></div></form>`;
 }
 
 function renderReadOnlySection(records, title) {
@@ -438,7 +553,7 @@ async function openSessionAudit(sessionId, opener) {
   opener?.focus?.();
 }
 
-function resourceFieldMarkup(fieldDefinition, record, editing) {
+function resourceFieldMarkup(fieldDefinition, record, editing, lookupField = "") {
   const aliases = fieldDefinition.name === "cpf"
     ? ["cpf", "cpfcnpj", "cpfCnpj", "CPFCNPJ", "cpfcNPJ"]
     : fieldDefinition.name === "confirmado" ? ["confirmado", "status"] : [fieldDefinition.name];
@@ -461,7 +576,8 @@ function resourceFieldMarkup(fieldDefinition, record, editing) {
     return `<label class="field-label" for="${id}">${esc(fieldDefinition.label)}<select id="${id}" name="${fieldDefinition.name}" ${required}><option value="">Selecione uma conta</option>${(record?.appointmentAccounts || []).map((account) => `<option value="${esc(account.id)}" ${String(selectedId) === String(account.id) ? "selected" : ""}>${esc(account.nome)} · ${esc(account.email)}</option>`).join("")}</select></label>`;
   }
   if (fieldDefinition.type === "textarea") return `<label class="field-label" for="${id}">${esc(fieldDefinition.label)}<textarea id="${id}" name="${fieldDefinition.name}" rows="3" ${required}>${esc(value)}</textarea></label>`;
-  const input = `<input id="${id}" name="${fieldDefinition.name}" type="${fieldDefinition.type || "text"}" value="${fieldDefinition.type === "password" ? "" : esc(value)}" ${required}>`;
+  const suggestions = fieldDefinition.name === lookupField ? `data-catalog-lookup list="catalog-suggestions-${record?.catalogEntity || ""}"` : "";
+  const input = `<input id="${id}" name="${fieldDefinition.name}" type="${fieldDefinition.type || "text"}" value="${fieldDefinition.type === "password" ? "" : esc(value)}" ${suggestions} ${required}>`;
   const control = fieldDefinition.type === "password"
     ? `<span class="password-field">${input}<button type="button" class="password-toggle" data-toggle-password="${id}" aria-label="Mostrar ${esc(fieldDefinition.label).toLowerCase()}" aria-pressed="false">Mostrar</button></span>`
     : input;
@@ -473,7 +589,13 @@ export function renderResourceFormMarkup(slug, record = null, appointmentAccount
   const editing = Boolean(record);
   const fields = editing && definition.updateFields ? definition.fields.filter((item) => definition.updateFields.includes(item.name)) : definition.fields;
   const formRecord = slug === "agendamento" ? { ...record, appointmentAccounts } : record;
-  return `<form class="inline-form" data-form="resource" data-resource="${slug}" ${editing ? `data-resource-id="${esc(record.id)}"` : ""}><div class="inline-form-title"><div><span class="eyebrow">${editing ? "ATUALIZAÇÃO" : "NOVO REGISTRO"}</span><h3>${editing ? `Editar ${esc(definition.singular)}` : `Novo ${esc(definition.singular)}`}</h3></div><button type="button" class="icon-button" aria-label="Fechar formulário" data-close-form>×</button></div><div class="inline-form-grid">${fields.map((item) => resourceFieldMarkup(item, formRecord, editing)).join("")}</div><p class="form-feedback" role="alert"></p><div class="form-actions"><button class="button button-primary compact">${editing ? "Salvar alterações" : "Criar registro"} <span>↗</span></button><button type="button" class="button button-outline compact" data-close-form>Cancelar</button></div></form>`;
+  const lookupField = slug === "operacao" ? "andamento" : getDatabaseCategory(slug)?.lookupField || "";
+  const resourceFormRecord = { ...formRecord, catalogEntity: slug };
+  const codeField = slug === "servico" ? `<label class="field-label">Código da referência<input name="codigoReferencia" list="service-code-suggestions" autocomplete="off" placeholder="Ex.: SRV-000001"></label><datalist id="service-code-suggestions"></datalist><div class="service-reference-details" aria-live="polite"></div>` : "";
+  const containerCode = slug === "conteiner" ? `<label class="field-label">ID do tipo de contêiner<input name="codigoReferencia" list="container-code-suggestions" autocomplete="off" placeholder="Ex.: CTR-000001"></label><datalist id="container-code-suggestions"></datalist>` : "";
+  const containerDetails = slug === "conteiner" ? `<div data-container-reference aria-live="polite"></div>` : "";
+  const operationReference = slug === "operacao" ? `<label class="field-label">Buscar por ID da operação, carga ou contêiner<input name="codigoOperacao" list="operation-code-suggestions" autocomplete="off" placeholder="Ex.: OPR-000001, CRG-000001 ou CTR-000001"></label><datalist id="operation-code-suggestions"></datalist><div data-operation-reference aria-live="polite"></div>` : "";
+  return `<form class="inline-form" data-form="resource" data-resource="${slug}" ${lookupField ? `data-catalog-entity="${slug}" data-catalog-lookup="${lookupField}"` : ""} ${editing ? `data-resource-id="${esc(record.id)}"` : ""}><div class="inline-form-title"><div><span class="eyebrow">${editing ? "ATUALIZAÇÃO" : "NOVO REGISTRO"}</span><h3>${editing ? `Editar ${esc(definition.singular)}` : `Novo ${esc(definition.singular)}`}</h3></div><button type="button" class="icon-button" aria-label="Fechar formulário" data-close-form>×</button></div>${codeField}${containerCode}${operationReference}<div class="inline-form-grid">${fields.map((item) => resourceFieldMarkup(item, resourceFormRecord, editing, lookupField)).join("")}</div>${lookupField ? `<datalist id="catalog-suggestions-${slug}"></datalist><p class="muted small">Digite um tipo cadastrado no Banco de dados para preencher os demais campos automaticamente.</p>` : ""}${containerDetails}<p class="form-feedback" role="alert"></p><div class="form-actions"><button class="button button-primary compact">${editing ? "Salvar alterações" : "Criar registro"} <span>↗</span></button><button type="button" class="button button-outline compact" data-close-form>Cancelar</button></div></form>`;
 }
 
 export function renderAppointmentAccountsEmpty() {
@@ -485,6 +607,21 @@ async function openResourceForm(slug, record = null) {
   if (!slot) return;
   if (slug !== "agendamento") {
     slot.innerHTML = renderResourceFormMarkup(slug, record);
+    if (slug === "servico") populateServiceCodeSuggestions(slot.querySelector("form"));
+    if (slug === "conteiner") {
+      try {
+        updateContainerReference(slot.querySelector("form"));
+      } catch (error) {
+        setFeedback(slot.querySelector("form"), error.message);
+      }
+      if (slug === "operacao") {
+        try {
+          updateOperationReference(slot.querySelector("form"));
+        } catch (error) {
+          setFeedback(slot.querySelector("form"), error.message);
+        }
+      }
+    }
     slot.querySelector("input, select, textarea")?.focus();
     return;
   }
@@ -510,7 +647,7 @@ function renderTable(records, columns, title) {
   return `<div class="table-scroll"><table class="records-table"><thead><tr>${keys.map((key) => `<th>${esc(labelFor(key))}</th>`).join("")}${title === "Agendamento" || title === "Solicitação" ? "<th>Ação</th>" : ""}</tr></thead><tbody>${records.map((item) => `<tr>${keys.map((key) => `<td>${statusPill(key, item[key])}</td>`).join("")}${title === "Agendamento" || title === "Solicitação" ? `<td>${item.id ? `<button class="small-action" data-status-id="${esc(item.id)}" data-status="${String(item.status).toLowerCase() === "true" || String(item.status).toLowerCase() === "confirmado" ? "pendente" : "confirmado"}">${String(item.status).toLowerCase() === "true" || String(item.status).toLowerCase() === "confirmado" ? "Marcar pendente" : "Confirmar"}</button>` : "—"}</td>` : ""}</tr>`).join("")}</tbody></table></div>`;
 }
 
-function labelFor(key) { return ({ id: "Código", actorName: "Profissional", actorRole: "Perfil", startedAt: "Início", lastActivityAt: "Última atividade", loggedOutAt: "Encerramento", durationSeconds: "Duração (segundos)", cpf: "CPF / CNPJ", cpfcnpj: "CPF / CNPJ", cpfCnpj: "CPF / CNPJ", CPFCNPJ: "CPF / CNPJ", numeroConteiner: "Número do contêiner", tipoCarga: "Tipo de carga", dataHora: "Data e horário", criadoEm: "Recebida em", valorEstimado: "Valor estimado" })[key] || key.replace(/([A-Z])/g, " $1").replace(/^./, (char) => char.toUpperCase()); }
+function labelFor(key) { return ({ id: "Código", actorName: "Profissional", actorRole: "Perfil", startedAt: "Início", lastActivityAt: "Última atividade", loggedOutAt: "Encerramento", durationSeconds: "Duração (segundos)", cpf: "CPF / CNPJ", cpfcnpj: "CPF / CNPJ", cpfCnpj: "CPF / CNPJ", CPFCNPJ: "CPF / CNPJ", numeroConteiner: "Número do contêiner", tipoCarga: "Tipo de carga", dataHora: "Data e horário", criadoEm: "Data e hora do cadastro", valorEstimado: "Valor estimado" })[key] || key.replace(/([A-Z])/g, " $1").replace(/^./, (char) => char.toUpperCase()); }
 
 function statusPill(key, value) {
   const rendered = valueText(value);
@@ -525,12 +662,76 @@ export function renderMessages(records) {
 }
 
 function renderAppointments(records, slug) {
+  if (slug === "solicitacao") return renderSolicitacoes(records);
   if (!records.length) return `<div class="data-panel"><div class="panel-heading"><div><span class="eyebrow">GESTÃO</span><h2>${slug === "agendamento" ? "Visitas técnicas" : "Solicitações"} <span class="count-pill">0</span></h2></div><button class="button button-outline compact" data-reload>↻ Atualizar</button></div>${renderTable([], sections.find((item) => item.slug === slug).columns, slug)}</div>`;
   return `<div class="data-panel"><div class="panel-heading"><div><span class="eyebrow">GESTÃO</span><h2>${slug === "agendamento" ? "Visitas técnicas" : "Solicitações"} <span class="count-pill">${records.length}</span></h2></div><button class="button button-outline compact" data-reload>↻ Atualizar</button></div>${renderTable(records, sections.find((item) => item.slug === slug).columns, slug === "agendamento" ? "Agendamento" : "Solicitação")}</div>`;
 }
 
-function renderBudgets(records) {
-  return `<div class="data-panel"><div class="panel-heading"><div><span class="eyebrow">COMERCIAL</span><h2>Orçamentos <span class="count-pill">${records.length}</span></h2></div><div class="panel-actions"><button class="button button-outline compact" data-reload>↻ Atualizar</button><button class="button button-primary compact" data-action="new-budget">＋ Novo orçamento</button></div></div><div id="budget-form-slot"></div>${renderTable(records, sections.find((item) => item.slug === "orcamento").columns, "Orçamento")}</div>`;
+export function renderSolicitacoes(records) {
+  const solicitationStates = readSolicitationStates();
+  const grouped = new Map();
+  for (const record of records) {
+    const service = record.servico && typeof record.servico === "object" ? record.servico : null;
+    const serviceName = service?.nome || record.servico || "Serviço não informado";
+    const tariff = localizarTarifaServico(serviceName);
+    const category = service?.categoria || record.categoria || tariff?.categoria || "Sem categoria";
+    const defaults = findDatabaseEntry("solicitacao", "servico", serviceName) || {};
+    const state = solicitationStates[record.id] || {};
+    if (!grouped.has(category)) grouped.set(category, []);
+    grouped.get(category).push({
+      ...record,
+      _serviceName: serviceName,
+      _solicitado: state.solicitado || defaults.solicitado || "Sim",
+      _prestado: state.prestado || defaults.prestado || "Não",
+    });
+  }
+  const groups = [...grouped.entries()].sort(([a], [b]) => a.localeCompare(b, "pt-BR"));
+  const categoriesMarkup = groups.map(([category, items]) => {
+    const rows = items.map((record) => {
+      const currentStatus = String(record.status).toLowerCase();
+      const confirmed = currentStatus === "true" || currentStatus === "confirmado";
+      const options = (selected) => ["Sim", "Não"].map((value) => `<option value="${value}" ${selected === value ? "selected" : ""}>${value}</option>`).join("");
+      return `<tr><td>${valueText(record.id)}</td><td>${valueText(record.cliente?.nome || record.cliente)}</td><td>${valueText(record.carga?.descricao || record.carga)}</td><td>${valueText(record._serviceName)}</td><td><label class="sr-only" for="solicitado-${esc(record.id)}">Serviço solicitado para solicitação ${esc(record.id)}</label><select class="solicitation-flag" id="solicitado-${esc(record.id)}" data-solicitation-field="solicitado" data-id="${esc(record.id)}">${options(record._solicitado)}</select></td><td><label class="sr-only" for="prestado-${esc(record.id)}">Serviço prestado para solicitação ${esc(record.id)}</label><select class="solicitation-flag" id="prestado-${esc(record.id)}" data-solicitation-field="prestado" data-id="${esc(record.id)}">${options(record._prestado)}</select></td><td>${statusPill("status", record.status)}</td><td><div class="row-actions"><button class="small-action" data-solicitation-action="view" data-id="${esc(record.id)}">Ver</button>${record.id ? `<button class="small-action" data-status-id="${esc(record.id)}" data-status="${confirmed ? "pendente" : "confirmado"}">${confirmed ? "Marcar pendente" : "Confirmar"}</button>` : "—"}</div></td></tr>`;
+    }).join("");
+    return `<section class="service-catalog-category solicitation-category"><div class="solicitation-category-heading"><h3>${esc(category)}</h3><span class="count-pill">${items.length}</span></div><div class="table-scroll"><table class="records-table"><thead><tr><th>Código</th><th>Cliente</th><th>Carga</th><th>Serviço</th><th>Solicitado?</th><th>Prestado?</th><th>Status</th><th>Ações</th></tr></thead><tbody>${rows}</tbody></table></div></section>`;
+  }).join("");
+  const content = records.length
+    ? categoriesMarkup
+    : `<div class="empty-state"><span>▱</span><strong>Nenhuma solicitação recebida</strong><p>As solicitações serão organizadas aqui conforme a categoria do serviço prestado.</p></div>`;
+  return `<section class="data-panel"><div class="panel-heading"><div><span class="eyebrow">GESTÃO / SERVIÇOS</span><h2>Solicitações <span class="count-pill">${records.length}</span></h2><p class="dash-description">Solicitações agrupadas pela categoria do serviço prestado.</p></div><button class="button button-outline compact" data-reload>↻ Atualizar</button></div>${content}</section>`;
+}
+
+export function renderBudgets(records) {
+  const metadata = readBudgetMetadata();
+  const rows = records.map((record) => {
+    const saved = withBudgetMetadata(record, metadata);
+    return `<tr><td>${valueText(record.id)}</td><td>${valueText(record.cliente?.nome || record.cliente)}</td><td>${valueText(record.carga?.descricao || record.carga)}</td><td>${valueText(record.servico?.nome || record.servico)}</td><td>${valueText(budgetReferenceValue(saved))}</td><td>${statusPill("status", record.status)}</td><td>${formatAuditDate(saved.criadoEm || saved.createdAt || saved.dataHora)}</td><td><div class="row-actions"><button class="small-action" type="button" data-budget-action="view" data-id="${esc(record.id)}">Ver</button><button class="small-action" type="button" data-budget-action="edit" data-id="${esc(record.id)}">Editar</button><button class="small-action" type="button" data-budget-action="print" data-id="${esc(record.id)}">Imprimir</button></div></td></tr>`;
+  }).join("");
+  const table = records.length
+    ? `<div class="table-scroll"><table class="records-table"><thead><tr><th>Código</th><th>Cliente</th><th>Carga</th><th>Serviço</th><th>Valor estimado</th><th>Status</th><th>Data e hora</th><th>Ações</th></tr></thead><tbody>${rows}</tbody></table></div>`
+    : `<div class="empty-state"><span>▱</span><strong>Nenhum orçamento cadastrado</strong><p>Os orçamentos criados aparecerão aqui com seus dados e data de cadastro.</p></div>`;
+  return `<div class="data-panel"><div class="panel-heading"><div><span class="eyebrow">COMERCIAL</span><h2>Orçamentos <span class="count-pill">${records.length}</span></h2></div><div class="panel-actions"><button class="button button-outline compact" data-reload>↻ Atualizar</button><button class="button button-primary compact" data-action="new-budget">＋ Novo orçamento</button></div></div><div id="budget-form-slot"></div>${table}</div>`;
+}
+
+function withBudgetMetadata(record, metadata = readBudgetMetadata()) {
+  const saved = metadata[record.id] || {};
+  return {
+    ...record,
+    valorEstimado: record.valorEstimado ?? saved.valorEstimado,
+    criadoEm: record.criadoEm || record.createdAt || record.dataHora || saved.criadoEm,
+  };
+}
+
+function budgetReferenceValue(record) {
+  if (record.valorEstimado != null) {
+    const value = Number(record.valorEstimado);
+    return Number.isFinite(value)
+      ? value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
+      : valueText(record.valorEstimado);
+  }
+  const serviceName = record.servico?.nome || record.servico;
+  const defaults = databaseBudgetDefaults(serviceName);
+  return defaults.valor != null ? formatarTarifaServico({ valor: defaults.valor }) : "—";
 }
 
 function modal(title, contents) {
@@ -590,6 +791,19 @@ function recordDetailsMarkup(record) {
   return `<dl class="record-details">${Object.entries(record).filter(([key]) => !isSensitiveField(key)).map(([key, value]) => `<div><dt>${esc(labelFor(key))}</dt><dd>${valueText(value)}</dd></div>`).join("")}</dl>`;
 }
 
+export function serviceReferenceMarkup(record) {
+  const rows = [
+    ["Código", valueText(record.codigo)],
+    ["Produto / serviço", valueText(record.nome)],
+    ["Categoria", valueText(record.categoria)],
+    ["Descrição", valueText(record.descricao)],
+    ["Tarifa", record.valor === "" || record.valor == null ? "A consultar" : esc(formatarTarifaServico({ valor: Number(record.valor) }))],
+    ["Unidade de cobrança", valueText(record.unidade)],
+    ["Data e hora do valor", formatAuditDate(record.valorAtualizadoEm)],
+  ];
+  return `<details class="service-reference-details"><summary>Descrição e dados da referência ${esc(record.codigo)}</summary><dl class="record-details">${rows.map(([label, value]) => `<div><dt>${esc(label)}</dt><dd>${value}</dd></div>`).join("")}</dl></details>`;
+}
+
 function printRecord(record, title) {
   const popup = window.open("", "_blank", "width=800,height=700");
   if (!popup) return false;
@@ -632,6 +846,244 @@ async function handleResourceAction(action, slug, id, label = "") {
   } catch (error) { showSectionError(error.message); }
 }
 
+async function handleBudgetAction(action, id) {
+  const savedRecord = (cachedRecords.get("orcamento") || []).find((item) => String(item.id) === String(id));
+  if (!savedRecord) {
+    showSectionError("Atualize a lista antes de abrir este orçamento.");
+    return;
+  }
+  const record = withBudgetMetadata(savedRecord);
+  if (action === "print") {
+    if (!printRecord({ ...record, valorEstimado: budgetReferenceValue(record) }, `Orçamento ${record.id}`)) showSectionError("Permita a abertura da janela de impressão para continuar.");
+    return;
+  }
+  if (action === "edit") {
+    const statuses = ["PENDENTE", "EM_ANALISE", "APROVADO", "RECUSADO"];
+    const status = String(record.status || "PENDENTE").toUpperCase();
+    const statusOptions = [...new Set([...statuses, status])].map((value) => `<option value="${esc(value)}" ${value === status ? "selected" : ""}>${esc(value.replaceAll("_", " "))}</option>`).join("");
+    modal(`Editar orçamento ${record.id}`, `<form class="form-grid" data-form="budget-edit" data-budget-id="${esc(record.id)}"><label class="field-label">Status<select name="status" required>${statusOptions}</select></label><label class="field-label">Valor estimado (R$)<input name="valorEstimado" type="number" min="0" step="0.01" value="${esc(record.valorEstimado ?? "")}"></label><label class="field-label">Observações<textarea name="observacoes" rows="4">${esc(record.observacoes || "")}</textarea></label><p class="form-feedback" role="alert"></p><div class="form-actions"><button class="button button-primary compact">Salvar alterações</button></div></form>`);
+    return;
+  }
+  modal(`Orçamento · ${record.id}`, `<div class="detail-modal-content">${recordDetailsMarkup({ ...record, valorEstimado: budgetReferenceValue(record) })}<div class="form-actions"><button class="button button-outline compact" type="button" data-budget-action="print" data-id="${esc(record.id)}">Imprimir ficha</button><button class="button button-primary compact" type="button" data-budget-action="edit" data-id="${esc(record.id)}">Editar</button></div></div>`);
+}
+
+function openDatabaseForm(categoryId, id = "") {
+  if (!isAdmin()) return;
+  const slot = document.querySelector("#database-form-slot");
+  if (!slot) return;
+  try {
+    const record = id ? readDatabaseEntries(categoryId).find((entry) => String(entry.id) === String(id)) : null;
+    if (id && !record) throw new Error("O registro não foi encontrado. Atualize o Banco de dados e tente novamente.");
+    slot.innerHTML = renderDatabaseEntryForm(categoryId, record);
+    slot.querySelector("input, select, textarea")?.focus();
+  } catch (error) {
+    slot.innerHTML = `<p class="inline-error" role="alert">${esc(error.message)}</p>`;
+  }
+}
+
+function handleDatabaseAction(action, categoryId, id) {
+  if (!isAdmin()) return;
+  try {
+    const record = readDatabaseEntries(categoryId).find((entry) => String(entry.id) === String(id));
+    if (!record) throw new Error("O registro não foi encontrado. Atualize o Banco de dados e tente novamente.");
+    if (action === "edit") {
+      openDatabaseForm(categoryId, id);
+    } else if (action === "view") {
+      const details = categoryId === "servico" ? serviceReferenceMarkup(record).replace("<details ", "<details open ") : recordDetailsMarkup(record);
+      modal(`${getDatabaseCategory(categoryId).label} · ${record[getDatabaseCategory(categoryId).lookupField]}`, `<div class="detail-modal-content">${details}<div class="form-actions"><button class="button button-primary compact" data-database-action="edit" data-category="${categoryId}" data-id="${esc(id)}">Editar</button></div></div>`);
+    } else if (action === "delete") {
+      if (!isAdmin()) return;
+      if (!window.confirm("Excluir este dado de referência? Os registros existentes não serão alterados.")) return;
+      deleteDatabaseEntry(categoryId, id);
+      void reloadCurrentSection("Dado de referência excluído.");
+    }
+  } catch (error) {
+    showSectionError(error.message);
+  }
+}
+
+function handleSolicitationAction(action, id) {
+  if (action !== "view") return;
+  const record = (cachedRecords.get("solicitacao") || []).find((item) => String(item.id) === String(id));
+  if (!record) {
+    showSectionError("Atualize a lista antes de abrir esta solicitação.");
+    return;
+  }
+  try {
+    const serviceName = record.servico?.nome || record.servico || "Serviço não informado";
+    const states = readSolicitationStates();
+    const defaults = findDatabaseEntry("solicitacao", "servico", serviceName) || {};
+    const state = states[id] || {};
+    const details = {
+      ...record,
+      servicoSolicitado: state.solicitado || defaults.solicitado || "Sim",
+      servicoPrestado: state.prestado || defaults.prestado || "Não",
+    };
+    modal(`Solicitação · ${record.id}`, `<div class="detail-modal-content">${recordDetailsMarkup(details)}</div>`);
+  } catch (error) {
+    showSectionError(error.message);
+  }
+}
+
+async function handleChargeAction(action, id) {
+  const record = (cachedRecords.get("carga") || []).find((item) => String(item.id) === String(id));
+  if (!record) {
+    showSectionError("Atualize a lista antes de abrir esta carga.");
+    return;
+  }
+  if (action === "edit") {
+    showChargeForm(record);
+  } else if (action === "print") {
+    if (!printRecord(record, `Carga ${record.id}`)) showSectionError("Permita a abertura da janela de impressão para continuar.");
+  } else if (action === "delete") {
+    if (!canDeleteOperational()) return;
+    if (!window.confirm(`Excluir a carga ${record.id}? Esta ação não pode ser desfeita.`)) return;
+    try {
+      await del(`/cargas/${encodeURIComponent(id)}`);
+      await reloadCurrentSection("Carga excluída com sucesso.");
+    } catch (error) {
+      showSectionError(error.message);
+    }
+  } else {
+    modal(`Carga · ${record.id}`, `<div class="detail-modal-content">${recordDetailsMarkup(record)}<div class="form-actions"><button class="button button-outline compact" data-charge-action="print" data-id="${esc(record.id)}">Imprimir ficha</button><button class="button button-primary compact" data-charge-action="edit" data-id="${esc(record.id)}">Editar</button></div></div>`);
+  }
+}
+
+function applyDatabaseTemplate(form, fieldName, lookupValue = null) {
+  const categoryId = form.dataset.catalogEntity;
+  const category = getDatabaseCategory(categoryId);
+  if (!category) return;
+  const lookupField = form.dataset.catalogLookup || category.lookupField;
+  if (fieldName !== lookupField) return;
+  const lookupInput = form.elements.namedItem(fieldName);
+  const feedback = form.querySelector(".form-feedback");
+  try {
+    const entries = readDatabaseEntries(categoryId);
+    const datalist = form.querySelector(`#catalog-suggestions-${categoryId}`);
+    if (datalist) datalist.innerHTML = [...new Set(entries.map((entry) => entry[lookupField]).filter(Boolean))]
+      .map((value) => `<option value="${esc(value)}"></option>`).join("");
+    const selected = findDatabaseEntry(categoryId, lookupField, lookupValue ?? lookupInput?.value);
+    if (!selected) {
+      for (const field of category.fields) {
+        if (field.name === lookupField) continue;
+        const input = form.elements.namedItem(field.name);
+        if (input?.dataset.catalogAutofilledValue != null) {
+          if (input.value === input.dataset.catalogAutofilledValue) input.value = "";
+          delete input.dataset.catalogAutofilledValue;
+        }
+      }
+      return;
+    }
+    for (const field of category.fields) {
+      if (field.name === lookupField) continue;
+      const input = form.elements.namedItem(field.name);
+      const value = selected[field.name];
+      if (!input) continue;
+      if (value == null || value === "") {
+        if (input.dataset.catalogAutofilledValue != null && input.value === input.dataset.catalogAutofilledValue) input.value = "";
+        delete input.dataset.catalogAutofilledValue;
+        continue;
+      }
+      input.value = String(value);
+      input.dataset.catalogAutofilledValue = String(value);
+    }
+    if (feedback) feedback.textContent = "";
+  } catch (error) {
+    if (feedback) feedback.textContent = error.message;
+  }
+}
+
+function populateServiceCodeSuggestions(form) {
+  try {
+    const entries = readDatabaseEntries("servico");
+    form.querySelector("#service-code-suggestions").innerHTML = entries.map((entry) => `<option value="${esc(entry.codigo)}">${esc(entry.nome)}</option>`).join("");
+  } catch (error) {
+    setFeedback(form, error.message);
+  }
+}
+
+export function applyServiceCode(form) {
+  const details = form.querySelector(".service-reference-details");
+  const name = form.elements.namedItem("nome");
+  const code = form.elements.namedItem("codigoReferencia").value;
+  const entry = findDatabaseEntry("servico", "codigo", code);
+  if (!entry) {
+    if (name.dataset.catalogAutofilledValue != null && name.value === name.dataset.catalogAutofilledValue) name.value = "";
+    delete name.dataset.catalogAutofilledValue;
+    applyDatabaseTemplate(form, "nome", "");
+    details.innerHTML = code.trim() ? `<p class="muted small">Código não encontrado no Banco de dados deste navegador.</p>` : "";
+    return;
+  }
+  name.value = entry.nome;
+  name.dataset.catalogAutofilledValue = entry.nome;
+  applyDatabaseTemplate(form, "nome", entry.nome);
+  details.innerHTML = serviceReferenceMarkup(entry);
+}
+
+export function updateContainerReference(form, byCode = false) {
+  const entries = readDatabaseEntries("conteiner");
+  const codeInput = form.elements.namedItem("codigoReferencia");
+  const typeInput = form.elements.namedItem("tipo");
+  const details = form.querySelector("[data-container-reference]");
+  form.querySelector("#container-code-suggestions").innerHTML = entries.map((entry) => `<option value="${esc(entry.codigo)}">${esc(entry.tipo)}</option>`).join("");
+  form.querySelector("#catalog-suggestions-conteiner").innerHTML = entries.map((entry) => `<option value="${esc(entry.tipo)}"></option>`).join("");
+  const entry = findDatabaseEntry("conteiner", byCode ? "codigo" : "tipo", byCode ? codeInput.value : typeInput.value);
+  if (byCode) {
+    if (entry) {
+      typeInput.value = entry.tipo;
+      typeInput.dataset.catalogAutofilledValue = entry.tipo;
+      applyDatabaseTemplate(form, "tipo", entry.tipo);
+    } else {
+      if (typeInput.dataset.catalogAutofilledValue != null && typeInput.value === typeInput.dataset.catalogAutofilledValue) typeInput.value = "";
+      delete typeInput.dataset.catalogAutofilledValue;
+      applyDatabaseTemplate(form, "tipo", "");
+    }
+  } else {
+    codeInput.value = entry?.codigo || "";
+    delete typeInput.dataset.catalogAutofilledValue;
+  }
+  if (!entry) {
+    details.innerHTML = byCode && codeInput.value.trim() ? `<p class="muted small">ID não encontrado no Banco de dados deste navegador.</p>` : "";
+    return;
+  }
+  const fields = [{ name: "codigo", label: "ID" }, ...getDatabaseCategory("conteiner").fields];
+  details.innerHTML = `<details open><summary>Dados de referência do contêiner</summary><dl class="record-details">${fields.map((field) => `<div><dt>${esc(field.label)}</dt><dd>${valueText(entry[field.name])}</dd></div>`).join("")}</dl></details>`;
+}
+
+export function updateOperationReference(form) {
+  const entries = readDatabaseEntries("operacao");
+  const input = form.elements.namedItem("codigoOperacao");
+  const details = form.querySelector("[data-operation-reference]");
+  const cargos = readDatabaseEntries("carga");
+  const containers = readDatabaseEntries("conteiner");
+  form.querySelector("#operation-code-suggestions").innerHTML = [
+    ...entries.map((entry) => `<option value="${esc(entry.codigo)}">${esc(entry.categoria)}</option>`),
+    ...cargos.map((entry) => `<option value="${esc(entry.codigo)}">${esc(entry.tipoCarga)}</option>`),
+    ...containers.map((entry) => `<option value="${esc(entry.codigo)}">${esc(entry.tipo)}</option>`),
+  ].join("");
+  const entry = findDatabaseEntry("operacao", "codigo", input.value);
+  for (const name of ["andamento", "responsavel", "observacoes"]) {
+    const field = form.elements.namedItem(name);
+    if (field.dataset.operationAutofilledValue != null && field.value === field.dataset.operationAutofilledValue) field.value = "";
+    delete field.dataset.operationAutofilledValue;
+    if (entry?.[name] && !field.value) {
+      field.value = String(entry[name]);
+      field.dataset.operationAutofilledValue = field.value;
+    }
+  }
+  if (!entry) {
+    const search = input.value.trim().toUpperCase();
+    const linked = [...cargos, ...containers].find((item) => item.codigo.toUpperCase() === search);
+    const matches = linked ? entries.filter((item) => ["cargas", "conteineres"].some((key) => String(item[key] || "").split(",").some((code) => code.trim().toUpperCase() === search))) : [];
+    details.innerHTML = !search ? "" : linked
+      ? `<p class="muted small">Operações vinculadas a ${esc(search)}:</p>${matches.length ? matches.map((item) => `<button type="button" class="small-action" data-select-operation="${esc(item.codigo)}">${esc(item.codigo)} · ${esc(item.categoria)}</button>`).join(" ") : `<p class="muted small">Nenhuma operação vinculada a este ID.</p>`}`
+      : `<p class="muted small">ID não encontrado no Banco de dados deste navegador.</p>`;
+    return;
+  }
+  const fields = [{ name: "codigo", label: "ID" }, ...getDatabaseCategory("operacao").fields];
+  details.innerHTML = `<details open><summary>Dados de referência da operação</summary><dl class="record-details">${fields.map((field) => `<div><dt>${esc(field.label)}</dt><dd>${valueText(entry[field.name]).replaceAll("\n", "<br>")}</dd></div>`).join("")}</dl><p class="muted small">Confirme os valores exatos por berço na tabela oficial de Pranchas Mínimas Operacionais.</p></details>`;
+}
+
 function showSectionError(message) {
   const host = document.querySelector("#section-content");
   if (host) host.insertAdjacentHTML("afterbegin", `<p class="inline-error" role="alert">${esc(message)}</p>`);
@@ -660,6 +1112,18 @@ async function saveResource(form) {
   const slug = form.dataset.resource;
   const definition = resourceDefinitions[slug];
   const id = form.dataset.resourceId;
+  if (slug === "servico" && form.elements.namedItem("codigoReferencia").value.trim()
+    && !findDatabaseEntry("servico", "codigo", form.elements.namedItem("codigoReferencia").value)) {
+    throw new Error("Código de referência não encontrado. Corrija ou limpe o código para continuar.");
+  }
+  if (slug === "conteiner" && form.elements.namedItem("codigoReferencia").value.trim()
+    && !findDatabaseEntry("conteiner", "codigo", form.elements.namedItem("codigoReferencia").value)) {
+    throw new Error("ID de contêiner não encontrado. Corrija ou limpe o ID para continuar.");
+  }
+  if (slug === "operacao" && form.elements.namedItem("codigoOperacao").value.trim()
+    && !findDatabaseEntry("operacao", "codigo", form.elements.namedItem("codigoOperacao").value)) {
+    throw new Error("Selecione uma operação vinculada, informe um ID de operação válido ou limpe a busca para continuar.");
+  }
   const payload = coerceResourceForm(form, slug);
   const updatingOwnAccount = slug === "usuario" && id && String(id) === String(currentUser?.id);
   if (slug === "agendamento") {
@@ -702,11 +1166,41 @@ function openSchedule() {
   modal("Solicite uma visita técnica", `<p class="modal-lede">Informe seus dados e escolha a melhor data para nossa equipe entrar em contato.</p><form class="form-grid" data-form="schedule">${field("Nome completo", "nome", "text", "name")}${field("Telefone", "telefone", "tel", "tel")}${field("E-mail", "email", "email", "email")}<label class="field-label" for="visit-date">Data e horário desejados<input id="visit-date" name="dataHora" type="datetime-local" min="${new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)}" required></label><label class="field-label hidden" id="visit-cpf-field" for="visit-cpf">CPF<input id="visit-cpf" name="cpf" inputmode="numeric" autocomplete="off"></label><label class="field-label hidden" id="visit-password-field" for="visit-password">Senha do seu cadastro<input id="visit-password" name="senha" type="password" autocomplete="current-password"></label><label class="consent"><input name="confirmacao" type="checkbox" required><span>Confirmo que os dados estão corretos e solicito o agendamento da visita técnica.</span></label><p class="form-feedback" role="alert"></p><button class="button button-primary form-submit">Solicitar visita <span>↗</span></button></form>`);
 }
 
-function showChargeForm() {
+function showChargeForm(record = null) {
   const slot = document.querySelector("#charge-form-slot");
   if (!slot) return;
-  slot.innerHTML = `<form class="inline-form" data-form="charge"><div class="inline-form-title"><h3>Nova carga</h3><button type="button" class="icon-button" aria-label="Fechar cadastro" data-close-form>×</button></div><div class="inline-form-grid">${chargeFields.map(([name, title, type]) => `<label class="field-label">${title}<input name="${name}" type="${type}" ${type === "number" ? 'step="any"' : ""} required></label>`).join("")}</div><p class="form-feedback" role="alert"></p><div class="form-actions"><button class="button button-primary compact">Salvar carga <span>↗</span></button><button class="button button-outline compact" type="button" data-close-form>Cancelar</button></div></form>`;
-  slot.querySelector("input")?.focus();
+  slot.innerHTML = `<form class="inline-form" data-form="charge" data-catalog-entity="carga" data-catalog-lookup="tipoCarga" ${record ? `data-charge-id="${esc(record.id)}"` : ""}><div class="inline-form-title"><h3>${record ? "Editar carga" : "Nova carga"}</h3><button type="button" class="icon-button" aria-label="Fechar cadastro" data-close-form>×</button></div><label class="field-label">Buscar por ID da carga ou do contêiner<input name="buscaReferencia" list="cargo-reference-suggestions" autocomplete="off" placeholder="Ex.: CRG-000001 ou CTR-000001"></label><datalist id="cargo-reference-suggestions"></datalist><div data-cargo-reference aria-live="polite"></div><div class="inline-form-grid">${chargeFields.map(([name, title, type]) => `<label class="field-label">${title}<input name="${name}" type="${type}" value="${esc(record?.[name] ?? "")}" ${name === "tipoCarga" ? 'data-catalog-lookup list="catalog-suggestions-carga"' : ""} ${type === "number" ? 'step="any"' : ""} required></label>`).join("")}</div><datalist id="catalog-suggestions-carga"></datalist><p class="muted small">Selecione uma carga de referência para preencher os campos disponíveis. Peso, volume, origem e destino devem corresponder à carga real.</p><p class="form-feedback" role="alert"></p><div class="form-actions"><button class="button button-primary compact">${record ? "Salvar alterações" : "Salvar carga"} <span>↗</span></button><button class="button button-outline compact" type="button" data-close-form>Cancelar</button></div></form>`;
+  try {
+    updateCargoReference(slot.querySelector("form"));
+  } catch (error) {
+    setFeedback(slot.querySelector("form"), error.message);
+  }
+  slot.querySelector(record ? "[name='tipoCarga']" : "input")?.focus();
+}
+
+export function updateCargoReference(form) {
+  const cargos = readDatabaseEntries("carga");
+  const containers = readDatabaseEntries("conteiner");
+  const search = form.elements.namedItem("buscaReferencia").value.trim().toUpperCase();
+  const result = form.querySelector("[data-cargo-reference]");
+  form.querySelector("#cargo-reference-suggestions").innerHTML = [
+    ...cargos.map((entry) => `<option value="${esc(entry.codigo)}">${esc(entry.tipoCarga)}</option>`),
+    ...containers.map((entry) => `<option value="${esc(entry.codigo)}">${esc(entry.tipo)}</option>`),
+  ].join("");
+  form.querySelector("#catalog-suggestions-carga").innerHTML = cargos.map((entry) => `<option value="${esc(entry.tipoCarga)}"></option>`).join("");
+  if (!search) {
+    result.innerHTML = "";
+    return;
+  }
+  const cargo = cargos.find((entry) => entry.codigo.toUpperCase() === search);
+  const container = containers.find((entry) => entry.codigo.toUpperCase() === search);
+  const matches = cargo ? [cargo] : container ? cargos.filter((entry) => String(entry.conteineres || "").split(",").some((code) => code.trim().toUpperCase() === search)) : [];
+  const heading = cargo ? `Carga ${cargo.codigo}` : container ? `Contêiner ${container.codigo} · ${container.tipo}` : "";
+  const buttons = matches.map((entry) => `<button type="button" class="small-action" data-select-cargo="${esc(entry.codigo)}">${esc(entry.codigo)} · ${esc(entry.tipoCarga)}</button>`).join(" ");
+  const cargoDetails = cargo ? `<dl class="record-details">${getDatabaseCategory("carga").fields.map((field) => `<div><dt>${esc(field.label)}</dt><dd>${valueText(cargo[field.name])}</dd></div>`).join("")}</dl>` : "";
+  result.innerHTML = heading
+    ? `<div class="notice-panel"><div><strong>${esc(heading)}</strong><p>${cargo ? "Dados de referência da carga:" : "Cargas vinculadas a este tipo de contêiner:"}</p>${cargoDetails}${buttons || "Nenhuma carga vinculada."}</div></div>`
+    : `<p class="muted small">ID não encontrado no Banco de dados deste navegador.</p>`;
 }
 
 async function showBudgetForm() {
@@ -716,10 +1210,74 @@ async function showBudgetForm() {
   try {
     const [clients, loads, availableServices] = await Promise.all([get("/clientes"), get("/cargas"), get("/servicos")]);
     const options = (payload, title) => collectionFrom(payload).map((record) => `<option value="${esc(record.id)}">${esc(record.nome || record.descricao || `${title} ${record.id}`)}</option>`).join("");
-    slot.innerHTML = `<form class="inline-form" data-form="budget"><div class="inline-form-title"><h3>Novo orçamento</h3><button type="button" class="icon-button" data-close-form aria-label="Fechar">×</button></div><p class="muted small">O servidor cria orçamentos a partir de um cliente, uma carga e um serviço cadastrados.</p><div class="inline-form-grid">${selectField("Cliente", "clienteId", options(clients, "Cliente"))}${selectField("Carga", "cargaId", options(loads, "Carga"))}${selectField("Serviço", "servicoId", options(availableServices, "Serviço"))}</div><p class="form-feedback" role="alert"></p><button class="button button-primary compact">Criar orçamento <span>↗</span></button></form>`;
+    const serviceList = collectionFrom(availableServices);
+    const categories = [...new Set(serviceList.map((service) => service.categoria).filter(Boolean))].sort((a, b) => a.localeCompare(b, "pt-BR"));
+    const categoryOptions = categories.map((category) => `<option value="${esc(category)}">${esc(category)}</option>`).join("");
+    slot.innerHTML = `<form class="inline-form" data-form="budget" data-catalog-entity="orcamento" data-catalog-lookup="servico"><div class="inline-form-title"><h3>Novo orçamento</h3><button type="button" class="icon-button" data-close-form aria-label="Fechar">×</button></div><p class="muted small">Selecione o cliente e a carga e busque um serviço cadastrado por nome ou código da referência.</p><div class="inline-form-grid">${selectField("Cliente", "clienteId", options(clients, "Cliente"))}${selectField("Carga", "cargaId", options(loads, "Carga"))}<label class="field-label">Categoria do serviço<select name="servicoCategoria"><option value="">Todas as categorias</option>${categoryOptions}</select></label><label class="field-label">Buscar serviço<input name="servicoBusca" type="search" autocomplete="off" placeholder="Digite o nome ou código do serviço" aria-controls="budget-service-results"></label></div><input name="servicoId" type="hidden"><input name="servico" type="hidden"><input name="valorEstimado" type="hidden"><div class="budget-service-results" id="budget-service-results" aria-live="polite"></div><p class="form-feedback" role="alert"></p><button class="button button-primary compact">Criar orçamento <span>↗</span></button></form>`;
+    const form = slot.querySelector('form[data-form="budget"]');
+    budgetServiceOptions.set(form, serviceList);
+    renderBudgetServiceResults(form);
   } catch (error) {
     slot.innerHTML = `<div class="load-error" role="alert">${esc(error.message)}<br>Para criar um orçamento, cadastre antes um cliente, uma carga e um serviço.</div>`;
   }
+}
+
+function renderBudgetServiceResults(form) {
+  const resultSlot = form?.querySelector("#budget-service-results");
+  if (!resultSlot) return;
+  const services = budgetServiceOptions.get(form) || [];
+  const category = form.elements.servicoCategoria.value;
+  const query = normalizeServiceSearch(form.elements.servicoBusca.value);
+  const matches = services.filter((service) => {
+    const categoryMatches = !category || service.categoria === category;
+    const reference = findDatabaseEntry("servico", "nome", service.nome);
+    const searchMatches = !query || normalizeServiceSearch(`${service.nome} ${service.descricao} ${service.categoria} ${reference?.codigo || ""}`).includes(query);
+    return categoryMatches && searchMatches;
+  });
+  if (!services.length) {
+    resultSlot.innerHTML = `<p class="muted small">Nenhum serviço cadastrado. Cadastre serviços antes de criar um orçamento.</p>`;
+    return;
+  }
+  if (!matches.length) {
+    resultSlot.innerHTML = `<p class="muted small">Nenhum serviço encontrado para esta categoria e busca.</p>`;
+    return;
+  }
+  resultSlot.innerHTML = `<div class="budget-service-options">${matches.slice(0, 20).map((service) => {
+    const valor = formatarTarifaServico({ valor: databaseBudgetDefaults(service.nome).valor });
+    const reference = findDatabaseEntry("servico", "nome", service.nome);
+    return `<button type="button" class="budget-service-option" data-budget-service="${esc(service.id)}"><strong>${esc(service.nome || `Serviço ${service.id}`)}</strong><span>${reference ? `${esc(reference.codigo)} · ` : ""}${esc(service.categoria || "Sem categoria")} · ${esc(valor)}</span><small>${esc(service.descricao || "")}</small></button>`;
+  }).join("")}</div>`;
+}
+
+function clearBudgetServiceSelection(form) {
+  form.elements.servicoId.value = "";
+  form.elements.servico.value = "";
+  form.elements.valorEstimado.value = "";
+  delete form.dataset.selectedServiceName;
+}
+
+function databaseBudgetDefaults(serviceName) {
+  const budgetEntry = findDatabaseEntry("orcamento", "servico", serviceName);
+  const serviceEntry = findDatabaseEntry("servico", "nome", serviceName);
+  const staticTariff = localizarTarifaServico(serviceName);
+  const savedValue = (entry, field) => {
+    if (entry?.[field] === "" || entry?.[field] == null) return null;
+    const value = Number(entry[field]);
+    return Number.isFinite(value) ? value : null;
+  };
+  return {
+    ...(budgetEntry || {}),
+    valor: budgetEntry
+      ? savedValue(budgetEntry, "valorEstimado")
+      : serviceEntry
+        ? savedValue(serviceEntry, "valor")
+        : staticTariff?.valor ?? null,
+    categoria: budgetEntry?.categoria || serviceEntry?.categoria || staticTariff?.categoria || "",
+  };
+}
+
+function normalizeServiceSearch(value) {
+  return String(value ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR").trim();
 }
 
 function selectField(label, name, options) { return `<label class="field-label">${label}<select name="${name}" required><option value="">Selecione</option>${options}</select></label>`; }
@@ -808,14 +1366,60 @@ async function handleSubmit(event) {
         break;
       }
       case "charge": {
-        const numeric = { ...fields, peso: Number(fields.peso), volume: Number(fields.volume) };
-        await post("/cargas", numeric);
-        await reloadCurrentSection("Carga cadastrada com sucesso.");
+        const numeric = Object.fromEntries(chargeFields.map(([name]) => [name, ["peso", "volume"].includes(name) ? Number(fields[name]) : fields[name]]));
+        const id = form.dataset.chargeId;
+        if (id) await put(`/cargas/${encodeURIComponent(id)}`, numeric);
+        else await post("/cargas", numeric);
+        await reloadCurrentSection(`Carga ${id ? "atualizada" : "cadastrada"} com sucesso.`);
+        break;
+      }
+      case "database-entry": {
+        if (!isAdmin()) throw new Error("Somente o administrador pode alterar o Banco de dados.");
+        saveDatabaseEntry(form.dataset.databaseCategory, fields, form.dataset.databaseId || "");
+        await reloadCurrentSection("Banco de dados atualizado com sucesso.");
         break;
       }
       case "budget": {
-        await postParams("/orcamentos", fields);
+        if (!fields.servicoId) throw new Error("Selecione um serviço para criar o orçamento.");
+        const created = await postParams("/orcamentos", {
+          clienteId: fields.clienteId,
+          cargaId: fields.cargaId,
+          servicoId: fields.servicoId,
+        });
+        const createdId = created?.id ?? created?.data?.id;
+        if (createdId != null) {
+          try {
+            saveBudgetMetadata(createdId, {
+              criadoEm: new Date().toISOString(),
+              valorEstimado: fields.valorEstimado ? Number(fields.valorEstimado) : null,
+            });
+          } catch (error) {
+            showSectionError(`Orçamento criado, mas os dados locais não puderam ser salvos: ${error.message}`);
+          }
+        }
         await reloadCurrentSection("Orçamento criado com sucesso.");
+        break;
+      }
+      case "budget-edit": {
+        const valorEstimado = fields.valorEstimado ? Number(fields.valorEstimado) : undefined;
+        await putParams(`/orcamentos/${encodeURIComponent(form.dataset.budgetId)}/analise`, {
+          status: fields.status,
+          valorEstimado,
+          observacoes: fields.observacoes,
+        });
+        const budget = (cachedRecords.get("orcamento") || []).find((item) => String(item.id) === String(form.dataset.budgetId));
+        if (budget) {
+          try {
+            saveBudgetMetadata(budget.id, {
+              ...(valorEstimado === undefined ? {} : { valorEstimado }),
+              criadoEm: withBudgetMetadata(budget).criadoEm || new Date().toISOString(),
+            });
+          } catch (error) {
+            showSectionError(`Orçamento atualizado, mas os dados locais não puderam ser salvos: ${error.message}`);
+          }
+        }
+        dismissModal();
+        await reloadCurrentSection("Orçamento atualizado com sucesso.");
         break;
       }
       case "resource":
@@ -866,7 +1470,8 @@ async function submitRegistration(form, fields) {
 async function reloadCurrentSection(message = "") {
   const slug = document.querySelector("#section-content")?.dataset.slug;
   const section = sections.find((item) => item.slug === slug);
-  if (section) await loadSection(section);
+  const category = document.querySelector("#database-category")?.value;
+  if (section) await loadSection(section, category || "servico");
   if (message) {
     const host = document.querySelector("#section-content");
     if (host) host.insertAdjacentHTML("afterbegin", `<p class="inline-success" role="status">${esc(message)}</p>`);
@@ -905,6 +1510,77 @@ if (app) app.addEventListener("click", async (event) => {
   if (routeDestination) {
     event.preventDefault();
     navigateTo(routeDestination);
+    return;
+  }
+  const databaseAction = event.target.closest("[data-database-action]");
+  if (databaseAction) {
+    if (databaseAction.dataset.databaseAction === "edit" && document.querySelector("#modal-root .modal-card")) dismissModal();
+    handleDatabaseAction(databaseAction.dataset.databaseAction, databaseAction.dataset.category, databaseAction.dataset.id);
+    return;
+  }
+  const operationSelection = event.target.closest("[data-select-operation]");
+  if (operationSelection) {
+    const form = operationSelection.closest('form[data-form="resource"]');
+    try {
+      form.elements.namedItem("codigoOperacao").value = operationSelection.dataset.selectOperation;
+      updateOperationReference(form);
+      setFeedback(form, "");
+    } catch (error) {
+      setFeedback(form, error.message);
+    }
+    return;
+  }
+  const cargoSelection = event.target.closest("[data-select-cargo]");
+  if (cargoSelection) {
+    const form = cargoSelection.closest('form[data-form="charge"]');
+    try {
+      const entry = findDatabaseEntry("carga", "codigo", cargoSelection.dataset.selectCargo);
+      if (!entry) throw new Error("Referência de carga não encontrada. Atualize a página.");
+      form.elements.namedItem("tipoCarga").value = entry.tipoCarga;
+      applyDatabaseTemplate(form, "tipoCarga", entry.tipoCarga);
+      form.elements.namedItem("buscaReferencia").value = entry.codigo;
+      updateCargoReference(form);
+    } catch (error) {
+      setFeedback(form, error.message);
+    }
+    return;
+  }
+  const chargeAction = event.target.closest("[data-charge-action]");
+  if (chargeAction) {
+    if (chargeAction.dataset.chargeAction === "edit" && document.querySelector("#modal-root .modal-card")) dismissModal();
+    await handleChargeAction(chargeAction.dataset.chargeAction, chargeAction.dataset.id);
+    return;
+  }
+  const solicitationAction = event.target.closest("[data-solicitation-action]");
+  if (solicitationAction) {
+    handleSolicitationAction(solicitationAction.dataset.solicitationAction, solicitationAction.dataset.id);
+    return;
+  }
+  const budgetService = event.target.closest("[data-budget-service]");
+  if (budgetService) {
+    const form = budgetService.closest('form[data-form="budget"]');
+    const service = (form && budgetServiceOptions.get(form) || []).find((item) => String(item.id) === String(budgetService.dataset.budgetService));
+    if (!form || !service) return;
+    try {
+      form.elements.servicoId.value = service.id;
+      form.elements.servico.value = service.nome || "";
+      form.elements.servicoBusca.value = service.nome || "";
+      applyDatabaseTemplate(form, "servico", service.nome);
+      const defaults = databaseBudgetDefaults(service.nome);
+      form.elements.valorEstimado.value = defaults.valor ?? "";
+      form.dataset.selectedServiceName = service.nome || "";
+      const valor = formatarTarifaServico({ valor: defaults.valor });
+      const reference = findDatabaseEntry("servico", "nome", service.nome);
+      form.querySelector("#budget-service-results").innerHTML = `<p class="budget-service-selected" role="status">Serviço selecionado: <strong>${esc(service.nome)}</strong> · ${esc(defaults.categoria || service.categoria || "Sem categoria")} · ${esc(valor)}</p>${reference ? serviceReferenceMarkup(reference) : ""}`;
+    } catch (error) {
+      clearBudgetServiceSelection(form);
+      setFeedback(form, error.message);
+    }
+    return;
+  }
+  const budgetAction = event.target.closest("[data-budget-action]");
+  if (budgetAction) {
+    await handleBudgetAction(budgetAction.dataset.budgetAction, budgetAction.dataset.id);
     return;
   }
   const target = event.target.closest("[data-action], [data-service], [data-close-modal], [data-close-form], [data-reload], [data-status-id], [data-toggle-password]");
@@ -963,6 +1639,10 @@ if (app) app.addEventListener("click", async (event) => {
     await openResourceForm(target.dataset.resource);
     return;
   }
+  if (target.dataset.action === "new-database-entry") {
+    openDatabaseForm(target.dataset.category);
+    return;
+  }
   if (target.dataset.action === "toggle-admin-setup") {
     try {
       await put("/admin/setup-status", { enabled: target.dataset.enabled !== "true" });
@@ -1003,6 +1683,117 @@ if (app) app.addEventListener("click", async (event) => {
 });
 
 if (app) app.addEventListener("submit", (event) => { void handleSubmit(event); });
+if (app) app.addEventListener("input", (event) => {
+  const formWithCatalog = event.target.closest("form[data-catalog-entity]");
+  if (formWithCatalog?.dataset.resource === "operacao" && event.target.name === "codigoOperacao") {
+    try {
+      setFeedback(formWithCatalog, "");
+      updateOperationReference(formWithCatalog);
+    } catch (error) {
+      setFeedback(formWithCatalog, error.message);
+    }
+    return;
+  }
+  if (formWithCatalog?.dataset.form === "charge" && event.target.name === "buscaReferencia") {
+    try {
+      setFeedback(formWithCatalog, "");
+      updateCargoReference(formWithCatalog);
+    } catch (error) {
+      setFeedback(formWithCatalog, error.message);
+    }
+    return;
+  }
+  if (formWithCatalog?.dataset.resource === "conteiner" && ["codigoReferencia", "tipo"].includes(event.target.name)) {
+    try {
+      setFeedback(formWithCatalog, "");
+      if (event.target.name === "tipo") applyDatabaseTemplate(formWithCatalog, "tipo");
+      updateContainerReference(formWithCatalog, event.target.name === "codigoReferencia");
+    } catch (error) {
+      setFeedback(formWithCatalog, error.message);
+    }
+    return;
+  }
+  if (formWithCatalog?.dataset.resource === "servico" && event.target.name === "codigoReferencia") {
+    try {
+      setFeedback(formWithCatalog, "");
+      applyServiceCode(formWithCatalog);
+    } catch (error) {
+      setFeedback(formWithCatalog, error.message);
+    }
+    return;
+  }
+  if (formWithCatalog?.dataset.resource === "servico" && event.target.name === "nome") {
+    formWithCatalog.elements.namedItem("codigoReferencia").value = "";
+    formWithCatalog.querySelector(".service-reference-details").innerHTML = "";
+    delete event.target.dataset.catalogAutofilledValue;
+  }
+  if (formWithCatalog && event.target.hasAttribute("data-catalog-lookup")) {
+    applyDatabaseTemplate(formWithCatalog, event.target.name);
+  }
+  const form = event.target.closest('form[data-form="budget"]');
+  if (!form || event.target.name !== "servicoBusca") return;
+  clearBudgetServiceSelection(form);
+  try {
+    renderBudgetServiceResults(form);
+  } catch (error) {
+    form.querySelector("#budget-service-results").innerHTML = `<p class="inline-error" role="alert">${esc(error.message)}</p>`;
+  }
+});
+if (app) app.addEventListener("change", (event) => {
+  const databaseCategorySelect = event.target.closest("#database-category");
+  if (databaseCategorySelect) {
+    try {
+      const host = document.querySelector("#section-content");
+      if (host) host.innerHTML = renderDatabaseSection(databaseCategorySelect.value);
+    } catch (error) {
+      showSectionError(error.message);
+    }
+    return;
+  }
+  const solicitationField = event.target.closest("[data-solicitation-field]");
+  if (solicitationField) {
+    try {
+      saveSolicitationState(solicitationField.dataset.id, { [solicitationField.dataset.solicitationField]: solicitationField.value });
+      solicitationField.setAttribute("aria-label", `${solicitationField.dataset.solicitationField === "solicitado" ? "Serviço solicitado" : "Serviço prestado"}: ${solicitationField.value}`);
+    } catch (error) {
+      solicitationField.insertAdjacentHTML("afterend", `<span class="field-error" role="alert">${esc(error.message)}</span>`);
+    }
+    return;
+  }
+  const form = event.target.closest('form[data-form="budget"]');
+  if (!form || event.target.name !== "servicoCategoria") return;
+  clearBudgetServiceSelection(form);
+  try {
+    renderBudgetServiceResults(form);
+  } catch (error) {
+    form.querySelector("#budget-service-results").innerHTML = `<p class="inline-error" role="alert">${esc(error.message)}</p>`;
+  }
+});
+globalThis.window?.addEventListener?.("storage", (event) => {
+  if (!event.key?.startsWith("techocean.frontDatabase.") && !["techocean.frontSolicitations.v1", "techocean.frontBudgets.v1"].includes(event.key)) return;
+  const slug = document.querySelector("#section-content")?.dataset.slug;
+  if (!slug) return;
+  if (event.key?.startsWith("techocean.frontDatabase.") && slug === "conteiner") {
+    const referenceSection = document.querySelector("#container-reference-section");
+    if (referenceSection) referenceSection.outerHTML = renderContainerReferenceSection();
+    return;
+  }
+  if (event.key?.startsWith("techocean.frontDatabase.") && slug === "carga") {
+    const referenceSection = document.querySelector("#cargo-reference-section");
+    if (referenceSection) referenceSection.outerHTML = renderCargoReferenceSection();
+    return;
+  }
+  if (event.key?.startsWith("techocean.frontDatabase.") && slug === "operacao") {
+    const referenceSection = document.querySelector("#operation-reference-section");
+    if (referenceSection) referenceSection.outerHTML = renderOperationReferenceSection();
+    return;
+  }
+  if (event.key === "techocean.frontSolicitations.v1" && slug !== "solicitacao") return;
+  if (event.key === "techocean.frontBudgets.v1" && slug !== "orcamento") return;
+  if (event.key?.startsWith("techocean.frontDatabase.") && !["banco-dados", "orcamento", "solicitacao"].includes(slug)) return;
+  const section = sections.find((item) => item.slug === slug);
+  if (section) void loadSection(section);
+});
 if (app) app.addEventListener("keydown", (event) => {
   const activeModal = document.querySelector("#modal-root .modal-card");
   if (event.key === "Escape" && activeModal) dismissModal();
