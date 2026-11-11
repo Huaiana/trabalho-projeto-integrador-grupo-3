@@ -820,7 +820,7 @@ async function loadSharedSolicitations(host) {
     if (!host.isConnected) return;
     cachedRecords.set("solicitacoes-compartilhadas", collectionFrom(requests));
     cachedRecords.set("referencias-compartilhadas", collectionFrom(references));
-    host.innerHTML = `${renderSharedRequestPanel()}${renderSharedSolicitations(collectionFrom(requests), collectionFrom(references), isAdmin())}`;
+    host.innerHTML = `${renderSharedRequestPanel(collectionFrom(requests))}${renderSharedSolicitations(collectionFrom(requests), collectionFrom(references), isAdmin())}`;
     await openSharedRequest(null, false);
   } catch (error) {
     if (host.isConnected) host.innerHTML = `${renderSharedRequestPanel()}${renderSharedSolicitationsError(error.message)}`;
@@ -831,8 +831,9 @@ export function renderSharedSolicitationsError(message) {
   return `<div class="load-error" role="alert"><p>Não foi possível carregar as solicitações compartilhadas: ${esc(message)}</p><p>Verifique se a API atualizada está publicada e recarregue a página.</p></div>`;
 }
 
-export function renderSharedRequestPanel() {
-  return `<section class="data-panel shared-request-panel"><div class="panel-heading"><div><span class="eyebrow">SOLICITAÇÃO / CADASTRO</span><h2>Dados da solicitação</h2></div><button class="button button-outline compact" data-shared-request-action="new">＋ Criar nova solicitação</button></div><div id="shared-request-slot"><p class="muted small" role="status">Os campos serão habilitados quando os dados do servidor estiverem disponíveis.</p><fieldset disabled class="shared-request-unavailable">${sharedRequestForm(null, [], [], [], [], [])}</fieldset></div></section>`;
+export function renderSharedRequestPanel(requests = []) {
+  const choices = requests.map((r) => `<option value="${esc(r.id)}">${esc(`${r.id} · ${r.nomeServico}`)}</option>`).join("");
+  return `<section class="data-panel shared-request-panel"><div class="panel-heading"><div><span class="eyebrow">SOLICITAÇÃO / CADASTRO</span><h2>Dados da solicitação</h2></div><div class="shared-panel-actions"><label class="field-label">Solicitação para editar ou imprimir<select data-shared-request-selection><option value="">Selecione</option>${choices}</select></label><div class="form-actions"><button type="button" class="button button-outline compact" data-shared-request-action="new">Criar solicitação</button><button type="button" class="button button-outline compact" data-shared-request-action="edit-selected" disabled>Editar</button><button type="button" class="button button-outline compact" data-shared-request-action="print-selected" disabled>Imprimir</button></div></div></div><div id="shared-request-slot"><p class="muted small" role="status">Os campos serão habilitados quando os dados do servidor estiverem disponíveis.</p><fieldset disabled class="shared-request-unavailable">${sharedRequestForm(null, [], [], [], [], [])}</fieldset></div></section>`;
 }
 
 function sharedReferenceText(reference) {
@@ -847,9 +848,9 @@ function sharedCreatedAt(value) {
 }
 
 export function renderSharedSolicitations(requests, references, admin) {
-  const rows = requests.map((r) => `<tr data-shared-request-row><td>${valueText(r.id)}</td><td>${valueText(r.nomeServico)}</td><td>${valueText(r.categoria)}</td><td>${valueText(r.descricao)}</td><td>${valueText(sharedReferenceText(r.servicoReferencia))}</td><td>${valueText(sharedReferenceText(r.cargaReferencia))}</td><td>${valueText(sharedReferenceText(r.conteinerReferencia))}</td><td>${valueText(sharedReferenceText(r.operacaoReferencia))}</td><td>${valueText(`${sharedReferenceText(r.orcamentoReferencia)} · ${r.valor == null ? "Valor não informado" : formatarTarifaServico({ valor: Number(r.valor) })}`)}</td><td>${valueText(`${r.solicitante.id} · ${r.solicitante.nome}`)}</td><td>${valueText(`${r.prestador.id} · ${r.prestador.nome} · ${r.prestador.cargo}`)}</td><td>${valueText(sharedStatus(r.statusSolicitacao))}</td><td>${valueText(sharedCreatedAt(r.criadoEm))}</td><td><div class="row-actions"><button class="small-action" data-shared-request-action="view" data-id="${esc(r.id)}">Ver</button><button class="small-action" data-shared-request-action="edit" data-id="${esc(r.id)}">Editar</button><button class="small-action" data-shared-request-action="print" data-id="${esc(r.id)}">Imprimir</button></div></td></tr>`).join("");
+  const rows = requests.map((r) => `<tr data-shared-request-row><td class="shared-request-actions"><div class="row-actions"><button class="small-action" data-shared-request-action="view" data-id="${esc(r.id)}">Ver</button><button class="small-action" data-shared-request-action="edit" data-id="${esc(r.id)}">Editar</button><button class="small-action" data-shared-request-action="print" data-id="${esc(r.id)}">Imprimir</button></div></td><td>${valueText(r.id)}</td><td>${valueText(r.nomeServico)}</td><td>${valueText(r.categoria)}</td><td>${valueText(r.descricao)}</td><td>${valueText(sharedReferenceText(r.servicoReferencia))}</td><td>${valueText(sharedReferenceText(r.cargaReferencia))}</td><td>${valueText(sharedReferenceText(r.conteinerReferencia))}</td><td>${valueText(sharedReferenceText(r.operacaoReferencia))}</td><td>${valueText(`${sharedReferenceText(r.orcamentoReferencia)} · ${r.valor == null ? "Valor não informado" : formatarTarifaServico({ valor: Number(r.valor) })}`)}</td><td>${valueText(`${r.solicitante.id} · ${r.solicitante.nome}`)}</td><td>${valueText(`${r.prestador.id} · ${r.prestador.nome} · ${r.prestador.cargo}`)}</td><td>${valueText(sharedStatus(r.statusSolicitacao))}</td><td>${valueText(sharedCreatedAt(r.criadoEm))}</td></tr>`).join("");
   const refs = references.map((r) => `<tr><td>${valueText(r.codigo)}</td><td>${valueText(r.nome)}</td><td>${valueText(r.categoria)}</td><td>${valueText(r.descricao)}</td><td>${valueText(r.valor == null ? "—" : formatarTarifaServico({ valor: Number(r.valor) }))}</td>${admin ? `<td><button class="small-action" data-shared-reference-action="edit" data-id="${esc(r.id)}">Editar</button></td>` : ""}</tr>`).join("");
-  return `<section class="data-panel" data-shared-requests><div class="panel-heading"><div><span class="eyebrow">DADOS COMPARTILHADOS</span><h2>Solicitações da equipe <span class="count-pill">${requests.length}</span></h2></div><button class="button button-primary compact" data-shared-request-action="new">＋ Criar nova solicitação</button></div><p class="dash-description">Salvas no servidor e disponíveis para a equipe. Estas solicitações também aparecem na lista operacional abaixo.</p>${requests.length ? `<label class="field-label">Buscar por ID ou nome<input type="search" data-shared-request-search></label><p class="muted small" data-shared-search-status aria-live="polite"></p><div class="table-scroll"><table class="records-table"><thead><tr><th>ID</th><th>Nome do serviço</th><th>Categoria</th><th>Descrição</th><th>Serviço oferecido</th><th>Carga</th><th>Contêiner</th><th>Operação</th><th>Orçamento</th><th>Solicitante</th><th>Prestador</th><th>Solicitação</th><th>Data e hora</th><th>Ações</th></tr></thead><tbody>${rows}</tbody></table></div>` : `<div class="empty-state"><strong>Nenhuma solicitação compartilhada</strong></div>`}</section><section class="data-panel"><div class="panel-heading"><div><span class="eyebrow">CATÁLOGO DO SERVIDOR</span><h2>Referências compartilhadas</h2></div>${admin ? `<button class="button button-outline compact" data-shared-reference-action="new">＋ Nova referência</button>` : ""}</div><p class="dash-description">Catálogo novo, separado dos dados locais deste navegador. O administrador pode cadastrar e editar referências aqui.</p>${references.length ? `<div class="table-scroll"><table class="records-table"><thead><tr><th>ID</th><th>Nome</th><th>Categoria</th><th>Descrição</th><th>Valor</th>${admin ? "<th>Ações</th>" : ""}</tr></thead><tbody>${refs}</tbody></table></div>` : `<div class="empty-state"><strong>Nenhuma referência compartilhada cadastrada</strong><p>O administrador pode cadastrar referências para vincular às solicitações.</p></div>`}</section>`;
+  return `<section class="data-panel" data-shared-requests><div class="panel-heading"><div><span class="eyebrow">DADOS COMPARTILHADOS</span><h2>Solicitações da equipe <span class="count-pill">${requests.length}</span></h2></div></div><p class="dash-description">Salvas no servidor e disponíveis para a equipe. Estas solicitações também aparecem na lista operacional abaixo.</p>${requests.length ? `<label class="field-label">Buscar por ID ou nome<input type="search" data-shared-request-search></label><p class="muted small" data-shared-search-status aria-live="polite"></p><div class="table-scroll"><table class="records-table shared-requests-table"><thead><tr><th class="shared-request-actions">Ações</th><th>ID</th><th>Nome do serviço</th><th>Categoria</th><th>Descrição</th><th>Serviço oferecido</th><th>Carga</th><th>Contêiner</th><th>Operação</th><th>Orçamento</th><th>Solicitante</th><th>Prestador</th><th>Solicitação</th><th>Data e hora</th></tr></thead><tbody>${rows}</tbody></table></div>` : `<div class="empty-state"><strong>Nenhuma solicitação compartilhada</strong><p>Após salvar uma solicitação, use os botões Ver, Editar e Imprimir na lista.</p></div>`}</section><section class="data-panel"><div class="panel-heading"><div><span class="eyebrow">CATÁLOGO DO SERVIDOR</span><h2>Referências compartilhadas</h2></div>${admin ? `<button class="button button-outline compact" data-shared-reference-action="new">＋ Nova referência</button>` : ""}</div><p class="dash-description">Catálogo novo, separado dos dados locais deste navegador. O administrador pode cadastrar e editar referências aqui.</p>${references.length ? `<div class="table-scroll"><table class="records-table"><thead><tr><th>ID</th><th>Nome</th><th>Categoria</th><th>Descrição</th><th>Valor</th>${admin ? "<th>Ações</th>" : ""}</tr></thead><tbody>${refs}</tbody></table></div>` : `<div class="empty-state"><strong>Nenhuma referência compartilhada cadastrada</strong><p>O administrador pode cadastrar referências para vincular às solicitações.</p></div>`}</section>`;
 }
 
 function sharedStatus(status) {
@@ -887,7 +888,80 @@ export function sharedRequestForm(record, clients, cargos, services, staff, refe
   const referenceControl = (field, label, type, selected) => `<label class="field-label">${label}<select name="${field}" data-shared-ref>${options(references.filter((ref) => ref.tipo === type), selected?.id, (ref) => `${ref.codigo} · ${ref.nome}`)}</select><textarea data-shared-ref-details="${field}" rows="3" readonly aria-label="Dados de ${label}">${esc(selected ? sharedReferenceText(selected) : "")}</textarea></label>`;
   const categories = catalogoSolicitacoes.map(({ categoria }) => ({ id: categoria, nome: categoria }));
   if (record?.categoria && !categories.some((item) => item.id === record.categoria)) categories.push({ id: record.categoria, nome: record.categoria });
-  return `<form class="inline-form shared-request-form" data-form="shared-request" ${record ? `data-id="${esc(record.id)}" data-version="${esc(record.versao)}"` : ""}><div class="inline-form-grid"><label class="field-label">ID da solicitação<input value="${record ? esc(record.id) : "Gerado ao salvar"}" readonly></label><label class="field-label">Nome do serviço para a solicitação<input name="nomeServico" required maxlength="255" value="${esc(record?.nomeServico || "")}"></label><label class="field-label">Categoria<select name="categoria" required>${options(categories, record?.categoria, (item) => item.nome)}</select></label><label class="field-label">Descrição do pedido<textarea name="descricao" required maxlength="2000">${esc(record?.descricao || "")}</textarea></label>${referenceControl("servicoReferenciaId", "Tipo de serviço oferecido", "SRV", record?.servicoReferencia)}${referenceControl("cargaReferenciaId", "Carga vinculada", "CRG", record?.cargaReferencia)}${referenceControl("conteinerReferenciaId", "Contêiner vinculado", "CTR", record?.conteinerReferencia)}${referenceControl("operacaoReferenciaId", "Operação vinculada", "OPR", record?.operacaoReferencia)}${referenceControl("orcamentoReferenciaId", "Orçamento vinculado", "ORC", record?.orcamentoReferencia)}<label class="field-label">Valor do orçamento (R$)<input name="valor" type="number" min="0" step="0.01" value="${esc(record?.valor ?? "")}"></label><label class="field-label">Solicitante (cliente)<select name="clienteId" required>${options(clients, record?.solicitante?.id, (item) => `${item.id} · ${item.nome}`)}</select></label><label class="field-label">Prestador de serviço<select name="prestadorId" required>${options(staff, record?.prestador?.id, (item) => `${item.id} · ${item.nome} · ${item.cargo}`)}</select></label><label class="field-label">Carga operacional para uso em operações<select name="cargaOperacionalId" required>${options(cargos, record?.cargaOperacional?.id, (item) => `${item.id} · ${item.descricao}`)}</select></label><label class="field-label">Serviço operacional para uso em operações<select name="servicoOperacionalId" required>${options(services, record?.servicoOperacional?.id, (item) => `${item.id} · ${item.nome}`)}</select></label><label class="field-label">Status da solicitação<select name="statusSolicitacao" required>${[["EM_ANALISE", "Em análise"], ["SIM", "Sim"], ["NAO", "Não"]].map(([value, name]) => `<option value="${value}" ${(record?.statusSolicitacao || "EM_ANALISE") === value ? "selected" : ""}>${name}</option>`).join("")}</select></label></div><p class="muted small">Este status é separado do status operacional existente.</p><p class="form-feedback" role="alert"></p><button class="button button-primary compact">Salvar solicitação</button></form>`;
+  return `<form class="inline-form shared-request-form" data-form="shared-request" ${record ? `data-id="${esc(record.id)}" data-version="${esc(record.versao)}"` : ""}>
+    <section class="shared-form-section" aria-label="Dados do pedido">
+      <h4>Dados do pedido</h4>
+      <div class="inline-form-grid">
+        <label class="field-label">ID<input value="${record ? esc(record.id) : "Gerado ao salvar"}" readonly></label>
+        <label class="field-label">Nome do serviço para a solicitação<input name="nomeServico" required maxlength="255" value="${esc(record?.nomeServico || "")}"></label>
+        <label class="field-label">Referência do nome do serviço<select data-service-name-reference>${options(references.filter((ref) => ref.tipo === "SRV"), record?.servicoReferencia?.id, (ref) => `${ref.codigo} · ${ref.nome}`)}</select></label>
+        <label class="field-label">Categoria<select name="categoria" required>${options(categories, record?.categoria, (item) => item.nome)}</select></label>
+        <label class="field-label">Status da solicitação<select name="statusSolicitacao" required>${[["EM_ANALISE", "Em análise"], ["SIM", "Sim"], ["NAO", "Não"]].map(([value, name]) => `<option value="${value}" ${(record?.statusSolicitacao || "EM_ANALISE") === value ? "selected" : ""}>${name}</option>`).join("")}</select></label>
+        <label class="field-label">Descrição do pedido<textarea name="descricao" required maxlength="2000">${esc(record?.descricao || "")}</textarea></label>
+        <label class="field-label">Solicitante (cliente)<select name="clienteId" required>${options(clients, record?.solicitante?.id, (item) => `${item.id} · ${item.nome}`)}</select></label>
+        <label class="field-label">Registros do cliente: orçamento operacional<select data-shared-client-budget disabled><option value="">Selecione o cliente primeiro</option></select></label>
+        <label class="field-label">Prestador de serviço<select name="prestadorId" required>${options(staff, record?.prestador?.id, (item) => `${item.id} · ${item.nome} · ${item.cargo}`)}</select></label>
+        <label class="field-label">Carga operacional para uso em operações<select name="cargaOperacionalId" required>${options(cargos, record?.cargaOperacional?.id, (item) => `${item.id} · ${item.descricao}`)}</select></label>
+        <label class="field-label">Serviço operacional para uso em operações<select name="servicoOperacionalId" required>${options(services, record?.servicoOperacional?.id, (item) => `${item.id} · ${item.nome}`)}</select></label>
+      </div>
+      <p class="muted small" data-shared-budget-status>Selecione um cliente para consultar seus orçamentos. Apenas dados vinculados no servidor serão preenchidos.</p>
+      <p class="muted small">Este status indica a autorização e é separado do status operacional existente; não bloqueia operações.</p>
+    </section>
+    <section class="shared-form-section" aria-label="Referências vinculadas">
+      <h4>Referências vinculadas</h4>
+      <div class="inline-form-grid">
+        ${referenceControl("servicoReferenciaId", "Tipo de serviço oferecido", "SRV", record?.servicoReferencia)}
+        ${referenceControl("cargaReferenciaId", "Carga vinculada", "CRG", record?.cargaReferencia)}
+        ${referenceControl("conteinerReferenciaId", "Contêiner vinculado", "CTR", record?.conteinerReferencia)}
+        ${referenceControl("operacaoReferenciaId", "Operação vinculada", "OPR", record?.operacaoReferencia)}
+        ${referenceControl("orcamentoReferenciaId", "Orçamento vinculado", "ORC", record?.orcamentoReferencia)}
+        <label class="field-label">Valor do orçamento (R$)<input name="valor" type="number" min="0" step="0.01" value="${esc(record?.valor ?? "")}"></label>
+      </div>
+    </section>
+    <p class="form-feedback" role="alert"></p><button class="button button-primary compact">Salvar solicitação</button>
+  </form>`;
+}
+
+export function clientBudgets(budgets, clientId) {
+  if (!clientId) return [];
+  return budgets.filter((budget) => String(budget.cliente_id ?? budget.clienteId ?? budget.cliente?.id ?? "") === String(clientId));
+}
+
+function refreshClientBudgets(form, budgets, autoSelect = false) {
+  const select = form.querySelector("[data-shared-client-budget]");
+  const status = form.querySelector("[data-shared-budget-status]");
+  const matches = clientBudgets(budgets, form.elements.clienteId.value);
+  select.innerHTML = `<option value="">${form.elements.clienteId.value ? "Selecione um orçamento" : "Selecione o cliente primeiro"}</option>${matches.map((budget) => `<option value="${esc(budget.id)}">${esc(`ID ${budget.id} · ${budget.servico?.nome ?? budget.servico ?? "Serviço"} · ${budget.status ?? "Sem status"}`)}</option>`).join("")}`;
+  select.disabled = !matches.length;
+  status.textContent = matches.length
+    ? "Selecione um orçamento para preencher carga, serviço e valor disponíveis. A seleção é uma fonte de preenchimento, não um vínculo salvo."
+    : form.elements.clienteId.value ? "Nenhum orçamento vinculado a este cliente. Preencha os demais dados manualmente." : "Selecione um cliente para consultar seus orçamentos.";
+  if (autoSelect && matches.length === 1) {
+    select.value = String(matches[0].id);
+    applyClientBudget(form, matches[0]);
+  }
+}
+
+export function budgetPrefill(budget) {
+  return {
+    carga: budget.carga_id ?? budget.cargaId ?? budget.carga?.id ?? "",
+    servico: budget.servico_id ?? budget.servicoId ?? budget.servico?.id ?? "",
+    valor: budget.valor_estimado ?? budget.valorEstimado ?? "",
+  };
+}
+
+function applyClientBudget(form, budget) {
+  const data = budgetPrefill(budget);
+  form.elements.cargaOperacionalId.value = String(data.carga);
+  form.elements.servicoOperacionalId.value = String(data.servico);
+  form.elements.valor.value = data.valor;
+  const service = (cachedRecords.get("shared-operational-services") || []).find((item) => String(item.id) === String(data.servico));
+  if (!form.elements.nomeServico.value && service?.nome) {
+    form.elements.nomeServico.value = service.nome;
+    form.dataset.autoServiceName = service.nome;
+  }
+  const missing = (data.carga && !form.elements.cargaOperacionalId.value) || (data.servico && !form.elements.servicoOperacionalId.value);
+  if (missing) form.querySelector("[data-shared-budget-status]").textContent = "A carga ou o serviço do orçamento não está disponível. Confira os dados e selecione-os manualmente.";
 }
 
 async function openSharedRequest(record = null, focus = true) {
@@ -906,10 +980,15 @@ async function openSharedRequest(record = null, focus = true) {
   const controls = [...slot.querySelectorAll("input, select, textarea, button")].map((control) => [control, control.disabled]);
   controls.forEach(([control]) => { control.disabled = true; });
   try {
-    const [clients, cargos, services, staff, references] = await Promise.all([get("/clientes"), get("/cargas"), get("/servicos/todos"), get("/referencias-compartilhadas/prestadores"), get("/referencias-compartilhadas")]);
+    const [clients, cargos, services, staff, references, budgets] = await Promise.all([get("/clientes"), get("/cargas"), get("/servicos/todos"), get("/referencias-compartilhadas/prestadores"), get("/referencias-compartilhadas"), get("/orcamentos")]);
     if (!slot.isConnected || slot.dataset.requestId !== requestId) return;
     cachedRecords.set("referencias-compartilhadas", collectionFrom(references));
+    cachedRecords.set("shared-client-budgets", collectionFrom(budgets));
+    cachedRecords.set("shared-operational-services", collectionFrom(services));
     slot.innerHTML = `<h3>${record ? `Editar solicitação ${esc(record.id)}` : "Nova solicitação"}</h3>${sharedRequestForm(record, collectionFrom(clients), collectionFrom(cargos), collectionFrom(services), collectionFrom(staff), collectionFrom(references))}`;
+    const form = slot.querySelector('form[data-form="shared-request"]');
+    form.dataset.previousClient = String(record?.solicitante?.id ?? "");
+    refreshClientBudgets(form, collectionFrom(budgets));
     if (focus) slot.querySelector('[name="nomeServico"]')?.focus({ preventScroll: true });
   } catch (error) {
     if (slot.isConnected && slot.dataset.requestId === requestId) {
@@ -2072,8 +2151,11 @@ function navigateTo(path, { replace = false } = {}) {
 if (app) app.addEventListener("click", async (event) => {
   const sharedRequestAction = event.target.closest("[data-shared-request-action]");
   if (sharedRequestAction) {
-    const action = sharedRequestAction.dataset.sharedRequestAction;
-    const record = (cachedRecords.get("solicitacoes-compartilhadas") || []).find((item) => String(item.id) === sharedRequestAction.dataset.id);
+    const rawAction = sharedRequestAction.dataset.sharedRequestAction;
+    const action = rawAction.replace("-selected", "");
+    const selected = document.querySelector("[data-shared-request-selection]");
+    const requestId = rawAction.endsWith("-selected") ? selected?.value : sharedRequestAction.dataset.id;
+    const record = (cachedRecords.get("solicitacoes-compartilhadas") || []).find((item) => String(item.id) === requestId);
     if (action === "new") {
       const form = document.querySelector('#shared-request-slot form[data-form="shared-request"]');
       if (form?.dataset.dirty && !window.confirm("Descartar alterações não salvas no formulário?")) return;
@@ -2081,7 +2163,13 @@ if (app) app.addEventListener("click", async (event) => {
       await openSharedRequest();
     }
     else if (!record) showSectionError("Solicitação não encontrada. Atualize o painel.");
-    else await handleSharedRequestAction(action, record);
+    else {
+      if (selected) {
+        selected.value = String(record.id);
+        document.querySelectorAll('[data-shared-request-action="edit-selected"], [data-shared-request-action="print-selected"]').forEach((button) => { button.disabled = false; });
+      }
+      await handleSharedRequestAction(action, record);
+    }
     return;
   }
   const sharedReferenceAction = event.target.closest("[data-shared-reference-action]");
@@ -2461,12 +2549,64 @@ if (app) app.addEventListener("input", (event) => {
   }
 });
 if (app) app.addEventListener("change", (event) => {
+  if (event.target.matches("[data-shared-request-selection]")) {
+    document.querySelectorAll('[data-shared-request-action="edit-selected"], [data-shared-request-action="print-selected"]').forEach((button) => { button.disabled = !event.target.value; });
+    return;
+  }
   const sharedRequestFormElement = event.target.closest('form[data-form="shared-request"]');
   if (sharedRequestFormElement) sharedRequestFormElement.dataset.dirty = "true";
+  if (sharedRequestFormElement && event.target.name === "clienteId") {
+    const form = sharedRequestFormElement;
+    if (form.dataset.previousClient !== event.target.value &&
+        [form.elements.cargaOperacionalId.value, form.elements.servicoOperacionalId.value, form.elements.valor.value].some(Boolean) &&
+        !window.confirm("Trocar o cliente limpará a carga, o serviço operacional e o valor preenchidos. Continuar?")) {
+      event.target.value = form.dataset.previousClient;
+      return;
+    }
+    if (form.dataset.previousClient !== event.target.value) {
+      form.elements.cargaOperacionalId.value = "";
+      form.elements.servicoOperacionalId.value = "";
+      form.elements.valor.value = "";
+      if (form.dataset.autoServiceName === form.elements.nomeServico.value) form.elements.nomeServico.value = "";
+      delete form.dataset.autoServiceName;
+    }
+    form.dataset.previousClient = event.target.value;
+    refreshClientBudgets(form, cachedRecords.get("shared-client-budgets") || [], true);
+    return;
+  }
+  if (event.target.matches("[data-shared-client-budget]")) {
+    const form = sharedRequestFormElement;
+    const budget = clientBudgets(cachedRecords.get("shared-client-budgets") || [], form.elements.clienteId.value).find((item) => String(item.id) === event.target.value);
+    if (budget) {
+      if ([form.elements.cargaOperacionalId.value, form.elements.servicoOperacionalId.value, form.elements.valor.value].some(Boolean) &&
+          !window.confirm("Substituir a carga, o serviço operacional e o valor pelos dados deste orçamento?")) {
+        event.target.value = "";
+        return;
+      }
+      applyClientBudget(form, budget);
+    }
+    return;
+  }
+  if (event.target.matches("[data-service-name-reference]")) {
+    const form = sharedRequestFormElement;
+    const reference = (cachedRecords.get("referencias-compartilhadas") || []).find((item) => item.tipo === "SRV" && String(item.id) === event.target.value);
+    if (!reference) return;
+    if (form.elements.nomeServico.value && form.elements.nomeServico.value !== reference.nome &&
+        !window.confirm("Substituir o nome do serviço pela referência selecionada?")) {
+      event.target.value = form.elements.servicoReferenciaId.value;
+      return;
+    }
+    form.elements.nomeServico.value = reference.nome;
+    delete form.dataset.autoServiceName;
+    form.elements.servicoReferenciaId.value = String(reference.id);
+    form.querySelector('[data-shared-ref-details="servicoReferenciaId"]').value = sharedReferenceText(reference);
+    return;
+  }
   if (event.target.matches("[data-shared-ref]")) {
     const form = event.target.closest('form[data-form="shared-request"]');
     const reference = (cachedRecords.get("referencias-compartilhadas") || []).find((item) => String(item.id) === event.target.value);
     form.querySelector(`[data-shared-ref-details="${event.target.name}"]`).value = reference ? sharedReferenceText(reference) : "";
+    if (event.target.name === "servicoReferenciaId") form.querySelector("[data-service-name-reference]").value = event.target.value;
     if (event.target.name === "orcamentoReferenciaId" && reference?.valor != null) form.elements.valor.value = reference.valor;
     return;
   }

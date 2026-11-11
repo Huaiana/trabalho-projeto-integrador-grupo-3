@@ -37,10 +37,22 @@
 .dashboard .inline-form [data-cargo-reference]:empty,.dashboard .inline-form [data-operation-reference]:empty,.dashboard .inline-form [data-container-reference]:empty{display:none}
 .dashboard .inline-form .service-reference-value{margin:0}
 .dashboard .shared-request-unavailable{border:0;margin:0;padding:0;min-width:0}
+.dashboard .shared-panel-actions{display:grid;gap:8px;min-width:min(100%,320px)}
+.dashboard .shared-panel-actions .form-actions{display:flex;flex-wrap:wrap;gap:8px}
+.dashboard .shared-form-section{min-width:0;padding:18px;border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,.025)}
+.dashboard .shared-form-section h4{margin:0 0 16px;font-size:.95rem;color:var(--text)}
+.dashboard .shared-form-section>.muted{margin:12px 0 0}
 .dashboard .shared-request-form .inline-form-grid>.field-label:has([data-shared-ref-details]){grid-column:auto}
 .dashboard .shared-request-form [data-shared-ref-details]{min-height:84px}
+.dashboard .shared-requests-table .shared-request-actions{position:sticky;left:0;z-index:1;min-width:190px;background:#10242e;box-shadow:4px 0 8px rgba(0,0,0,.15)}
+.dashboard .shared-requests-table th.shared-request-actions{z-index:2}
+.dashboard .shared-requests-table .row-actions{flex-wrap:nowrap}
 @media(max-width:720px){
   .dashboard .inline-form-grid,.dashboard .service-form-grid{grid-template-columns:minmax(0,1fr)}
   .dashboard .inline-form-grid>.field-label:has(textarea),
-  .dashboard [data-form="charge"] .inline-form-grid>.field-label:has([name="tipoCarga"]){grid-column:auto}
+  .dashboard [data-form="charge"] .inline-form-grid>.field-label:has([name="tipoCarga"]),
+  .dashboard .shared-request-form .inline-form-grid>.field-label:has([data-shared-ref-details]){grid-column:auto}
+  .dashboard .shared-form-section{padding:14px}
+  .dashboard .shared-requests-table .shared-request-actions{min-width:0}
+  .dashboard .shared-requests-table .row-actions{flex-direction:column;align-items:stretch}
 }

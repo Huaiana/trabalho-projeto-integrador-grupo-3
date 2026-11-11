@@ -16,6 +16,8 @@ import {
   renderSharedRequestPanel,
   renderSharedSolicitationsError,
   sharedRequestForm,
+  clientBudgets,
+  budgetPrefill,
   filterSolicitations,
   filterSolicitationReferences,
   solicitationDescription,
@@ -277,7 +279,10 @@ describe("DOM interface helpers", () => {
     const markup = renderSharedSolicitations([request], [], false);
     for (const text of ["Pedido de atracação", "SRV-000001", "Dados do serviço", "CRG-000002", "CTR-000003", "OPR-000004", "ORC-000005", "125,50", "7 · Cliente", "9 · Funcionário", "Em análise"]) expect(markup).toContain(text);
     expect(markup).toContain("10/11/2026, 09:00:00 (Brasília)");
-    for (const action of ["new", "view", "edit", "print"]) expect(markup).toContain(`data-shared-request-action="${action}"`);
+    for (const action of ["view", "edit", "print"]) expect(markup).toContain(`data-shared-request-action="${action}"`);
+    expect(markup.indexOf('data-shared-request-action="edit"')).toBeLessThan(markup.indexOf("Pedido de atracação"));
+    expect(markup.indexOf('data-shared-request-action="print"')).toBeLessThan(markup.indexOf("Pedido de atracação"));
+    expect(markup).toContain('class="shared-request-actions"');
     expect(markup).not.toContain('data-shared-reference-action="new"');
     expect(renderSharedSolicitations([], [], true)).toContain('data-shared-reference-action="new"');
   });
@@ -292,6 +297,9 @@ describe("DOM interface helpers", () => {
     for (const field of ["nomeServico", "categoria", "descricao", "valor", "clienteId", "prestadorId", "cargaOperacionalId", "servicoOperacionalId", "statusSolicitacao"]) expect(markup).toContain(`name="${field}"`);
     expect(markup).toContain("Em análise");
     expect(markup).toContain("Supervisor");
+    for (const section of ["Dados do pedido", "Referências vinculadas"]) expect(markup).toContain(`aria-label="${section}"`);
+    expect(markup).toContain('data-service-name-reference');
+    expect(markup).toContain('data-shared-client-budget');
   });
 
   it("places the solicitation form directly in the panel, including when server data is unavailable", () => {
@@ -299,10 +307,28 @@ describe("DOM interface helpers", () => {
     expect(markup).toContain('id="shared-request-slot"');
     expect(markup).toContain('data-form="shared-request"');
     expect(markup).toContain("<fieldset disabled");
-    for (const label of ["ID da solicitação", "Nome do serviço para a solicitação", "Categoria", "Descrição do pedido", "Tipo de serviço oferecido", "Carga vinculada", "Contêiner vinculado", "Operação vinculada", "Orçamento vinculado", "Solicitante (cliente)", "Prestador de serviço", "Status da solicitação"]) expect(markup).toContain(label);
-    expect(markup).toContain("Criar nova solicitação");
+    for (const label of ["ID", "Nome do serviço para a solicitação", "Categoria", "Descrição do pedido", "Tipo de serviço oferecido", "Carga vinculada", "Contêiner vinculado", "Operação vinculada", "Orçamento vinculado", "Solicitante (cliente)", "Prestador de serviço", "Status da solicitação"]) expect(markup).toContain(label);
+    expect(markup).toContain("Criar solicitação");
+    expect(markup).toContain('data-shared-request-action="edit-selected" disabled');
+    expect(markup).toContain('data-shared-request-action="print-selected" disabled');
+    expect(renderSharedRequestPanel([{ id: 23, nomeServico: "Atracação" }])).toContain('value="23">23 · Atracação');
+    expect(renderSharedSolicitations([], [], true)).not.toContain('data-shared-request-action="new"');
     expect(markup).toContain("Salvar solicitação");
+    expect(renderSharedSolicitations([], [], false)).toContain("Após salvar uma solicitação");
     expect(markup).not.toContain('role="dialog"');
+  });
+
+  it("uses only budgets belonging to the selected client and supports both API shapes", () => {
+    const budgets = [
+      { id: 1, cliente_id: 7, carga_id: 4, servico_id: 5, valor_estimado: 0 },
+      { id: 2, cliente: { id: 7 }, carga: { id: 6 }, servico: { id: 8 }, valorEstimado: 19.5 },
+      { id: 3, cliente_id: 8, carga_id: 9, servico_id: 10 },
+    ];
+    expect(clientBudgets(budgets, "7").map((item) => item.id)).toEqual([1, 2]);
+    expect(clientBudgets(budgets, "")).toEqual([]);
+    expect(budgetPrefill(budgets[0])).toEqual({ carga: 4, servico: 5, valor: 0 });
+    expect(budgetPrefill(budgets[1])).toEqual({ carga: 6, servico: 8, valor: 19.5 });
+    expect(budgetPrefill(budgets[2]).valor).toBe("");
   });
 
   it("does not display refresh buttons in solicitations or the shared API error", () => {
