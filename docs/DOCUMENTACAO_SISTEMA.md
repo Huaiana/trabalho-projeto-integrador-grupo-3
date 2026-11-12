@@ -7,7 +7,7 @@ Plataforma web para operações portuárias/logísticas: clientes solicitam serv
 | Camada | Tecnologia | Hospedagem |
 |---|---|---|
 | Backend | Spring Boot 3.5.16, Java 21, Spring Security (OAuth2 Resource Server/JWT), Spring Data JPA | Render (Docker) |
-| Frontend | Vite + JavaScript puro (SPA) | Cloudflare Pages (`techocean`) |
+| Frontend | React, TypeScript, TanStack Start e Vite | Cloudflare (Worker SSR) |
 | Banco | JPA/Hibernate (`ddl-auto=update` em produção) | Configurado por variáveis de ambiente |
 
 URLs: frontend `https://techocean.pages.dev`; API `https://trabalho-projeto-integrador-grupo-3-1.onrender.com`.
@@ -22,7 +22,7 @@ demo/                      Backend (pom.xml na raiz; fontes em demo/src)
     model/                 Entidades JPA
     repository/            Spring Data repositories
     service/               Regras de negócio
-web/techocean-web-main/    Frontend (src/main.js, src/api.js, testes, build Vite)
+web/techocean-web-main/    Frontend React/TanStack (src/routes, services, testes, build Vite/Nitro)
 Dockerfile                 Build do backend no Render (contexto = raiz do repo)
 docs/                      Documentação
 ```
@@ -46,7 +46,7 @@ Regras em `SecurityConfig`: ordem das regras do mais específico ao mais genéri
 - **Sessões**: cada login cria `AuthSession`; token JWT referencia a sessão; logout encerra. Aba "Sessões" lista início, última atividade, duração (segundos) e botão **Acessar** (ativa) / **Verificar** (encerrada), que abre as ações da sessão (`GET /admin/sessoes/{id}/auditoria`).
 - **Auditoria**: `SessionAuditInterceptor` registra cada requisição autenticada em `AuditEvent` com: código único do evento (`EVT-yyyyMMdd-HHmmssSSS-XXXXXX`), código da ação (ex.: `AUTH-001`, `ADM-00x`, `BKP-001`, `AUD-001`, `CARGA-00x`, `SYS-999`), descrição, profissional, data/hora, sessão.
 - **Backup**: `/api/backup/operacional` (todos os perfis), `/api/backup/admin/completo`, `/api/backup/historico`. Cada backup gera `BackupRecord` (código `BKP-yyyyMMdd-HHmmss-XXXXXX`, autor, data/hora, quantidade de registros). O histórico persiste no banco; os arquivos ficam em `./backups/` (efêmero no Render).
-- **Frontend**: botão `← Painel` em todas as abas; token persistido em `localStorage` (`techocean.accessToken`) para manter login após novo deploy.
+- **Frontend**: aplicação React/TanStack Start com rotas, serviços e componentes tipados; a autenticação usa sessões por cookie HttpOnly validadas pela API, sem persistir token de acesso no `localStorage`.
 - **Relógio dos painéis**: a barra exibe data e hora em `America/Sao_Paulo` nas páginas de acesso e nos painéis, atualizadas a cada segundo com o relógio do dispositivo. A precisão depende da data e hora configuradas no dispositivo; não há sincronização com servidor de horário. Datas de registros e agendamentos existentes mantêm sua interpretação atual.
 - **Banco de dados de referências no frontend**: o administrador pode editar valores, tarifas por condição e vincular IDs de serviços, cargas, contêineres e operações na categoria Orçamento. A equipe consulta essas referências ao criar um orçamento; os vínculos não identificados automaticamente devem ser selecionados pelo administrador. As tarifas de 2017 são históricas, exigem confirmação e não calculam automaticamente períodos, adicionais ou impostos. Os dados de referência e os metadados locais de orçamento ficam no navegador, sem sincronização entre dispositivos; os cadastros operacionais continuam utilizando a API.
 - **Valores de serviço**: o valor individual do serviço é salvo por ID no navegador e sugerido em novos orçamentos nesse navegador; não é enviado à API. No formulário de serviço, o administrador pode alterar separadamente a tarifa da referência selecionada, salva no Banco de dados local.
@@ -110,7 +110,7 @@ Injeção SQL (JPA parametrizado), exposição de senhas em respostas, controle 
 
 - **Build/testes**: `npm test`, `npm run lint`, `npm run build` na raiz (scripts delegam ao frontend); backend `.\mvnw.cmd -DskipTests package`.
 - **Deploy backend**: push no `main` dispara auto-deploy no Render (Dockerfile).
-- **Deploy frontend**: `npx wrangler pages deploy 'web/techocean-web-main/dist' --project-name techocean` (usar o `dist` do frontend, não o da raiz).
+- **Deploy frontend**: execute `npm ci` e `npm run build` no diretório `web/techocean-web-main`; o TanStack/Nitro gera o Worker SSR e sua configuração Wrangler em `.output/server/wrangler.json` (não usar o antigo `dist`).
 - **Variáveis importantes**: `APP_AUTH_SECRET`, credenciais do banco, SMTP (opcional), `VITE_API_URL` (frontend).
 
 ## 8. Plano de correção sugerido (prioridade)

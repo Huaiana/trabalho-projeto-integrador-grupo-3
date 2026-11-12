@@ -64,9 +64,7 @@ function Cadastro() {
         setErros({ cpf: error.message });
       } else {
         setErroGeral(
-          error instanceof Error
-            ? error.message
-            : "Não foi possível concluir o cadastro.",
+          error instanceof Error ? error.message : "Não foi possível concluir o cadastro.",
         );
       }
     } finally {
@@ -86,8 +84,8 @@ function Cadastro() {
             <p className="eyebrow">Cadastro confirmado</p>
             <h1 className="mt-3 text-3xl font-bold">Cadastro criado!</h1>
             <p className="mt-4 text-muted-foreground">
-              Seu cadastro de cliente foi realizado com sucesso. Nossa equipe
-              entrará em contato pelo telefone ou e-mail informado.
+              Seu cadastro de cliente foi realizado com sucesso. Nossa equipe entrará em contato
+              pelo telefone ou e-mail informado.
             </p>
             <Link
               to="/"
@@ -107,13 +105,7 @@ function Cadastro() {
             <form className="mt-8 space-y-5" onSubmit={cadastrar} noValidate>
               <label className="block text-sm font-medium" htmlFor="nome">
                 Nome completo
-                <input
-                  id="nome"
-                  name="nome"
-                  autoComplete="name"
-                  required
-                  className={campoClasse}
-                />
+                <input id="nome" name="nome" autoComplete="name" required className={campoClasse} />
                 {erros["nome"] && (
                   <span className="mt-1 block text-xs text-destructive" role="alert">
                     {erros["nome"]}

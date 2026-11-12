@@ -2,14 +2,16 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { secoes } from "@/lib/dashboard-secoes";
 
 export const Route = createFileRoute("/dashboard/")({
-  head: () => ({ meta: [
-    { title: "Visão geral — Techocean" },
-    { name: "description", content: "Acesso às áreas de gestão Techocean." },
-    { property: "og:title", content: "Visão geral — Techocean" },
-    { property: "og:description", content: "Acesso às áreas de gestão Techocean." },
-    { property: "og:type", content: "website" },
-    { name: "twitter:card", content: "summary" },
-  ] }),
+  head: () => ({
+    meta: [
+      { title: "Visão geral — Techocean" },
+      { name: "description", content: "Acesso às áreas de gestão Techocean." },
+      { property: "og:title", content: "Visão geral — Techocean" },
+      { property: "og:description", content: "Acesso às áreas de gestão Techocean." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+    ],
+  }),
   component: VisaoGeral,
 });
 

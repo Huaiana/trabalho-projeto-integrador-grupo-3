@@ -81,8 +81,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { title: "Techocean — Amarração e Segurança de Cargas" },
       {
         name: "description",
-        content:
-          "Projetamos amarrações e instalações que protegem cada produto até o destino.",
+        content: "Projetamos amarrações e instalações que protegem cada produto até o destino.",
       },
       { property: "og:title", content: "Techocean — Amarração e Segurança de Cargas" },
       {

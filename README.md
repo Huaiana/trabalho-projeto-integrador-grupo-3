@@ -24,11 +24,11 @@ npm ci
 npm run dev
 ```
 
-O `npm ci` na raiz instala as dependências do frontend em `web/techocean-web-main/`. O site ficará disponível em `http://localhost:5173`. Em desenvolvimento, as chamadas usam o proxy `/api` do Vite, evitando chamadas cross-origin do navegador. O destino do proxy é `VITE_API_URL`, quando definido, ou o Spring Boot local em `http://127.0.0.1:8080`.
+O frontend atualizado usa React, TypeScript e TanStack Start. O `npm ci` na raiz instala as dependências em `web/techocean-web-main/`. O site ficará disponível em `http://localhost:5173`. Em desenvolvimento, as chamadas à API usam o proxy `/api`; `VITE_API_URL` pode substituir o destino local padrão.
 
 Para evitar que a interface fique carregando indefinidamente quando a API não responde, as requisições expiram após 15 segundos e exibem um erro que permite tentar novamente.
 
-Assim, `web/techocean-web-main/.env` pode apontar `VITE_API_URL` para a API Render ou para uma API local. No build de produção, essa mesma variável define a URL chamada diretamente pelo navegador.
+Assim, `web/techocean-web-main/.env` pode apontar `VITE_API_URL` para a API publicada ou para uma API local. A configuração `.env` já existente foi mantida na substituição do frontend.
 
 Se a porta `8080` já estiver ocupada, inicie a API em outra porta e configure a URL no terminal do frontend:
 
@@ -54,11 +54,11 @@ npm test
 npm run lint
 ```
 
-No deploy, defina `VITE_API_URL` no ambiente de build do Cloudflare Pages para o endpoint remoto.
+No deploy, defina `VITE_API_URL` no ambiente de build do Cloudflare para o endpoint remoto. O build TanStack/Nitro gera a saída em `.output`; não use a pasta `dist` do frontend antigo.
 
 ## Publicação
 
-- **Frontend:** Cloudflare Pages, diretório `web/techocean-web-main`, comando `npm ci && npm run build`, saída `dist`. Defina `VITE_API_URL` como a URL HTTPS pública da API Railway.
+- **Frontend:** Cloudflare, diretório `web/techocean-web-main`, comando `npm ci && npm run build`. O build gera a configuração do Worker SSR em `.output/server/wrangler.json`; defina `VITE_API_URL` como a URL HTTPS pública da API Railway.
 - **API e banco:** Railway usando o Dockerfile da raiz e um PostgreSQL no mesmo projeto. Configure `SPRING_PROFILES_ACTIVE=production`, as variáveis `DB_*` ligadas às variáveis `PG*` do PostgreSQL, `APP_AUTH_SECRET` e `CORS_ALLOWED_ORIGIN_PATTERNS` com o domínio Pages do site. As instruções completas estão em [backend/techocean-main/README.md](./backend/techocean-main/README.md).
 
 O banco novo começa vazio. Exporte e importe os dados do banco antigo antes de direcionar o tráfego se precisar preservá-los.

@@ -2,7 +2,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cargaSchema } from "@/models/carga";
 import { cadastrarCarga, listarCargas } from "@/services/cargas";
 
-const carga = { descricao: "Bobinas de aço", peso: 24.5, volume: 12.8, tipoCarga: "Bobinas", origem: "Santos", destino: "Recife" };
+const carga = {
+  descricao: "Bobinas de aço",
+  peso: 24.5,
+  volume: 12.8,
+  tipoCarga: "Bobinas",
+  origem: "Santos",
+  destino: "Recife",
+};
 afterEach(() => vi.unstubAllGlobals());
 
 describe("Modelo de carga enviado pelo usuário", () => {
@@ -27,7 +34,10 @@ describe("Integração de cargas", () => {
     vi.stubGlobal("fetch", fetchMock);
     await cadastrarCarga(carga);
     expect(fetchMock).toHaveBeenCalledWith(expect.stringMatching(/\/cargas$/), {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(carga),
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(carga),
+      credentials: "include",
     });
   });
   it("não envia carga sem destino", async () => {
@@ -41,11 +51,17 @@ describe("Integração de cargas", () => {
     expect(await listarCargas()).toEqual([{ id: 7, ...carga }]);
   });
   it("lê uma página Spring", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({ content: [{ id: 7, ...carga }] })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(Response.json({ content: [{ id: 7, ...carga }] })),
+    );
     expect(await listarCargas()).toEqual([{ id: 7, ...carga }]);
   });
   it("não trata falha do servidor como sucesso", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({ message: "Carga recusada" }, { status: 400 })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(Response.json({ message: "Carga recusada" }, { status: 400 })),
+    );
     await expect(cadastrarCarga(carga)).rejects.toThrow("Carga recusada");
   });
 });

@@ -11,3 +11,5 @@
 
 - Cargo uses a model for validation, a repository for HTTP, a service for business orchestration, and a controller hook consumed by its panel; each layer has a single responsibility.
 - Cargo API reads run in the browser through React Query, not SSR loaders, because the user's localhost API is reachable only from their own browser.
+- Authentication uses browser requests with HttpOnly cookie sessions validated by the own API; dashboard disables SSR and checks the server session in beforeLoad so private UI never renders before validation. Profile fields are display-only; authorization belongs to the API.
+- Authentication keeps validation, HTTP, query orchestration and controller hooks separate, matching the existing layered integration pattern.

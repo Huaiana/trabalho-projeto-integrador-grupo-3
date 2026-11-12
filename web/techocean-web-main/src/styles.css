@@ -150,8 +150,15 @@
 }
 
 @layer base {
-  body { font-family: var(--font-sans); }
-  h1, h2, h3 { font-family: var(--font-display); letter-spacing: -0.02em; }
+  body {
+    font-family: var(--font-sans);
+  }
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+  }
 }
 
 @utility eyebrow {
@@ -163,5 +170,9 @@
 }
 
 @utility hero-overlay {
-  background: linear-gradient(180deg, oklch(0.16 0.03 240 / 0.35) 0%, oklch(0.16 0.03 240 / 0.95) 100%);
+  background: linear-gradient(
+    180deg,
+    oklch(0.16 0.03 240 / 0.35) 0%,
+    oklch(0.16 0.03 240 / 0.95) 100%
+  );
 }

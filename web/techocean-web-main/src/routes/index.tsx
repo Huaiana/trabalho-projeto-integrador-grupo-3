@@ -1,5 +1,15 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { ArrowUpRight, ArrowDown, Compass, Anchor, ShieldCheck, Container, X, Send, UserPlus } from "lucide-react";
+import {
+  ArrowUpRight,
+  ArrowDown,
+  Compass,
+  Anchor,
+  ShieldCheck,
+  Container,
+  X,
+  Send,
+  UserPlus,
+} from "lucide-react";
 import { useState, type FormEvent, type ReactNode } from "react";
 import heroPort from "@/assets/hero-port.jpg";
 import lashing from "@/assets/lashing.jpg";
@@ -22,8 +32,7 @@ export const Route = createFileRoute("/")({
       { property: "og:title", content: "Techocean — Amarração e Segurança de Cargas" },
       {
         property: "og:description",
-        content:
-          "A segurança da sua carga começa antes de embarcar. Precisão em cada amarração.",
+        content: "A segurança da sua carga começa antes de embarcar. Precisão em cada amarração.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -179,10 +188,7 @@ function Index() {
       setPedirSenha(false);
       setAgendamentoConfirmado(true);
     } catch (error) {
-      if (
-        error instanceof ErroAgendamentoApi &&
-        error.code === "CADASTRO_NECESSARIO"
-      ) {
+      if (error instanceof ErroAgendamentoApi && error.code === "CADASTRO_NECESSARIO") {
         salvarAgendamentoPendente(dados);
         await navigate({ to: "/cadastro" });
         return;
@@ -196,9 +202,7 @@ function Index() {
       }
 
       setErroAgendamento(
-        error instanceof Error
-          ? error.message
-          : "Não foi possível enviar a solicitação de visita.",
+        error instanceof Error ? error.message : "Não foi possível enviar a solicitação de visita.",
       );
     } finally {
       setEnviandoAgendamento(false);
@@ -253,8 +257,7 @@ function Index() {
             A segurança da sua carga começa antes de embarcar.
           </h1>
           <p className="mt-6 max-w-xl text-base text-muted-foreground md:text-lg">
-            Projetamos amarrações e instalações que protegem cada produto até o
-            destino.
+            Projetamos amarrações e instalações que protegem cada produto até o destino.
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-6">
             <button
@@ -294,10 +297,9 @@ function Index() {
             Experiência construída no cais, projeto a projeto.
           </h2>
           <p className="text-muted-foreground leading-relaxed">
-            Há mais de 15 anos atuamos nos principais portos do país, unindo
-            engenharia e prática operacional para garantir que cada carga chegue
-            intacta ao destino. Nossa equipe acompanha embarques de ponta a
-            ponta, do planejamento da amarração à inspeção final.
+            Há mais de 15 anos atuamos nos principais portos do país, unindo engenharia e prática
+            operacional para garantir que cada carga chegue intacta ao destino. Nossa equipe
+            acompanha embarques de ponta a ponta, do planejamento da amarração à inspeção final.
           </p>
         </div>
       </section>
@@ -319,9 +321,7 @@ function Index() {
                   <s.icon className="size-8 text-primary" />
                 </div>
                 <h3 className="mt-8 text-2xl font-semibold">{s.title}</h3>
-                <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-                  {s.desc}
-                </p>
+                <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{s.desc}</p>
                 <button
                   type="button"
                   onClick={() => setServicoAberto(s)}
@@ -345,9 +345,9 @@ function Index() {
               Cada detalhe verificado antes da partida.
             </h2>
             <p className="mt-6 text-muted-foreground leading-relaxed">
-              Do cálculo de tensão das cintas à conferência dos pontos de
-              fixação, nosso time segue protocolos rigorosos em campo. É assim
-              que mantemos zero incidentes de carga em toda a nossa história.
+              Do cálculo de tensão das cintas à conferência dos pontos de fixação, nosso time segue
+              protocolos rigorosos em campo. É assim que mantemos zero incidentes de carga em toda a
+              nossa história.
             </p>
             <button
               type="button"
@@ -370,9 +370,7 @@ function Index() {
 
       <footer className="border-t border-border px-6 py-8 md:px-12">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 text-sm text-muted-foreground">
-          <span className="font-display font-bold text-foreground">
-            Techocean
-          </span>
+          <span className="font-display font-bold text-foreground">Techocean</span>
           <p>© 2026 Techocean. Precisão em cada amarração.</p>
         </div>
       </footer>
@@ -411,8 +409,8 @@ function Index() {
       {painelAgendamento && (
         <Painel titulo="Solicite uma visita técnica" onFechar={() => setPainelAgendamento(false)}>
           <p className="text-sm text-muted-foreground">
-            Informe seus dados e escolha a melhor data para nossa equipe entrar
-            em contato e confirmar a visita.
+            Informe seus dados e escolha a melhor data para nossa equipe entrar em contato e
+            confirmar a visita.
           </p>
           <form className="mt-6 grid gap-5" onSubmit={enviarAgendamento}>
             <label className="text-sm font-medium" htmlFor="agendamento-nome">
@@ -478,8 +476,7 @@ function Index() {
                 required
                 className="mt-1 size-4 accent-primary"
               />
-              Confirmo que os dados estão corretos e solicito o agendamento da
-              visita técnica.
+              Confirmo que os dados estão corretos e solicito o agendamento da visita técnica.
             </label>
             {erroAgendamento && (
               <p className="text-sm text-destructive" role="alert">
@@ -488,8 +485,7 @@ function Index() {
             )}
             {agendamentoConfirmado && (
               <p className="text-sm text-primary" role="status">
-                Solicitação confirmada. Nossa equipe entrará em contato para
-                confirmar a visita.
+                Solicitação confirmada. Nossa equipe entrará em contato para confirmar a visita.
               </p>
             )}
             <button
