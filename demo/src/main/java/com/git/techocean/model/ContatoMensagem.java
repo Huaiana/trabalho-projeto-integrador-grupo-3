@@ -36,6 +36,9 @@ public class ContatoMensagem {
     @Column(length = 1000)
     private String resposta;
 
+    @Column(nullable = false, columnDefinition = "boolean default false")
+    private boolean lida;
+
     @Column(nullable = false, length = 30)
     private String status;
 

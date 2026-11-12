@@ -392,7 +392,8 @@ async function loadSection(section, databaseCategory = "servico") {
       } catch (referenceError) {
         references = `<div class="load-error" role="alert">Não foi possível carregar as referências locais: ${esc(referenceError.message)}</div>`;
       }
-      host.innerHTML = `<div class="load-error" role="alert"><p>${esc(error.message)}</p>${section.slug === "solicitacao" ? "" : '<button class="button button-outline" data-reload>Atualizar</button>'}</div>${references}`;
+      const canReload = !["cliente", "conteiner", "mensagens", "operacao", "orcamento", "servico", "agendamento", "solicitacao"].includes(section.slug);
+      host.innerHTML = `<div class="load-error" role="alert"><p>${esc(error.message)}</p>${canReload ? '<button class="button button-outline" data-reload>Atualizar</button>' : ""}</div>${references}`;
       if (section.slug === "solicitacao") {
         host.insertAdjacentHTML("afterbegin", '<div id="shared-solicitations"><p class="loading-state">Carregando solicitações compartilhadas…</p></div>');
         await loadSharedSolicitations(host.querySelector("#shared-solicitations"));
@@ -437,7 +438,8 @@ export function renderCrudSection(records, section, setupStatus = null) {
   const panelTitle = isUserSettings ? "Contas de acesso" : `${section.name}s`;
   const panelEyebrow = isUserSettings ? "CONFIGURAÇÕES" : "GESTÃO / REGISTROS";
   const actionLabel = isUserSettings ? "Novo administrador" : `Novo ${definition.singular}`;
-  const actions = `<div class="panel-actions"><button class="button button-outline compact" data-reload>↻ <span>Atualizar</span></button><button class="button button-outline compact" type="button" data-edit-resource-form="${section.slug}">Editar</button><button class="button button-outline compact" type="button" data-save-resource-form="${section.slug}">✓ <span>Salvar</span></button><button class="button button-primary compact" data-action="new-resource" data-resource="${section.slug}">＋ ${actionLabel}</button></div>`;
+  const refresh = ["cliente", "conteiner", "operacao", "servico", "agendamento"].includes(section.slug) ? "" : '<button class="button button-outline compact" data-reload>↻ <span>Atualizar</span></button>';
+  const actions = `<div class="panel-actions">${refresh}<button class="button button-outline compact" type="button" data-edit-resource-form="${section.slug}">Editar</button><button class="button button-outline compact" type="button" data-save-resource-form="${section.slug}">✓ <span>Salvar</span></button><button class="button button-primary compact" data-action="new-resource" data-resource="${section.slug}">＋ ${actionLabel}</button></div>`;
   const emptyTitle = isUserSettings ? "Nenhuma conta de acesso encontrada" : "Nenhum registro encontrado";
   const emptyDescription = isUserSettings
     ? "Crie uma conta para o administrador ou para outro integrante da equipe."
@@ -484,7 +486,7 @@ export function renderResourceTable(records, slug, role = userRole()) {
   if (slug === "servico") columns.push("valorLocal");
   const serviceValues = slug === "servico" ? readServiceValues() : {};
   const allowDelete = roleCapabilities(role).canDeleteOperational;
-  return `<div class="table-scroll"><table class="records-table"><thead><tr>${columns.map((key) => `<th>${esc(key === "valorLocal" ? "Valor local (R$)" : labelFor(key))}</th>`).join("")}<th>Ações</th></tr></thead><tbody>${records.map((record) => `<tr>${columns.map((key) => `<td>${key === "valorLocal" ? serviceValues[record.id] ? esc(formatarTarifaServico({ valor: serviceValues[record.id].valor })) : "Não definido" : statusPill(key, record[key])}</td>`).join("")}<td><div class="row-actions"><button class="small-action" type="button" data-resource-action="view" data-resource="${slug}" data-id="${esc(record.id)}">Ver</button><button class="small-action" type="button" data-resource-action="edit" data-resource="${slug}" data-id="${esc(record.id)}">Editar</button>${slug === "servico" ? `<button class="small-action" type="button" data-resource-action="edit-value" data-resource="${slug}" data-id="${esc(record.id)}">Editar valor</button>` : ""}<button class="small-action" type="button" data-resource-action="print" data-resource="${slug}" data-id="${esc(record.id)}">Imprimir</button>${slug === "agendamento" ? `<button class="small-action" type="button" data-status-id="${esc(record.id)}" data-status="${String(record.status).toLowerCase() === "true" || String(record.status).toLowerCase() === "confirmado" ? "pendente" : "confirmado"}">${String(record.status).toLowerCase() === "true" || String(record.status).toLowerCase() === "confirmado" ? "Marcar pendente" : "Confirmar"}</button>` : ""}${allowDelete ? `<button class="small-action danger-action" type="button" data-resource-action="delete" data-resource="${slug}" data-id="${esc(record.id)}" data-label="${esc(record[columns[1]] ?? definition.singular)}">Excluir</button>` : ""}</div></td></tr>`).join("")}</tbody></table></div>`;
+  return `<div class="table-scroll"><table class="records-table ${slug === "servico" ? "service-records-table" : ""}"><thead><tr>${columns.map((key) => `<th>${esc(key === "valorLocal" ? "Valor local (R$)" : labelFor(key))}</th>`).join("")}<th>Ações</th></tr></thead><tbody>${records.map((record) => `<tr>${columns.map((key) => `<td>${key === "valorLocal" ? serviceValues[record.id] ? esc(formatarTarifaServico({ valor: serviceValues[record.id].valor })) : "Não definido" : statusPill(key, record[key])}</td>`).join("")}<td><div class="row-actions"><button class="small-action" type="button" data-resource-action="view" data-resource="${slug}" data-id="${esc(record.id)}">Ver</button><button class="small-action" type="button" data-resource-action="edit" data-resource="${slug}" data-id="${esc(record.id)}">Editar</button>${slug === "servico" ? `<button class="small-action" type="button" data-resource-action="edit-value" data-resource="${slug}" data-id="${esc(record.id)}">Editar valor</button>` : ""}<button class="small-action" type="button" data-resource-action="print" data-resource="${slug}" data-id="${esc(record.id)}">Imprimir</button>${slug === "agendamento" ? `<button class="small-action" type="button" data-status-id="${esc(record.id)}" data-status="${String(record.status).toLowerCase() === "true" || String(record.status).toLowerCase() === "confirmado" ? "pendente" : "confirmado"}">${String(record.status).toLowerCase() === "true" || String(record.status).toLowerCase() === "confirmado" ? "Marcar pendente" : "Confirmar"}</button>` : ""}${allowDelete ? `<button class="small-action danger-action" type="button" data-resource-action="delete" data-resource="${slug}" data-id="${esc(record.id)}" data-label="${esc(record[columns[1]] ?? definition.singular)}">Excluir</button>` : ""}</div></td></tr>`).join("")}</tbody></table></div>`;
 }
 
 function renderServiceSection(records, section) {
@@ -670,8 +672,8 @@ export function renderResourceFormMarkup(slug, record = null, appointmentAccount
   const localDetails = ["conteiner", "operacao"].includes(slug) && editing ? readResourceDetails()[`${slug}:${record.id}`] : null;
   const containerCode = slug === "conteiner" ? `<label class="field-label">ID do tipo de contêiner<input name="codigoReferencia" value="${esc(localDetails?.referencia || "")}" list="container-code-suggestions" autocomplete="off" placeholder="Ex.: CTR-000001"></label><datalist id="container-code-suggestions"></datalist>` : "";
   const containerDetails = slug === "conteiner" ? `<div data-container-reference aria-live="polite"></div>` : "";
-  const operationReference = slug === "operacao" ? `<label class="field-label">Buscar por ID da operação, carga ou contêiner<input name="codigoOperacao" value="${esc(localDetails?.referencia || "")}" list="operation-code-suggestions" autocomplete="off" placeholder="Ex.: OPR-000001, CRG-000001 ou CTR-000001"></label><datalist id="operation-code-suggestions"></datalist><div data-operation-reference aria-live="polite"></div>` : "";
-  const operationDetails = slug === "operacao" ? `<div class="inline-form-grid"><label class="field-label">Categoria da operação<input name="categoriaReferencia" readonly placeholder="Não informada"></label><label class="field-label">IDs e tipos dos contêineres da operação<textarea name="conteineresReferencia" rows="3" readonly placeholder="Nenhum vínculo cadastrado"></textarea></label><label class="field-label">IDs e tipos das cargas vinculadas<textarea name="cargasReferencia" rows="3" readonly placeholder="Nenhum vínculo cadastrado"></textarea></label><label class="field-label">Contêineres vinculados às cargas<textarea name="conteineresDasCargasReferencia" rows="3" readonly placeholder="Nenhum vínculo cadastrado"></textarea></label><label class="field-label">Principais cargas<textarea name="cargasPrincipaisReferencia" rows="3" readonly placeholder="Não informadas"></textarea></label><label class="field-label">Berços<input name="bercosReferencia" readonly placeholder="Não informados"></label><label class="field-label">Produtividade de referência<textarea name="produtividadeReferencia" rows="3" readonly placeholder="Não informada"></textarea></label><label class="field-label">Embarque — data e hora de Brasília<input type="datetime-local" name="embarqueLocal" value="${esc(localDetails?.embarqueLocal || "")}"></label><label class="field-label">Desembarque — data e hora de Brasília<input type="datetime-local" name="desembarqueLocal" value="${esc(localDetails?.desembarqueLocal || "")}"></label></div><p class="muted small">Os contêineres das cargas são referências de tipo, não substituem o código do contêiner operacional. Embarque e desembarque são opcionais e salvos neste navegador como horário de Brasília.</p>` : "";
+  const operationReference = slug === "operacao" ? `<label class="field-label operation-reference-search">Buscar por ID da operação, carga ou contêiner<input name="codigoOperacao" value="${esc(localDetails?.referencia || "")}" list="operation-code-suggestions" autocomplete="off" placeholder="Ex.: OPR-000001, CRG-000001 ou CTR-000001"></label><datalist id="operation-code-suggestions"></datalist><div data-operation-reference aria-live="polite"></div>` : "";
+  const operationDetails = slug === "operacao" ? `<div class="inline-form-grid operation-details-grid"><label class="field-label">Categoria da operação<input name="categoriaReferencia" readonly placeholder="Não informada"></label><label class="field-label">IDs e tipos dos contêineres da operação<textarea name="conteineresReferencia" rows="3" readonly placeholder="Nenhum vínculo cadastrado"></textarea></label><label class="field-label">IDs e tipos das cargas vinculadas<textarea name="cargasReferencia" rows="3" readonly placeholder="Nenhum vínculo cadastrado"></textarea></label><label class="field-label">Contêineres vinculados às cargas<textarea name="conteineresDasCargasReferencia" rows="3" readonly placeholder="Nenhum vínculo cadastrado"></textarea></label><label class="field-label">Principais cargas<textarea name="cargasPrincipaisReferencia" rows="3" readonly placeholder="Não informadas"></textarea></label><label class="field-label">Berços<input name="bercosReferencia" readonly placeholder="Não informados"></label><label class="field-label">Produtividade de referência<textarea name="produtividadeReferencia" rows="3" readonly placeholder="Não informada"></textarea></label><label class="field-label">Embarque — data e hora de Brasília<input type="datetime-local" name="embarqueLocal" value="${esc(localDetails?.embarqueLocal || "")}"></label><label class="field-label">Desembarque — data e hora de Brasília<input type="datetime-local" name="desembarqueLocal" value="${esc(localDetails?.desembarqueLocal || "")}"></label></div><p class="muted small">Os contêineres das cargas são referências de tipo, não substituem o código do contêiner operacional. Embarque e desembarque são opcionais e salvos neste navegador como horário de Brasília.</p>` : "";
   const localDescription = ["conteiner", "operacao"].includes(slug) ? `<label class="field-label">Descrição da referência (salva neste navegador)<textarea name="descricaoLocal" rows="5">${esc(localDetails?.descricao || "")}</textarea><small>Preenchida com dados da referência e editável manualmente; não altera o cadastro no servidor.</small></label>` : "";
   const serviceValue = slug === "servico" && editing ? readServiceValues()[record.id]?.valor : null;
   const serviceFields = slug === "servico" ? `<div class="service-form-grid">${fields.map((item) => `<div class="service-field service-field-${esc(item.name)}">${resourceFieldMarkup(item, resourceFormRecord, editing, lookupField)}</div>`).join("")}<label class="field-label service-field service-field-valor">Valor do serviço neste navegador (R$)<input type="number" name="valorLocal" min="0" step="0.01" value="${esc(serviceValue ?? "")}"><small>Opcional. Salvo com o serviço apenas neste navegador; não altera a tarifa da referência.</small></label></div>${role === "ADMIN" ? `<div class="service-reference-value"><label class="field-label">Editar tarifa da referência (R$)<input type="number" name="valorReferencia" min="0" step="0.01" disabled></label><button class="button button-outline compact" type="button" data-save-service-reference-value disabled>Salvar tarifa da referência</button><p class="muted small">Selecione um código. Esta alteração é salva separadamente no Banco de dados deste navegador.</p></div>` : ""}` : `<div class="inline-form-grid">${fields.map((item) => resourceFieldMarkup(item, resourceFormRecord, editing, lookupField)).join("")}</div>`;
@@ -749,8 +751,50 @@ function statusPill(key, value) {
 }
 
 export function renderMessages(records) {
-  if (!records.length) return `<div class="data-panel"><div class="panel-heading"><div><span class="eyebrow">FALE CONOSCO</span><h2>Caixa de entrada <span class="count-pill">0</span></h2></div><button class="button button-outline compact" data-reload>↻ Atualizar</button></div><div class="empty-state"><span>✉</span><strong>Nenhuma mensagem recebida</strong><p>As mensagens enviadas pelo formulário do site aparecerão aqui.</p></div></div>`;
-  return `<div class="data-panel"><div class="panel-heading"><div><span class="eyebrow">FALE CONOSCO</span><h2>Caixa de entrada <span class="count-pill">${records.length}</span></h2></div><button class="button button-outline compact" data-reload>↻ Atualizar</button></div><div class="message-list">${records.map((message) => `<article class="message-card"><div class="message-heading"><div class="avatar">${esc((message.nome || "?").slice(0, 1).toUpperCase())}</div><div><h2>${valueText(message.nome)}</h2><p>${valueText(message.email)} · ${message.criadoEm ? valueText(new Date(message.criadoEm).toLocaleString("pt-BR")) : "Contato recebido"}</p></div><span class="status-pill">${valueText(message.status || "Recebida")}</span></div><p class="message-content">${valueText(message.conteudo || message.mensagem || message.texto)}</p>${message.resposta ? `<div class="reply-sent"><strong>Resposta enviada</strong><p>${valueText(message.resposta)}</p></div>` : ""}${message.id ? `<form class="inline-reply" data-form="reply" data-message-id="${esc(message.id)}"><label class="sr-only" for="reply-${esc(message.id)}">Resposta</label><input id="reply-${esc(message.id)}" name="resposta" required placeholder="Escreva uma resposta…"><button class="button button-primary compact">Responder ↗</button></form>` : ""}</article>`).join("")}</div></div>`;
+  if (!records.length) return `<div class="data-panel"><div class="panel-heading"><div><span class="eyebrow">FALE CONOSCO</span><h2>Caixa de entrada <span class="count-pill">0</span></h2></div></div><div class="empty-state"><span>✉</span><strong>Nenhuma mensagem recebida</strong><p>As mensagens enviadas pelo formulário do site aparecerão aqui.</p></div></div>`;
+  return `<div class="data-panel"><div class="panel-heading"><div><span class="eyebrow">FALE CONOSCO</span><h2>Caixa de entrada <span class="count-pill">${records.length}</span></h2></div></div><div class="message-list">${records.map((message) => {
+    const read = message.lida === true;
+    const answered = Boolean(String(message.resposta || "").trim());
+    const received = message.criadoEm ? valueText(new Date(message.criadoEm).toLocaleString("pt-BR")) : "Contato recebido";
+    return `<article class="message-card message-card-clickable" tabindex="0" data-message-card="${esc(message.id)}" aria-label="Visualizar mensagem de ${esc(message.nome || "remetente")}"><div class="message-heading"><div class="avatar">${esc((message.nome || "?").slice(0, 1).toUpperCase())}</div><div class="message-sender"><h2>${valueText(message.nome)}</h2><p>${valueText(message.email)} · ${received}</p></div><div class="message-statuses"><span class="status-pill ${read ? "message-read" : "message-unread"}">${read ? "Lida" : "Não lida"}</span><span class="status-pill ${answered ? "message-answered" : "message-pending"}">${answered ? "Respondida" : "Não respondida"}</span></div></div><p class="message-content message-preview">${valueText(message.conteudo || message.mensagem || message.texto)}</p><div class="message-actions"><button type="button" class="small-action" data-message-action="view" data-id="${esc(message.id)}">Visualizar</button><button type="button" class="small-action" data-message-action="reply" data-id="${esc(message.id)}">${answered ? "Ver resposta" : "Responder"}</button>${message.id != null ? `<button type="button" class="small-action" data-message-read="${esc(message.id)}" data-read="${!read}">Marcar como ${read ? "não lida" : "lida"}</button>` : ""}</div></article>`;
+  }).join("")}</div></div>`;
+}
+
+function renderMessageDialog(message) {
+  const answered = Boolean(String(message.resposta || "").trim());
+  const content = message.conteudo || message.mensagem || message.texto;
+  return `<div class="message-dialog" data-message-dialog="${esc(message.id)}"><div class="message-dialog-meta"><span class="status-pill ${message.lida ? "message-read" : "message-unread"}">${message.lida ? "Lida" : "Não lida"}</span><span class="status-pill ${answered ? "message-answered" : "message-pending"}">${answered ? "Respondida" : "Não respondida"}</span><span>${valueText(message.criadoEm ? new Date(message.criadoEm).toLocaleString("pt-BR") : "Data não informada")}</span></div><dl class="record-details"><div><dt>Nome</dt><dd>${valueText(message.nome)}</dd></div><div><dt>E-mail</dt><dd>${valueText(message.email)}</dd></div><div><dt>Mensagem</dt><dd>${valueText(content)}</dd></div></dl>${answered ? `<div class="reply-sent"><strong>Resposta enviada</strong><p>${valueText(message.resposta)}</p></div>` : ""}<form class="message-reply-form" data-form="reply" data-message-id="${esc(message.id)}"><label class="field-label">${answered ? "Atualizar resposta" : "Responder"}<textarea name="resposta" rows="4" maxlength="1000" required placeholder="Escreva uma resposta…">${esc(message.resposta || "")}</textarea></label><p class="form-feedback" role="alert"></p><button class="button button-primary compact">${answered ? "Salvar resposta" : "Enviar resposta"} <span>↗</span></button></form></div>`;
+}
+
+async function updateMessageReadStatus(id, read) {
+  const records = cachedRecords.get("mensagens") || [];
+  const index = records.findIndex((entry) => String(entry.id) === String(id));
+  if (index < 0) throw new Error("Mensagem não encontrada. Atualize o painel.");
+  const response = await put(`/mensagens/contatos/${encodeURIComponent(id)}/leitura`, { lida: read });
+  const updated = response?.data && typeof response.data === "object" ? response.data : response;
+  const message = { ...records[index], ...(updated && typeof updated === "object" ? updated : {}), lida: read };
+  records[index] = message;
+  cachedRecords.set("mensagens", records);
+  const host = document.querySelector("#section-content");
+  if (host) host.innerHTML = renderMessages(records);
+  return message;
+}
+
+async function openContactMessage(id, focusReply = false) {
+  let message = (cachedRecords.get("mensagens") || []).find((entry) => String(entry.id) === String(id));
+  if (!message) {
+    showSectionError("Mensagem não encontrada. Atualize o painel.");
+    return;
+  }
+  if (!message.lida) {
+    try {
+      message = await updateMessageReadStatus(id, true);
+    } catch (error) {
+      showSectionError(`Não foi possível marcar a mensagem como lida: ${error.message}`);
+    }
+  }
+  modal(`Mensagem · ${message.id}`, renderMessageDialog(message));
+  if (focusReply) document.querySelector('#modal-root [name="resposta"]')?.focus();
 }
 
 function renderAppointments(records, slug) {
@@ -962,14 +1006,14 @@ export function renderBudgets(records) {
   const table = records.length
     ? `<div class="table-scroll"><table class="records-table"><thead><tr><th>Código</th><th>Cliente</th><th>Carga</th><th>Serviço</th><th>Valor estimado</th><th>Status</th><th>Data e hora</th><th>Ações</th></tr></thead><tbody>${rows}</tbody></table></div>`
     : `<div class="empty-state"><span>▱</span><strong>Nenhum orçamento cadastrado</strong><p>Os orçamentos criados aparecerão aqui com seus dados e data de cadastro.</p></div>`;
-  return `<div class="data-panel"><div class="panel-heading"><div><span class="eyebrow">COMERCIAL</span><h2>Orçamentos <span class="count-pill">${records.length}</span></h2></div><div class="panel-actions"><button class="button button-outline compact" data-reload>↻ Atualizar</button><button class="button button-primary compact" data-action="new-budget">＋ Novo orçamento</button></div></div><div id="budget-form-slot"></div>${table}</div>${renderBudgetReferenceSection()}`;
+  return `<div class="data-panel"><div class="panel-heading"><div><span class="eyebrow">COMERCIAL</span><h2>Orçamentos <span class="count-pill">${records.length}</span></h2></div><div class="panel-actions"><button class="button button-primary compact" data-action="new-budget">＋ Novo orçamento</button></div></div><div id="budget-form-slot"></div>${table}</div>${renderBudgetReferenceSection()}`;
 }
 
 export function renderBudgetReferenceSection() {
   try {
     const records = readDatabaseEntries("orcamento");
     const rows = records.map((entry) => `<tr><td>${valueText(entry.codigo)}</td><td>${valueText(entry.servico)}</td><td>${valueText(entry.categoria)}</td><td>${budgetDatabaseFieldText({ name: "valorEstimado", type: "number" }, entry)}</td><td>${budgetTariffsMarkup(entry.tarifas)}</td><td>${budgetConditionsMarkup(entry.regras)}</td>${["servicos", "cargas", "conteineres", "operacoes"].map((name) => `<td>${budgetDatabaseFieldText({ name }, entry)}</td>`).join("")}<td>${valueText(entry.observacoes)}</td></tr>`).join("");
-    return `<section class="data-panel" id="budget-reference-section"><div class="panel-heading"><div><span class="eyebrow">CONSULTA / REFERÊNCIAS</span><h2>Referências de orçamento</h2></div></div><p class="dash-description">As tarifas de 2017 não representam preços atuais e não são calculadas automaticamente. A tabela previa impostos à parte e adicional de 35% para certos serviços e cargas. Confira regras, adicionais e impostos antes de usar.</p>${rows ? `<div class="table-scroll"><table class="records-table"><thead><tr><th>ID</th><th>Serviço</th><th>Categoria</th><th>Valor cadastrado (R$)</th><th>Tarifas disponíveis</th><th>Condições</th><th>IDs de serviço</th><th>IDs de carga</th><th>IDs de contêiner</th><th>IDs de operação</th><th>Observações</th></tr></thead><tbody>${rows}</tbody></table></div>` : `<p class="muted">Nenhuma referência cadastrada.</p>`}</section>`;
+    return `<section class="data-panel" id="budget-reference-section"><div class="panel-heading"><div><span class="eyebrow">CONSULTA / REFERÊNCIAS</span><h2>Referências de orçamento</h2></div></div><p class="dash-description">As tarifas de 2017 não representam preços atuais e não são calculadas automaticamente. A tabela previa impostos à parte e adicional de 35% para certos serviços e cargas. Confira regras, adicionais e impostos antes de usar.</p>${rows ? `<div class="table-scroll"><table class="records-table budget-reference-table"><thead><tr><th>ID</th><th>Serviço</th><th>Categoria</th><th>Valor cadastrado (R$)</th><th>Tarifas disponíveis</th><th>Condições</th><th>IDs de serviço</th><th>IDs de carga</th><th>IDs de contêiner</th><th>IDs de operação</th><th>Observações</th></tr></thead><tbody>${rows}</tbody></table></div>` : `<p class="muted">Nenhuma referência cadastrada.</p>`}</section>`;
   } catch (error) {
     return `<div id="budget-reference-section" class="load-error" role="alert">Não foi possível carregar as referências de orçamento: ${esc(error.message)}</div>`;
   }
@@ -1712,7 +1756,7 @@ async function showBudgetForm() {
     const serviceList = collectionFrom(availableServices);
     const categories = [...new Set(serviceList.map((service) => service.categoria).filter(Boolean))].sort((a, b) => a.localeCompare(b, "pt-BR"));
     const categoryOptions = categories.map((category) => `<option value="${esc(category)}">${esc(category)}</option>`).join("");
-    slot.innerHTML = `<form class="inline-form" data-form="budget" data-catalog-entity="orcamento" data-catalog-lookup="servico"><div class="inline-form-title"><h3>Novo orçamento</h3><button type="button" class="icon-button" data-close-form aria-label="Fechar">×</button></div><p class="muted small">Selecione o cliente, a carga e um serviço cadastrado. A referência histórica é opcional e não substitui o serviço operacional.</p><div class="inline-form-grid">${selectField("Cliente", "clienteId", options(clients, "Cliente"))}${selectField("Carga", "cargaId", options(loads, "Carga"))}<label class="field-label">Categoria do serviço<select name="servicoCategoria"><option value="">Todas as categorias</option>${categoryOptions}</select></label><label class="field-label">Buscar serviço<input name="servicoBusca" type="search" autocomplete="off" placeholder="Digite o nome ou código do serviço" aria-controls="budget-service-results"></label></div><input name="servicoId" type="hidden"><input name="servico" type="hidden"><div class="budget-service-results" id="budget-service-results" aria-live="polite"></div><label class="field-label">Buscar referência por ID, nome ou ID vinculado<input name="buscaOrcamento" type="search" autocomplete="off" placeholder="ORC, SRV, CRG, CTR ou OPR" aria-controls="budget-reference-results"></label><div id="budget-reference-results" aria-live="polite"></div><label class="field-label">Valor estimado (R$)<input name="valorEstimado" type="number" min="0" step="0.01"></label><div id="budget-reference-confirmation"></div><p class="form-feedback" role="alert"></p><button class="button button-primary compact">Criar orçamento <span>↗</span></button></form>`;
+    slot.innerHTML = `<form class="inline-form budget-form" data-form="budget" data-catalog-entity="orcamento" data-catalog-lookup="servico"><div class="inline-form-title"><h3>Novo orçamento</h3><button type="button" class="icon-button" data-close-form aria-label="Fechar">×</button></div><p class="muted small">Selecione o cliente, a carga e um serviço cadastrado. A referência histórica é opcional e não substitui o serviço operacional.</p><div class="inline-form-grid">${selectField("Cliente", "clienteId", options(clients, "Cliente"))}${selectField("Carga", "cargaId", options(loads, "Carga"))}<label class="field-label">Categoria do serviço<select name="servicoCategoria"><option value="">Todas as categorias</option>${categoryOptions}</select></label><label class="field-label">Buscar serviço<input name="servicoBusca" type="search" autocomplete="off" placeholder="Digite o nome ou código do serviço" aria-controls="budget-service-results"></label></div><input name="servicoId" type="hidden"><input name="servico" type="hidden"><div class="budget-service-results" id="budget-service-results" aria-live="polite"></div><label class="field-label budget-reference-search">Buscar referência por ID, nome ou ID vinculado<input name="buscaOrcamento" type="search" autocomplete="off" placeholder="ORC, SRV, CRG, CTR ou OPR" aria-controls="budget-reference-results"></label><div id="budget-reference-results" aria-live="polite"></div><label class="field-label">Valor estimado (R$)<input name="valorEstimado" type="number" min="0" step="0.01"></label><div id="budget-reference-confirmation"></div><p class="form-feedback" role="alert"></p><button class="button button-primary compact">Criar orçamento <span>↗</span></button></form>`;
     const form = slot.querySelector('form[data-form="budget"]');
     form.querySelector("#budget-reference-confirmation").insertAdjacentHTML("beforebegin", `<label class="field-label">Descrição da referência (salva neste navegador)<textarea name="descricaoLocal" rows="5"></textarea><small>Confira e edite os dados antes de salvar.</small></label>`);
     budgetServiceOptions.set(form, serviceList);
@@ -2009,6 +2053,7 @@ async function handleSubmit(event) {
         break;
       case "reply":
         await put(`/mensagens/contatos/${form.dataset.messageId}/resposta`, { resposta: fields.resposta });
+        dismissModal();
         await reloadCurrentSection("Resposta enviada com sucesso.");
         break;
     }
@@ -2317,6 +2362,25 @@ if (app) app.addEventListener("click", async (event) => {
   const budgetAction = event.target.closest("[data-budget-action]");
   if (budgetAction) {
     await handleBudgetAction(budgetAction.dataset.budgetAction, budgetAction.dataset.id);
+    return;
+  }
+  const messageRead = event.target.closest("[data-message-read]");
+  if (messageRead) {
+    try {
+      await updateMessageReadStatus(messageRead.dataset.messageRead, messageRead.dataset.read === "true");
+    } catch (error) {
+      showSectionError(`Não foi possível atualizar a leitura da mensagem: ${error.message}`);
+    }
+    return;
+  }
+  const messageAction = event.target.closest("[data-message-action]");
+  if (messageAction) {
+    await openContactMessage(messageAction.dataset.id, messageAction.dataset.messageAction === "reply");
+    return;
+  }
+  const messageCard = event.target.closest("[data-message-card]");
+  if (messageCard && !event.target.closest("button, a, input, textarea, select")) {
+    await openContactMessage(messageCard.dataset.messageCard);
     return;
   }
   const target = event.target.closest("[data-action], [data-service], [data-close-modal], [data-close-form], [data-reload], [data-status-id], [data-toggle-password]");
@@ -2665,6 +2729,11 @@ if (app) app.addEventListener("keydown", (event) => {
   const activeModal = document.querySelector("#modal-root .modal-card");
   if (event.key === "Escape" && activeModal) dismissModal();
   else trapFocusWithinModal(event, activeModal);
+  const messageCard = event.target.closest("[data-message-card]");
+  if (messageCard && !event.target.closest("button, a, input, textarea, select") && ["Enter", " "].includes(event.key)) {
+    event.preventDefault();
+    void openContactMessage(messageCard.dataset.messageCard);
+  }
 });
 
 globalThis.window?.addEventListener?.("popstate", () => renderRoute());

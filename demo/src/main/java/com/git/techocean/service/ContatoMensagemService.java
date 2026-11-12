@@ -46,6 +46,16 @@ public class ContatoMensagemService {
         return repository.save(contato);
     }
 
+    public ContatoMensagem atualizarLeitura(@NonNull Long id, Boolean lida) {
+        if (lida == null) {
+            throw erro("Informe se a mensagem foi lida.");
+        }
+        ContatoMensagem contato = java.util.Objects.requireNonNull(repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Mensagem não encontrada.")));
+        contato.setLida(lida);
+        return repository.save(contato);
+    }
+
     public void deletar(@NonNull Long id) {
         ContatoMensagem contato = java.util.Objects.requireNonNull(repository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Mensagem não encontrada.")));

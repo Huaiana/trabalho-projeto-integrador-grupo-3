@@ -58,3 +58,41 @@
 .cargo-detail { display: grid; grid-template-columns: minmax(160px, 1fr) 2fr; gap: 1rem; padding: .5rem .75rem; border-left: 3px solid currentColor; }
 .cargo-detail p { margin: .25rem 0 0; }
 @media (max-width: 640px) { .cargo-detail { grid-template-columns: 1fr; } }
+
+.dashboard .operation-reference-search{width:min(100%,460px)}
+.dashboard .inline-form .operation-details-grid{max-width:900px;grid-template-columns:repeat(2,minmax(0,1fr))}
+.dashboard .inline-form .operation-details-grid textarea{min-height:84px}
+.dashboard .service-form-grid{max-width:820px}
+.dashboard .service-form-grid .service-field-descricao textarea{min-height:96px}
+.dashboard form[data-form="budget"]{display:grid;max-width:900px;gap:14px}
+.dashboard form[data-form="budget"] .inline-form-grid{grid-template-columns:repeat(2,minmax(0,360px))}
+.dashboard form[data-form="budget"] .budget-service-results,.dashboard form[data-form="budget"] #budget-reference-results{max-width:760px;min-width:0}
+.dashboard form[data-form="budget"] .budget-reference-search{max-width:560px}
+.dashboard form[data-form="budget"] [name="descricaoLocal"]{min-height:84px}
+.dashboard .budget-reference-table{min-width:1200px;table-layout:fixed}
+.dashboard .budget-reference-table th,.dashboard .budget-reference-table td{white-space:normal;overflow-wrap:anywhere;vertical-align:top}
+.dashboard .service-records-table td:nth-child(3){max-width:320px;white-space:normal;overflow-wrap:anywhere}
+
+.message-card-clickable{cursor:pointer;transition:border-color .18s,background .18s}
+.message-card-clickable:hover,.message-card-clickable:focus-visible{border-color:rgba(117,212,209,.42);background:rgba(20,39,51,.9)}
+.message-sender{min-width:0;overflow-wrap:anywhere}
+.message-statuses,.message-actions,.message-dialog-meta{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.message-statuses{justify-content:flex-end;margin-left:auto}
+.message-unread,.message-pending{border-color:rgba(240,185,96,.28);color:#f3cb8b;background:rgba(240,185,96,.08)}
+.message-read,.message-answered{border-color:rgba(117,212,166,.25);color:#a7e8c1;background:rgba(117,212,166,.07)}
+.message-preview{display:-webkit-box;overflow:hidden;-webkit-box-orient:vertical;-webkit-line-clamp:3}
+.message-actions{justify-content:flex-end;margin-top:12px}
+.message-dialog-meta{margin-top:20px;color:var(--muted);font-size:.72rem}
+.message-dialog .record-details{margin-top:14px}
+.message-dialog .record-details dd{max-width:100%;overflow-wrap:anywhere}
+.message-reply-form{display:grid;gap:12px;margin-top:18px;border-top:1px solid var(--line);padding-top:17px}
+.message-reply-form button{justify-self:start}
+.message-reply-form textarea{min-height:96px}
+.budget-service-options{max-height:220px}
+
+@media(max-width:720px){
+  .dashboard .inline-form .operation-details-grid,.dashboard form[data-form="budget"] .inline-form-grid{grid-template-columns:minmax(0,1fr)}
+  .message-heading{align-items:flex-start;flex-wrap:wrap}
+  .message-statuses{justify-content:flex-start;margin-left:49px}
+  .message-actions{justify-content:flex-start}
+}

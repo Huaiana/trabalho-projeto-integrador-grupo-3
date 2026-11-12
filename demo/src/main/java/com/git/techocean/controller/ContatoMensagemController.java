@@ -47,6 +47,14 @@ public class ContatoMensagemController {
                 Objects.requireNonNull(id, "id não pode ser nulo"), request.resposta()));
     }
 
+    @PutMapping("/{id}/leitura")
+    public ResponseEntity<ContatoMensagem> atualizarLeitura(
+            @PathVariable Long id,
+            @RequestBody LeituraRequest request) {
+        return ResponseEntity.ok(service.atualizarLeitura(
+                Objects.requireNonNull(id, "id não pode ser nulo"), request.lida()));
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Map<String, String>> deletar(@PathVariable Long id) {
         service.deletar(Objects.requireNonNull(id, "id não pode ser nulo"));
@@ -57,5 +65,8 @@ public class ContatoMensagemController {
     }
 
     public record RespostaRequest(String resposta) {
+    }
+
+    public record LeituraRequest(Boolean lida) {
     }
 }
