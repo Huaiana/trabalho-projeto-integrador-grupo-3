@@ -1,3 +1,10 @@
+/*
+ * Tailwind v4 entry: config lives here, with no tailwind.config.js or PostCSS plugin.
+ * - Keep every @import in this top block, above @theme and the rest of the file. Install an
+ *   npm package before @importing its CSS. Never @import a remote URL (web fonts, CDN CSS): the
+ *   build resolves @import from the filesystem. Load those with a <link> in the head() of
+ *   src/routes/__root.tsx and name the family in a --font-* token in @theme inline below.
+ */
 @import "tailwindcss" source(none);
 @source "../src";
 @import "tw-animate-css";
@@ -6,6 +13,10 @@
 
 /*
  * Design system definition.
+ *
+ * The design lives in this file: oklch color tokens on the shadcn variables
+ * (--background, --foreground, --primary, --secondary, --muted, --accent, ...) plus
+ * new tokens as needed, font tokens, and custom styles and animations.
  *
  * The @theme inline block maps CSS custom properties to Tailwind utility
  * classes (e.g. --color-primary -> bg-primary, text-primary).
@@ -63,38 +74,38 @@
 
 :root {
   --radius: 0.625rem;
-  --background: oklch(0.16 0.03 240);
-  --foreground: oklch(0.96 0.01 230);
-  --card: oklch(0.2 0.035 240);
-  --card-foreground: oklch(0.96 0.01 230);
-  --popover: oklch(0.2 0.035 240);
-  --popover-foreground: oklch(0.96 0.01 230);
-  --primary: oklch(0.75 0.12 210);
-  --primary-foreground: oklch(0.14 0.03 240);
-  --secondary: oklch(0.24 0.04 240);
-  --secondary-foreground: oklch(0.96 0.01 230);
-  --muted: oklch(0.24 0.04 240);
-  --muted-foreground: oklch(0.7 0.03 235);
-  --accent: oklch(0.75 0.12 210);
-  --accent-foreground: oklch(0.14 0.03 240);
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.129 0.042 264.695);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.129 0.042 264.695);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.129 0.042 264.695);
+  --primary: oklch(0.208 0.042 265.755);
+  --primary-foreground: oklch(0.984 0.003 247.858);
+  --secondary: oklch(0.968 0.007 247.896);
+  --secondary-foreground: oklch(0.208 0.042 265.755);
+  --muted: oklch(0.968 0.007 247.896);
+  --muted-foreground: oklch(0.554 0.046 257.417);
+  --accent: oklch(0.968 0.007 247.896);
+  --accent-foreground: oklch(0.208 0.042 265.755);
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.984 0.003 247.858);
-  --border: oklch(1 0 0 / 12%);
-  --input: oklch(1 0 0 / 16%);
-  --ring: oklch(0.75 0.12 210);
+  --border: oklch(0.929 0.013 255.508);
+  --input: oklch(0.929 0.013 255.508);
+  --ring: oklch(0.704 0.04 256.788);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.18 0.032 240);
-  --sidebar-foreground: oklch(0.96 0.01 230);
-  --sidebar-primary: oklch(0.75 0.12 210);
-  --sidebar-primary-foreground: oklch(0.14 0.03 240);
-  --sidebar-accent: oklch(0.24 0.04 240);
-  --sidebar-accent-foreground: oklch(0.96 0.01 230);
-  --sidebar-border: oklch(1 0 0 / 12%);
-  --sidebar-ring: oklch(0.75 0.12 210);
+  --sidebar: oklch(0.984 0.003 247.858);
+  --sidebar-foreground: oklch(0.129 0.042 264.695);
+  --sidebar-primary: oklch(0.208 0.042 265.755);
+  --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
+  --sidebar-accent: oklch(0.968 0.007 247.896);
+  --sidebar-accent-foreground: oklch(0.208 0.042 265.755);
+  --sidebar-border: oklch(0.929 0.013 255.508);
+  --sidebar-ring: oklch(0.704 0.04 256.788);
 }
 
 .dark {
@@ -141,38 +152,4 @@
     background-color: var(--color-background);
     color: var(--color-foreground);
   }
-}
-
-@theme inline {
-  --font-display: "Outfit", sans-serif;
-  --font-sans: "Figtree", sans-serif;
-  --font-mono: "JetBrains Mono", monospace;
-}
-
-@layer base {
-  body {
-    font-family: var(--font-sans);
-  }
-  h1,
-  h2,
-  h3 {
-    font-family: var(--font-display);
-    letter-spacing: -0.02em;
-  }
-}
-
-@utility eyebrow {
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--color-primary);
-}
-
-@utility hero-overlay {
-  background: linear-gradient(
-    180deg,
-    oklch(0.16 0.03 240 / 0.35) 0%,
-    oklch(0.16 0.03 240 / 0.95) 100%
-  );
 }

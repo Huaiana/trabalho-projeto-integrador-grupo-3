@@ -7,9 +7,27 @@
 >
 > Commits you push to the connected branch sync back to Lovable and show up in
 > the editor, so keep the branch in a working state.
-<!-- LOVABLE:END -->
 
-- Cargo uses a model for validation, a repository for HTTP, a service for business orchestration, and a controller hook consumed by its panel; each layer has a single responsibility.
-- Cargo API reads run in the browser through React Query, not SSR loaders, because the user's localhost API is reachable only from their own browser.
-- Authentication uses browser requests with HttpOnly cookie sessions validated by the own API; dashboard disables SSR and checks the server session in beforeLoad so private UI never renders before validation. Profile fields are display-only; authorization belongs to the API.
-- Authentication keeps validation, HTTP, query orchestration and controller hooks separate, matching the existing layered integration pattern.
+## What Lovable manages
+
+Rules outside this block are the project's own. Change the pieces below in
+Lovable, not by hand. With the [Lovable MCP](https://mcp.lovable.dev)
+connected, `send_message` asks Lovable to do it; otherwise ask the user to
+use the editor.
+
+- **Database.** Do not add or edit `supabase/migrations/` or `drizzle/`.
+  Ask Lovable to change the schema.
+- **Generated files.** Do not edit a file whose header says it is automatically
+  generated.
+- **AI gateway.** Keep model calls on Lovable's gateway, and keep
+  `LOVABLE_API_KEY` out of browser code.
+- **Connectors.** Lovable provides native connectors. `list_connectors` shows
+  which are enabled; `add_connector` only returns the dashboard link. When a
+  connector is enabled, calls go through the connector gateway and need
+  `LOVABLE_API_KEY`. When Lovable does not provide one, users can bring their
+  own key and store it in Secrets.
+- **Secrets.** Lovable manages them. Do not put secret values in the repo.
+<!-- LOVABLE:END -->
+- The Techocean site lives in src/legacy (plain JS from the original repo) and is mounted once from __root; TanStack routes index/$ render nothing so the legacy router owns all paths without remounting.
+- Browser calls go to same-origin /api/*, relayed by src/routes/api/$.ts to the Techocean worker API, because the worker's CORS allow-list rejects Lovable origins.
+- Cargo/container reference links use cargo.conteineres as the single source of truth; derive container.cargas and update cargo links when editing from the container side to avoid divergent associations.

@@ -2,8 +2,8 @@
 
 # Estrela-guia
 
-Embarcadores têm sua carga amarrada com segurança antes de deixar o porto.
+Os clientes têm sua carga movimentada pelo porto.
 
 ## Métrica
 
-Visitas técnicas agendadas por mês
+Orçamentos emitidos para clientes a cada semana

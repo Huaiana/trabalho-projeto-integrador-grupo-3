@@ -15,7 +15,7 @@ $env:ADMIN_SETUP_TOKEN = [Convert]::ToBase64String($bytes)
 .\mvnw.cmd spring-boot:run
 ```
 
-A API ficará disponível em `http://localhost:8080`.
+A API Spring Boot ficará disponível em `http://localhost:8080`. O frontend abaixo usa, por padrão, o serviço remoto indicado em sua rota `/api`, e não essa API local.
 
 ### Terminal 2 — site
 
@@ -24,27 +24,15 @@ npm ci
 npm run dev
 ```
 
-O frontend atualizado usa React, TypeScript e TanStack Start. O `npm ci` na raiz instala as dependências em `web/techocean-web-main/`. O site ficará disponível em `http://localhost:5173`. Em desenvolvimento, as chamadas à API usam o proxy `/api`; `VITE_API_URL` pode substituir o destino local padrão.
+O frontend usa React, TypeScript e TanStack Start para hospedar o site em `src/legacy`. O `npm ci` na raiz instala as dependências em `web/techocean-web-main/`. O site ficará disponível em `http://localhost:5173`.
 
 Para evitar que a interface fique carregando indefinidamente quando a API não responde, as requisições expiram após 15 segundos e exibem um erro que permite tentar novamente.
 
-Assim, `web/techocean-web-main/.env` pode apontar `VITE_API_URL` para a API publicada ou para uma API local. A configuração `.env` já existente foi mantida na substituição do frontend.
-
-Se a porta `8080` já estiver ocupada, inicie a API em outra porta e configure a URL no terminal do frontend:
-
-```powershell
-# Terminal 1
-$env:SERVER_PORT = "8081"
-.\mvnw.cmd spring-boot:run
-
-# Terminal 2 (o proxy usa VITE_API_URL como destino)
-$env:VITE_API_URL = "http://127.0.0.1:8081"
-npm run dev
-```
+O navegador acessa a rota de servidor `/api`, que encaminha as requisições ao endereço configurado no código em `web/techocean-web-main/src/routes/api/$.ts`. O `.env` anterior foi preservado, mas `VITE_API_URL` não altera esse destino nesta versão.
 
 ### Acessar de outro dispositivo na mesma rede
 
-O Vite já escuta em todas as interfaces (`0.0.0.0`). Descubra o IPv4 deste computador com `ipconfig` e, no outro dispositivo, abra `http://<IPv4-do-computador>:5173` (nesta máquina o IPv4 atual é `10.32.22.85`). As chamadas `/api` passam pelo proxy do Vite, então o navegador não precisa de acesso CORS direto ao Render ou ao Spring Boot. Se o site não abrir, permita conexões TCP de entrada na porta `5173` no Firewall do Windows para redes privadas.
+Para acessar o site de outro dispositivo, configure o Vite para escutar na rede local e abra o endereço exibido no terminal. As chamadas `/api` passam pela rota de servidor do frontend, evitando chamadas diretas do navegador à API remota.
 
 Para gerar o build ou executar verificações do frontend a partir da raiz:
 
@@ -54,11 +42,11 @@ npm test
 npm run lint
 ```
 
-No deploy, defina `VITE_API_URL` no ambiente de build do Cloudflare para o endpoint remoto. O build TanStack/Nitro gera a saída em `.output`; não use a pasta `dist` do frontend antigo.
+O build TanStack/Nitro gera a saída em `.output`; não use a pasta `dist` do frontend antigo.
 
 ## Publicação
 
-- **Frontend:** Cloudflare, diretório `web/techocean-web-main`, comando `npm ci && npm run build`. O build gera a configuração do Worker SSR em `.output/server/wrangler.json`; defina `VITE_API_URL` como a URL HTTPS pública da API Railway.
+- **Frontend:** Cloudflare, diretório `web/techocean-web-main`, comando `npm ci && npm run build`. O build gera a configuração do Worker SSR em `.output/server/wrangler.json`. A rota de servidor `/api` encaminha para a API remota definida no código do frontend.
 - **API e banco:** Railway usando o Dockerfile da raiz e um PostgreSQL no mesmo projeto. Configure `SPRING_PROFILES_ACTIVE=production`, as variáveis `DB_*` ligadas às variáveis `PG*` do PostgreSQL, `APP_AUTH_SECRET` e `CORS_ALLOWED_ORIGIN_PATTERNS` com o domínio Pages do site. As instruções completas estão em [backend/techocean-main/README.md](./backend/techocean-main/README.md).
 
 O banco novo começa vazio. Exporte e importe os dados do banco antigo antes de direcionar o tráfego se precisar preservá-los.
