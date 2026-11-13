@@ -8,14 +8,14 @@ describe("dashboard panels", () => {
       { id: 2, nome: "João", email: "joao@example.com", conteudo: "Obrigado.", lida: true, resposta: "Estamos à disposição." },
     ]);
 
-    expect(markup).toContain("Não lida");
-    expect(markup).toContain("Lida");
+    expect(markup).toContain("Não lidas");
+    expect(markup).toContain("Lidas");
     expect(markup).toContain("Não respondida");
     expect(markup).toContain("Respondida");
     expect(markup).toContain('data-message-action="view"');
-    expect(markup).toContain('data-message-action="reply"');
+    expect(markup).toContain("data-message-toggle-reply");
+    expect(markup).toContain("Enviar");
     expect(markup).not.toContain('data-reload');
-    expect(markup).not.toContain('data-form="reply"');
   });
 
   it.each([

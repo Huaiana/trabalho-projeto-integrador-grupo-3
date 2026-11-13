@@ -752,18 +752,25 @@ function statusPill(key, value) {
 
 export function renderMessages(records) {
   if (!records.length) return `<div class="data-panel"><div class="panel-heading"><div><span class="eyebrow">FALE CONOSCO</span><h2>Caixa de entrada <span class="count-pill">0</span></h2></div></div><div class="empty-state"><span>✉</span><strong>Nenhuma mensagem recebida</strong><p>As mensagens enviadas pelo formulário do site aparecerão aqui.</p></div></div>`;
-  return `<div class="data-panel"><div class="panel-heading"><div><span class="eyebrow">FALE CONOSCO</span><h2>Caixa de entrada <span class="count-pill">${records.length}</span></h2></div></div><div class="message-list">${records.map((message) => {
+  const unread = records.filter((message) => message.lida !== true);
+  const readMessages = records.filter((message) => message.lida === true);
+  const area = (title, items, empty) => `<section class="message-area"><h3 class="message-area-title">${title} <span class="count-pill">${items.length}</span></h3>${items.length ? `<div class="message-list">${items.map(renderMessageCard).join("")}</div>` : `<p class="muted message-area-empty">${empty}</p>`}</section>`;
+  return `<div class="data-panel"><div class="panel-heading"><div><span class="eyebrow">FALE CONOSCO</span><h2>Caixa de entrada <span class="count-pill">${records.length}</span></h2></div></div><div class="message-areas">${area("Não lidas", unread, "Nenhuma mensagem não lida.")}${area("Lidas", readMessages, "Nenhuma mensagem lida.")}</div></div>`;
+}
+
+function renderMessageCard(message) {
+  {
     const read = message.lida === true;
     const answered = Boolean(String(message.resposta || "").trim());
     const received = message.criadoEm ? valueText(new Date(message.criadoEm).toLocaleString("pt-BR")) : "Contato recebido";
-    return `<article class="message-card message-card-clickable" tabindex="0" data-message-card="${esc(message.id)}" aria-label="Visualizar mensagem de ${esc(message.nome || "remetente")}"><div class="message-heading"><div class="avatar">${esc((message.nome || "?").slice(0, 1).toUpperCase())}</div><div class="message-sender"><h2>${valueText(message.nome)}</h2><p>${valueText(message.email)} · ${received}</p></div><div class="message-statuses"><span class="status-pill ${read ? "message-read" : "message-unread"}">${read ? "Lida" : "Não lida"}</span><span class="status-pill ${answered ? "message-answered" : "message-pending"}">${answered ? "Respondida" : "Não respondida"}</span></div></div><p class="message-content message-preview">${valueText(message.conteudo || message.mensagem || message.texto)}</p><div class="message-actions"><button type="button" class="small-action" data-message-action="view" data-id="${esc(message.id)}">Visualizar</button><button type="button" class="small-action" data-message-action="reply" data-id="${esc(message.id)}">${answered ? "Ver resposta" : "Responder"}</button>${message.id != null ? `<button type="button" class="small-action" data-message-read="${esc(message.id)}" data-read="${!read}">Marcar como ${read ? "não lida" : "lida"}</button>` : ""}</div></article>`;
-  }).join("")}</div></div>`;
+    return `<article class="message-card message-card-clickable" tabindex="0" data-message-card="${esc(message.id)}" aria-label="Visualizar mensagem de ${esc(message.nome || "remetente")}"><div class="message-heading"><div class="avatar">${esc((message.nome || "?").slice(0, 1).toUpperCase())}</div><div class="message-sender"><h2>${valueText(message.nome)}</h2><p>${valueText(message.email)} · ${received}</p></div><div class="message-statuses"><span class="status-pill ${read ? "message-read" : "message-unread"}">${read ? "Lida" : "Não lida"}</span><span class="status-pill ${answered ? "message-answered" : "message-pending"}">${answered ? "Respondida" : "Não respondida"}</span></div></div><p class="message-content message-preview">${valueText(message.conteudo || message.mensagem || message.texto)}</p><div class="message-actions"><button type="button" class="small-action" data-message-action="view" data-id="${esc(message.id)}">Visualizar</button><button type="button" class="small-action" data-message-toggle-reply="${esc(message.id)}">Responder</button>${message.id != null ? `<button type="button" class="small-action" data-message-read="${esc(message.id)}" data-read="${!read}">Marcar como ${read ? "não lida" : "lida"}</button>` : ""}</div>${answered ? `<div class="reply-sent"><strong>Resposta enviada</strong><p>${valueText(message.resposta)}</p></div>` : ""}<form class="message-reply-form" data-form="reply" data-message-id="${esc(message.id)}" hidden><textarea name="resposta" rows="3" maxlength="1000" required placeholder="Escreva uma resposta…">${esc(message.resposta || "")}</textarea><p class="form-feedback" role="alert"></p><div class="message-dialog-actions"><button class="button button-primary compact">Enviar <span>↗</span></button></div></form></article>`;
+      }
 }
 
 function renderMessageDialog(message) {
   const answered = Boolean(String(message.resposta || "").trim());
   const content = message.conteudo || message.mensagem || message.texto;
-  return `<div class="message-dialog" data-message-dialog="${esc(message.id)}"><div class="message-dialog-meta"><span class="status-pill ${message.lida ? "message-read" : "message-unread"}">${message.lida ? "Lida" : "Não lida"}</span><span class="status-pill ${answered ? "message-answered" : "message-pending"}">${answered ? "Respondida" : "Não respondida"}</span><span>${valueText(message.criadoEm ? new Date(message.criadoEm).toLocaleString("pt-BR") : "Data não informada")}</span></div><dl class="record-details"><div><dt>Nome</dt><dd>${valueText(message.nome)}</dd></div><div><dt>E-mail</dt><dd>${valueText(message.email)}</dd></div><div><dt>Mensagem</dt><dd>${valueText(content)}</dd></div></dl>${answered ? `<div class="reply-sent"><strong>Resposta enviada</strong><p>${valueText(message.resposta)}</p></div>` : ""}<form class="message-reply-form" data-form="reply" data-message-id="${esc(message.id)}"><label class="field-label">${answered ? "Atualizar resposta" : "Responder"}<textarea name="resposta" rows="4" maxlength="1000" required placeholder="Escreva uma resposta…">${esc(message.resposta || "")}</textarea></label><p class="form-feedback" role="alert"></p><button class="button button-primary compact">${answered ? "Salvar resposta" : "Enviar resposta"} <span>↗</span></button></form></div>`;
+  return `<div class="message-dialog" data-message-dialog="${esc(message.id)}"><div class="message-dialog-meta"><span class="status-pill ${message.lida ? "message-read" : "message-unread"}">${message.lida ? "Lida" : "Não lida"}</span><span class="status-pill ${answered ? "message-answered" : "message-pending"}">${answered ? "Respondida" : "Não respondida"}</span><span>${valueText(message.criadoEm ? new Date(message.criadoEm).toLocaleString("pt-BR") : "Data não informada")}</span></div><dl class="record-details"><div><dt>Nome</dt><dd>${valueText(message.nome)}</dd></div><div><dt>E-mail</dt><dd>${valueText(message.email)}</dd></div><div><dt>Mensagem</dt><dd>${valueText(content)}</dd></div></dl>${answered ? `<div class="reply-sent"><strong>Resposta enviada</strong><p>${valueText(message.resposta)}</p></div>` : ""}<form class="message-reply-form" data-form="reply" data-message-id="${esc(message.id)}"><label class="field-label">${answered ? "Atualizar resposta" : "Responder"}<textarea name="resposta" rows="4" maxlength="1000" required placeholder="Escreva uma resposta…">${esc(message.resposta || "")}</textarea></label><p class="form-feedback" role="alert"></p><div class="message-dialog-actions"><button type="button" class="button button-outline compact" data-message-focus-reply>Responder</button><button class="button button-primary compact">Enviar <span>↗</span></button></div></form></div>`;
 }
 
 async function updateMessageReadStatus(id, read) {
@@ -2373,13 +2380,26 @@ if (app) app.addEventListener("click", async (event) => {
     }
     return;
   }
+  const toggleReply = event.target.closest("[data-message-toggle-reply]");
+  if (toggleReply) {
+    const form = toggleReply.closest("[data-message-card]")?.querySelector(".message-reply-form");
+    if (form) {
+      form.hidden = !form.hidden;
+      if (!form.hidden) form.querySelector("textarea")?.focus();
+    }
+    return;
+  }
+  if (event.target.closest("[data-message-focus-reply]")) {
+    document.querySelector('#modal-root [name="resposta"]')?.focus();
+    return;
+  }
   const messageAction = event.target.closest("[data-message-action]");
   if (messageAction) {
     await openContactMessage(messageAction.dataset.id, messageAction.dataset.messageAction === "reply");
     return;
   }
   const messageCard = event.target.closest("[data-message-card]");
-  if (messageCard && !event.target.closest("button, a, input, textarea, select")) {
+  if (messageCard && !event.target.closest("button, a, input, textarea, select, form")) {
     await openContactMessage(messageCard.dataset.messageCard);
     return;
   }
@@ -2730,7 +2750,7 @@ if (app) app.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && activeModal) dismissModal();
   else trapFocusWithinModal(event, activeModal);
   const messageCard = event.target.closest("[data-message-card]");
-  if (messageCard && !event.target.closest("button, a, input, textarea, select") && ["Enter", " "].includes(event.key)) {
+  if (messageCard && !event.target.closest("button, a, input, textarea, select, form") && ["Enter", " "].includes(event.key)) {
     event.preventDefault();
     void openContactMessage(messageCard.dataset.messageCard);
   }
