@@ -41,6 +41,7 @@ Regras em `SecurityConfig`: ordem das regras do mais específico ao mais genéri
 ## 4. Módulos funcionais
 
 - **Cargas, Contêineres, Operações, Serviços, Orçamentos, Solicitações, Agendamentos, Clientes, Mensagens/Contatos**: CRUD via controllers/services.
+- **Caixa de entrada de mensagens (painel)**: a lista de mensagens de contato é dividida em duas áreas, **Não lidas** e **Lidas**, cada uma com contador. Cada cartão tem os botões **Responder** (abre um campo de resposta no próprio cartão), **Enviar** (grava a resposta) e **Marcar como lida/não lida**, que move o cartão entre as áreas. A visualização em janela também oferece Responder e Enviar. O botão **Atualizar** foi removido: a lista é recarregada após cada ação. Endpoints em `/mensagens/contatos`: `POST` (formulário público), `GET` (listar, mais recentes primeiro), `PUT /{id}/resposta` (define a resposta e o status `RESPONDIDO`), `PUT /{id}/leitura` (campo `lida`) e `DELETE /{id}`. A resposta aceita até 1000 caracteres; o campo `lida` é obrigatório (booleano).
 - **Primeiro acesso administrativo**: `/admin/setup` cria o primeiro admin; `AdminBootstrapLock` (chave primária fixa) garante que só um seja criado, mesmo com requisições concorrentes. Pode ser ativado/desativado (`AdminSetupConfig`).
 - **Recuperação de senha**: `/auth/password-reset/request|confirm`, token de uso único com expiração (`PasswordResetToken`), envio por e-mail (`JavaMailSender` opcional; sem SMTP retorna 503).
 - **Sessões**: cada login cria `AuthSession`; token JWT referencia a sessão; logout encerra. Aba "Sessões" lista início, última atividade, duração (segundos) e botão **Acessar** (ativa) / **Verificar** (encerrada), que abre as ações da sessão (`GET /admin/sessoes/{id}/auditoria`).
@@ -112,6 +113,8 @@ Injeção SQL (JPA parametrizado), exposição de senhas em respostas, controle 
 - **Deploy backend**: push no `main` dispara auto-deploy no Render (Dockerfile).
 - **Deploy frontend**: execute `npm ci` e `npm run build` no diretório `web/techocean-web-main`; o TanStack/Nitro gera o Worker SSR e sua configuração Wrangler em `.output/server/wrangler.json` (não usar o antigo `dist`).
 - **Variáveis importantes**: `APP_AUTH_SECRET`, credenciais do banco e SMTP (opcional). O destino do proxy do frontend está definido em `src/routes/api/$.ts`, não em `VITE_API_URL`.
+- **Null-safety**: em `SolicitacaoCompartilhadaService`, `idObrigatorio` é anotado com `@NonNull` e seu retorno é usado em `findById`, eliminando o aviso de conversão não verificada de `Long`.
+- **Apresentação**: `docs/Apresentacao_TechOcean_Com_Codigo.pptx` ganhou os slides 19 a 24, com o código de model, controller, repositório, serviço (validação e resposta/leitura) e caixa de entrada do módulo de mensagens; o encerramento é o slide 25.
 
 ## 8. Plano de correção sugerido (prioridade)
 
