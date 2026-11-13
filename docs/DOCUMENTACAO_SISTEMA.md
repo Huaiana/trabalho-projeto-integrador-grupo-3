@@ -114,7 +114,7 @@ Injeção SQL (JPA parametrizado), exposição de senhas em respostas, controle 
 - **Deploy frontend**: execute `npm ci` e `npm run build` no diretório `web/techocean-web-main`; o TanStack/Nitro gera o Worker SSR e sua configuração Wrangler em `.output/server/wrangler.json` (não usar o antigo `dist`).
 - **Variáveis importantes**: `APP_AUTH_SECRET`, credenciais do banco e SMTP (opcional). O destino do proxy do frontend está definido em `src/routes/api/$.ts`, não em `VITE_API_URL`.
 - **Null-safety**: em `SolicitacaoCompartilhadaService`, `idObrigatorio` é anotado com `@NonNull` e seu retorno é usado em `findById`, eliminando o aviso de conversão não verificada de `Long`.
-- **Apresentação**: `docs/Apresentacao_TechOcean_Com_Codigo.pptx` ganhou os slides 19 a 24, com o código de model, controller, repositório, serviço (validação e resposta/leitura) e caixa de entrada do módulo de mensagens; o encerramento é o slide 25.
+- **Apresentação**: `docs/Apresentacao_TechOcean_Com_Codigo.pptx` ganhou os slides 19 a 24, com o código de model, controller, repositório, serviço (validação e resposta/leitura) e caixa de entrada do módulo de mensagens; os slides 25 a 28 trazem o código do módulo de cargas (model, controller, repositório e serviço), os slides 29 e 30 a configuração de segurança (JWT, BCrypt e regras de acesso por perfil) e os slides 31 a 37 mostram capturas de tela do frontend (página inicial, serviços, painel, cargas, caixa de entrada, resposta de mensagem e solicitações); o encerramento é o slide 38.
 
 ## 8. Plano de correção sugerido (prioridade)
 
