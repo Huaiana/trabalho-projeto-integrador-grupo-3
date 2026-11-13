@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import org.springframework.http.HttpStatus;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -93,7 +94,7 @@ public class SolicitacaoCompartilhadaService {
             detalhe.setSolicitacao(solicitacao);
             detalhe.setCriadoEm(Instant.now());
         } else {
-            detalhe = detalhes.findById(id).orElseThrow(() -> naoEncontrado("Detalhes da solicitação"));
+            detalhe = detalhes.findById(idObrigatorio(id, "Solicitação")).orElseThrow(() -> naoEncontrado("Detalhes da solicitação"));
             if (!Objects.equals(detalhe.getVersao(), pedido.versao())) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "A solicitação foi alterada. Atualize e tente novamente.");
             }
@@ -141,6 +142,7 @@ public class SolicitacaoCompartilhadaService {
         return ref;
     }
 
+    @NonNull
     private Long idObrigatorio(Long id, String nome) {
         if (id == null || id <= 0) throw invalido(nome + " é obrigatório.");
         return id;
