@@ -751,11 +751,10 @@ function statusPill(key, value) {
 }
 
 export function renderMessages(records) {
-  if (!records.length) return `<div class="data-panel"><div class="panel-heading"><div><span class="eyebrow">FALE CONOSCO</span><h2>Caixa de entrada <span class="count-pill">0</span></h2></div></div><div class="empty-state"><span>✉</span><strong>Nenhuma mensagem recebida</strong><p>As mensagens enviadas pelo formulário do site aparecerão aqui.</p></div></div>`;
   const unread = records.filter((message) => message.lida !== true);
   const readMessages = records.filter((message) => message.lida === true);
   const area = (title, items, empty) => `<section class="message-area"><h3 class="message-area-title">${title} <span class="count-pill">${items.length}</span></h3>${items.length ? `<div class="message-list">${items.map(renderMessageCard).join("")}</div>` : `<p class="muted message-area-empty">${empty}</p>`}</section>`;
-  return `<div class="data-panel"><div class="panel-heading"><div><span class="eyebrow">FALE CONOSCO</span><h2>Caixa de entrada <span class="count-pill">${records.length}</span></h2></div></div><div class="message-areas">${area("Não lidas", unread, "Nenhuma mensagem não lida.")}${area("Lidas", readMessages, "Nenhuma mensagem lida.")}</div></div>`;
+  return `<div class="data-panel"><div class="panel-heading"><div><span class="eyebrow">FALE CONOSCO</span><h2>Caixa de entrada <span class="count-pill">${records.length}</span></h2></div></div><div class="message-areas">${area("Não lidas", unread, "Nenhuma mensagem não lida.")}${area("Lidas", readMessages, "Nenhuma mensagem lida.")}${records.length ? "" : '<p class="muted message-area-empty">As mensagens enviadas pelo formulário do site aparecerão aqui.</p>'}</div></div>`;
 }
 
 function renderMessageCard(message) {
