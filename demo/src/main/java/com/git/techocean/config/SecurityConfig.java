@@ -62,6 +62,13 @@ public class SecurityConfig {
                 .cors(Customizer.withDefaults())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(
+                                "/",
+                                "/index.html",
+                                "/assets/**",
+                                "/favicon.ico",
+                                "/robots.txt"
+                        ).permitAll()
                         .requestMatchers(HttpMethod.POST, "/admin/setup", "/admin/login").permitAll()
                         .requestMatchers(HttpMethod.GET, "/admin/setup-status").permitAll()
                         .requestMatchers(HttpMethod.POST, "/auth/password-reset/request", "/auth/password-reset/confirm").permitAll()
