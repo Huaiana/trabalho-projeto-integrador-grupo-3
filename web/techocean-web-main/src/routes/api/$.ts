@@ -1,11 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 // Same-origin relay to the Techocean API, so the browser never hits its CORS allow-list.
-// O upstream respeita VITE_API_URL (produção/build) e, em desenvolvimento local,
-// aponta para o Spring Boot rodando em http://localhost:8080.
-const UPSTREAM = import.meta.env?.VITE_API_URL
-  ? String(import.meta.env.VITE_API_URL).replace(/\/$/, "")
-  : "http://localhost:8080";
+// Em produção (build do Cloudflare Pages) aponta sempre para a API no Render, onde o
+// administrador já está cadastrado. O VITE_API_URL do ambiente do Pages é ignorado aqui.
+// Em desenvolvimento local aponta para o Spring Boot rodando em http://localhost:8080.
+const UPSTREAM = import.meta.env?.DEV
+  ? "http://localhost:8080"
+  : "https://trabalho-projeto-integrador-grupo-3-1.onrender.com";
 
 async function relay({ request }: { request: Request }) {
   const url = new URL(request.url);
