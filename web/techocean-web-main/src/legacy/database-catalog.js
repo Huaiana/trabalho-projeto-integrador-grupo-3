@@ -69,7 +69,11 @@ export const databaseCategories = [
       { name: "servico", label: "Nome do serviço", required: true },
       { name: "categoria", label: "Categoria" },
       { name: "valorEstimado", label: "Valor estimado (R$)", type: "number" },
-      { name: "tarifas", label: "Tarifas disponíveis (uma por linha: condição | valor)", type: "textarea" },
+      {
+        name: "tarifas",
+        label: "Tarifas disponíveis (uma por linha: condição | valor)",
+        type: "textarea",
+      },
       { name: "regras", label: "Valores e condições", type: "textarea" },
       { name: "servicos", label: "IDs dos serviços (separados por vírgula)" },
       { name: "cargas", label: "IDs das cargas (separados por vírgula)" },
@@ -105,7 +109,12 @@ export const databaseCategories = [
       { name: "orcamentos", label: "IDs dos orçamentos (separados por vírgula)" },
       { name: "solicitado", label: "Serviço solicitado?", type: "select", options: ["Sim", "Não"] },
       { name: "prestado", label: "Serviço prestado?", type: "select", options: ["Sim", "Não"] },
-      { name: "status", label: "Status padrão", type: "select", options: ["PENDENTE", "CONFIRMADO", "CONCLUÍDO", "CANCELADO"] },
+      {
+        name: "status",
+        label: "Status padrão",
+        type: "select",
+        options: ["PENDENTE", "CONFIRMADO", "CONCLUÍDO", "CANCELADO"],
+      },
     ],
   },
 ];
@@ -124,7 +133,9 @@ function readStorage(key) {
   try {
     return globalThis.localStorage?.getItem(key) ?? null;
   } catch {
-    throw new Error("O navegador bloqueou o acesso ao armazenamento local. Verifique as permissões de privacidade.");
+    throw new Error(
+      "O navegador bloqueou o acesso ao armazenamento local. Verifique as permissões de privacidade.",
+    );
   }
 }
 
@@ -133,25 +144,34 @@ function writeStorage(key, value) {
     if (!globalThis.localStorage) throw new Error("Armazenamento local indisponível.");
     globalThis.localStorage.setItem(key, JSON.stringify(value));
   } catch (error) {
-    if (error instanceof Error && error.message === "Armazenamento local indisponível.") throw error;
-    throw new Error("Não foi possível salvar os dados neste navegador. Verifique o espaço disponível e as permissões de privacidade.");
+    if (error instanceof Error && error.message === "Armazenamento local indisponível.")
+      throw error;
+    throw new Error(
+      "Não foi possível salvar os dados neste navegador. Verifique o espaço disponível e as permissões de privacidade.",
+    );
   }
 }
 
 function emptyCatalog() {
   let sequence = 0;
-  const serviceRows = catalogoServicos.flatMap(({ categoria, servicos }) => servicos.map((service) => ({
-    id: createId(),
-    codigo: serviceCode(++sequence),
-    nome: service.nome,
-    categoria,
-    descricao: "",
-    valor: service.valor ?? "",
-    unidade: service.unidade,
-  })));
+  const serviceRows = catalogoServicos.flatMap(({ categoria, servicos }) =>
+    servicos.map((service) => ({
+      id: createId(),
+      codigo: serviceCode(++sequence),
+      nome: service.nome,
+      categoria,
+      descricao: "",
+      valor: service.valor ?? "",
+      unidade: service.unidade,
+    })),
+  );
   return {
     carga: [],
-    conteiner: catalogoConteineres.map((entry, index) => ({ ...entry, id: createId(), codigo: containerCode(index + 1) })),
+    conteiner: catalogoConteineres.map((entry, index) => ({
+      ...entry,
+      id: createId(),
+      codigo: containerCode(index + 1),
+    })),
     operacao: [],
     orcamento: [],
     servico: serviceRows,
@@ -187,7 +207,10 @@ function solicitationCode(number) {
 }
 
 function createId() {
-  return globalThis.crypto?.randomUUID?.() || `local-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+  return (
+    globalThis.crypto?.randomUUID?.() ||
+    `local-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+  );
 }
 
 export function readDatabaseCatalog() {
@@ -197,11 +220,18 @@ export function readDatabaseCatalog() {
     data = stored === null ? emptyCatalog() : JSON.parse(stored);
     if (!data || typeof data !== "object" || Array.isArray(data)) throw new Error();
   } catch {
-    throw new Error("Os dados locais do Banco de dados estão inválidos. Exporte ou limpe os dados do navegador antes de continuar.");
+    throw new Error(
+      "Os dados locais do Banco de dados estão inválidos. Exporte ou limpe os dados do navegador antes de continuar.",
+    );
   }
-  const catalog = Object.fromEntries(databaseCategories.map(({ id }) => [id, Array.isArray(data[id]) ? data[id] : []]));
+  const catalog = Object.fromEntries(
+    databaseCategories.map(({ id }) => [id, Array.isArray(data[id]) ? data[id] : []]),
+  );
   const used = new Set(catalog.servico.map((entry) => entry.codigo).filter(Boolean));
-  let next = Number.isSafeInteger(data.nextServiceCode) && data.nextServiceCode > 0 ? data.nextServiceCode : 1;
+  let next =
+    Number.isSafeInteger(data.nextServiceCode) && data.nextServiceCode > 0
+      ? data.nextServiceCode
+      : 1;
   for (const code of used) {
     const match = /^SRV-(\d+)$/i.exec(code);
     if (match) next = Math.max(next, Number(match[1]) + 1);
@@ -209,7 +239,9 @@ export function readDatabaseCatalog() {
   let changed = stored === null;
   if (data.containerReferenceVersion !== 1) {
     for (const reference of catalogoConteineres) {
-      const existing = catalog.conteiner.find((entry) => normalize(entry.tipo) === normalize(reference.tipo));
+      const existing = catalog.conteiner.find(
+        (entry) => normalize(entry.tipo) === normalize(reference.tipo),
+      );
       if (existing) {
         for (const [key, value] of Object.entries(reference)) {
           if (key !== "tipo" && existing[key] == null) existing[key] = value;
@@ -222,7 +254,10 @@ export function readDatabaseCatalog() {
   }
   catalog.containerReferenceVersion = 1;
   const containerCodes = new Set(catalog.conteiner.map((entry) => entry.codigo).filter(Boolean));
-  let nextContainer = Number.isSafeInteger(data.nextContainerCode) && data.nextContainerCode > 0 ? data.nextContainerCode : 1;
+  let nextContainer =
+    Number.isSafeInteger(data.nextContainerCode) && data.nextContainerCode > 0
+      ? data.nextContainerCode
+      : 1;
   for (const code of containerCodes) {
     const match = /^CTR-(\d+)$/i.exec(code);
     if (match) nextContainer = Math.max(nextContainer, Number(match[1]) + 1);
@@ -237,13 +272,24 @@ export function readDatabaseCatalog() {
   catalog.nextContainerCode = nextContainer;
   if (data.cargoReferenceVersion !== 1) {
     for (const reference of catalogoCargas) {
-      const containerIds = reference.conteineres.map((tipo) => catalog.conteiner.find((entry) => normalize(entry.tipo) === normalize(tipo))?.codigo).filter(Boolean);
+      const containerIds = reference.conteineres
+        .map(
+          (tipo) =>
+            catalog.conteiner.find((entry) => normalize(entry.tipo) === normalize(tipo))?.codigo,
+        )
+        .filter(Boolean);
       if (!containerIds.length) continue;
-      const existing = catalog.carga.find((entry) => normalize(entry.tipoCarga) === normalize(reference.tipoCarga));
+      const existing = catalog.carga.find(
+        (entry) => normalize(entry.tipoCarga) === normalize(reference.tipoCarga),
+      );
       if (existing) {
         if (existing.conteineres == null) existing.conteineres = containerIds.join(", ");
       } else {
-        catalog.carga.push({ id: createId(), tipoCarga: reference.tipoCarga, conteineres: containerIds.join(", ") });
+        catalog.carga.push({
+          id: createId(),
+          tipoCarga: reference.tipoCarga,
+          conteineres: containerIds.join(", "),
+        });
       }
     }
     changed = true;
@@ -253,19 +299,38 @@ export function readDatabaseCatalog() {
     const oldNames = new Set(cargasAntigas.map(normalize));
     const newNames = new Set(catalogoCargas.map((r) => normalize(r.tipoCarga)));
     const legacy = catalog.carga.filter((e) => oldNames.has(normalize(e.tipoCarga)));
-    const reusable = legacy.slice().sort((a, b) => String(a.codigo || "~").localeCompare(String(b.codigo || "~")));
-    const kept = catalog.carga.filter((e) => !oldNames.has(normalize(e.tipoCarga)) && !newNames.has(normalize(e.tipoCarga)));
+    const reusable = legacy
+      .slice()
+      .sort((a, b) => String(a.codigo || "~").localeCompare(String(b.codigo || "~")));
+    const kept = catalog.carga.filter(
+      (e) => !oldNames.has(normalize(e.tipoCarga)) && !newNames.has(normalize(e.tipoCarga)),
+    );
     const refreshed = catalogoCargas.map((reference) => {
-      const current = catalog.carga.find((e) => normalize(e.tipoCarga) === normalize(reference.tipoCarga)) || reusable.shift() || { id: createId() };
-      const containerIds = reference.conteineres.map((tipo) => catalog.conteiner.find((entry) => normalize(entry.tipo) === normalize(tipo))?.codigo).filter(Boolean);
-      return { ...current, tipoCarga: reference.tipoCarga, descricao: reference.descricao, informacoes: reference.informacoes, conteineres: containerIds.join(", ") };
+      const current = catalog.carga.find(
+        (e) => normalize(e.tipoCarga) === normalize(reference.tipoCarga),
+      ) ||
+        reusable.shift() || { id: createId() };
+      const containerIds = reference.conteineres
+        .map(
+          (tipo) =>
+            catalog.conteiner.find((entry) => normalize(entry.tipo) === normalize(tipo))?.codigo,
+        )
+        .filter(Boolean);
+      return {
+        ...current,
+        tipoCarga: reference.tipoCarga,
+        descricao: reference.descricao,
+        informacoes: reference.informacoes,
+        conteineres: containerIds.join(", "),
+      };
     });
     catalog.carga = [...refreshed, ...kept];
     changed = true;
   }
   catalog.cargoReferenceVersion2 = 1;
   const cargoCodes = new Set(catalog.carga.map((entry) => entry.codigo).filter(Boolean));
-  let nextCargo = Number.isSafeInteger(data.nextCargoCode) && data.nextCargoCode > 0 ? data.nextCargoCode : 1;
+  let nextCargo =
+    Number.isSafeInteger(data.nextCargoCode) && data.nextCargoCode > 0 ? data.nextCargoCode : 1;
   for (const code of cargoCodes) {
     const match = /^CRG-(\d+)$/i.exec(code);
     if (match) nextCargo = Math.max(nextCargo, Number(match[1]) + 1);
@@ -280,11 +345,19 @@ export function readDatabaseCatalog() {
   catalog.nextCargoCode = nextCargo;
   if (data.cargoContainerLinksVersion !== 1) {
     for (const reference of catalogoCargas) {
-      const cargo = catalog.carga.find((entry) => normalize(entry.tipoCarga) === normalize(reference.tipoCarga));
+      const cargo = catalog.carga.find(
+        (entry) => normalize(entry.tipoCarga) === normalize(reference.tipoCarga),
+      );
       if (!cargo) continue;
-      const existing = String(cargo.conteineres || "").split(",").map((code) => code.trim().toUpperCase()).filter(Boolean);
+      const existing = String(cargo.conteineres || "")
+        .split(",")
+        .map((code) => code.trim().toUpperCase())
+        .filter(Boolean);
       const linked = reference.conteineres
-        .map((type) => catalog.conteiner.find((entry) => normalize(entry.tipo) === normalize(type))?.codigo)
+        .map(
+          (type) =>
+            catalog.conteiner.find((entry) => normalize(entry.tipo) === normalize(type))?.codigo,
+        )
         .filter(Boolean);
       cargo.conteineres = [...new Set([...existing, ...linked])].join(", ");
     }
@@ -296,7 +369,9 @@ export function readDatabaseCatalog() {
       if (!entry.categoria) entry.categoria = entry.andamento || "";
     }
     for (const reference of catalogoOperacoes) {
-      const existing = catalog.operacao.find((entry) => normalize(entry.categoria) === normalize(reference.categoria));
+      const existing = catalog.operacao.find(
+        (entry) => normalize(entry.categoria) === normalize(reference.categoria),
+      );
       if (existing) {
         for (const [key, value] of Object.entries(reference)) {
           if (key !== "categoria" && existing[key] == null) existing[key] = value;
@@ -309,18 +384,28 @@ export function readDatabaseCatalog() {
   }
   catalog.operationReferenceVersion = 1;
   if (data.operationLinksVersion !== 1) {
-    const operation = catalog.operacao.find((entry) => normalize(entry.categoria) === normalize("Granéis Líquidos"));
-    const cargo = catalog.carga.find((entry) => normalize(entry.tipoCarga) === normalize("Produtos químicos"));
-    const container = catalog.conteiner.find((entry) => normalize(entry.tipo) === normalize("Isotank 20'"));
+    const operation = catalog.operacao.find(
+      (entry) => normalize(entry.categoria) === normalize("Granéis Líquidos"),
+    );
+    const cargo = catalog.carga.find(
+      (entry) => normalize(entry.tipoCarga) === normalize("Produtos químicos"),
+    );
+    const container = catalog.conteiner.find(
+      (entry) => normalize(entry.tipo) === normalize("Isotank 20'"),
+    );
     if (operation) {
       if (operation.cargas == null && cargo?.codigo) operation.cargas = cargo.codigo;
-      if (operation.conteineres == null && container?.codigo && cargo?.codigo) operation.conteineres = container.codigo;
+      if (operation.conteineres == null && container?.codigo && cargo?.codigo)
+        operation.conteineres = container.codigo;
     }
     changed = true;
   }
   catalog.operationLinksVersion = 1;
   const operationCodes = new Set(catalog.operacao.map((entry) => entry.codigo).filter(Boolean));
-  let nextOperation = Number.isSafeInteger(data.nextOperationCode) && data.nextOperationCode > 0 ? data.nextOperationCode : 1;
+  let nextOperation =
+    Number.isSafeInteger(data.nextOperationCode) && data.nextOperationCode > 0
+      ? data.nextOperationCode
+      : 1;
   for (const code of operationCodes) {
     const match = /^OPR-(\d+)$/i.exec(code);
     if (match) nextOperation = Math.max(nextOperation, Number(match[1]) + 1);
@@ -344,26 +429,38 @@ export function readDatabaseCatalog() {
   if (data.solicitationReferenceVersion !== 1) {
     for (const reference of catalogoSolicitacoes) {
       const serviceCodes = (reference.servicos || []).flatMap((name) => {
-        const matches = catalog.servico.filter((service) => normalize(service.nome) === normalize(name));
+        const matches = catalog.servico.filter(
+          (service) => normalize(service.nome) === normalize(name),
+        );
         return matches.length === 1 ? [matches[0].codigo] : [];
       });
-      const existing = catalog.solicitacao.find((entry) => normalize(entry.servico) === normalize(reference.categoria));
+      const existing = catalog.solicitacao.find(
+        (entry) => normalize(entry.servico) === normalize(reference.categoria),
+      );
       if (existing) {
         if (existing.categoria == null) existing.categoria = reference.categoria;
         if (existing.descricao == null) existing.descricao = reference.descricao;
         if (existing.servicos == null) existing.servicos = serviceCodes.join(", ");
       } else {
         catalog.solicitacao.push({
-          id: createId(), servico: reference.categoria, categoria: reference.categoria,
-          descricao: reference.descricao, servicos: serviceCodes.join(", "),
+          id: createId(),
+          servico: reference.categoria,
+          categoria: reference.categoria,
+          descricao: reference.descricao,
+          servicos: serviceCodes.join(", "),
         });
       }
     }
     changed = true;
   }
   catalog.solicitationReferenceVersion = 1;
-  const solicitationCodes = new Set(catalog.solicitacao.map((entry) => entry.codigo).filter(Boolean));
-  let nextSolicitation = Number.isSafeInteger(data.nextSolicitationCode) && data.nextSolicitationCode > 0 ? data.nextSolicitationCode : 1;
+  const solicitationCodes = new Set(
+    catalog.solicitacao.map((entry) => entry.codigo).filter(Boolean),
+  );
+  let nextSolicitation =
+    Number.isSafeInteger(data.nextSolicitationCode) && data.nextSolicitationCode > 0
+      ? data.nextSolicitationCode
+      : 1;
   for (const code of solicitationCodes) {
     const match = /^SOL-(\d+)$/i.exec(code);
     if (match) nextSolicitation = Math.max(nextSolicitation, Number(match[1]) + 1);
@@ -378,10 +475,19 @@ export function readDatabaseCatalog() {
   catalog.nextSolicitationCode = nextSolicitation;
   if (data.budgetReferenceVersion !== 1) {
     for (const [item, nome, categoria, regras] of catalogoOrcamentos) {
-      if (catalog.orcamento.some((entry) => normalize(entry.servico) === normalize(`${item} — ${nome}`))) continue;
+      if (
+        catalog.orcamento.some(
+          (entry) => normalize(entry.servico) === normalize(`${item} — ${nome}`),
+        )
+      )
+        continue;
       catalog.orcamento.push({
-        id: createId(), servico: `${item} — ${nome}`, categoria, regras,
-        fonte: fonteTarifariaHistorica, historico: true,
+        id: createId(),
+        servico: `${item} — ${nome}`,
+        categoria,
+        regras,
+        fonte: fonteTarifariaHistorica,
+        historico: true,
       });
     }
     changed = true;
@@ -393,19 +499,35 @@ export function readDatabaseCatalog() {
       "2.1.2.2.35": ["Open Top 20'", "Open Top 40'", "Flat Rack 20'", "Flat Rack 40'"],
     };
     for (const [item, nome, , regras] of catalogoOrcamentos) {
-      const entry = catalog.orcamento.find((record) => record.historico && normalize(record.servico) === normalize(`${item} — ${nome}`));
+      const entry = catalog.orcamento.find(
+        (record) =>
+          record.historico && normalize(record.servico) === normalize(`${item} — ${nome}`),
+      );
       if (!entry) continue;
       if (entry.tarifas == null && entry.regras === regras) {
         entry.tarifas = tarifasPadrao(item);
         const options = parseTarifas(entry.tarifas);
-        if (entry.valorEstimado == null && options.length === 1 && item !== "2.1.2.1.3") entry.valorEstimado = options[0].value;
+        if (entry.valorEstimado == null && options.length === 1 && item !== "2.1.2.1.3")
+          entry.valorEstimado = options[0].value;
       }
-      if (entry.observacoes == null) entry.observacoes = "Referência de 2017. Confirme condições, adicionais e impostos antes de usar.";
+      if (entry.observacoes == null)
+        entry.observacoes =
+          "Referência de 2017. Confirme condições, adicionais e impostos antes de usar.";
       if (entry.servicos == null) {
-        entry.servicos = catalog.servico.filter((service) => normalize(service.nome) === normalize(nome)).map((service) => service.codigo).join(", ");
+        entry.servicos = catalog.servico
+          .filter((service) => normalize(service.nome) === normalize(nome))
+          .map((service) => service.codigo)
+          .join(", ");
       }
       if (entry.conteineres == null && containerLinks[item]) {
-        entry.conteineres = containerLinks[item].map((tipo) => catalog.conteiner.find((container) => normalize(container.tipo) === normalize(tipo))?.codigo).filter(Boolean).join(", ");
+        entry.conteineres = containerLinks[item]
+          .map(
+            (tipo) =>
+              catalog.conteiner.find((container) => normalize(container.tipo) === normalize(tipo))
+                ?.codigo,
+          )
+          .filter(Boolean)
+          .join(", ");
       }
     }
     changed = true;
@@ -418,16 +540,26 @@ export function readDatabaseCatalog() {
     };
     for (const [item, nome, , regras] of catalogoOrcamentos) {
       if (!explicitLinks[item]) continue;
-      const entry = catalog.orcamento.find((record) => record.historico && normalize(record.servico) === normalize(`${item} — ${nome}`));
+      const entry = catalog.orcamento.find(
+        (record) =>
+          record.historico && normalize(record.servico) === normalize(`${item} — ${nome}`),
+      );
       if (!entry || entry.conteineres != null || entry.regras !== regras) continue;
-      const codes = explicitLinks[item].map((tipo) => catalog.conteiner.find((container) => normalize(container.tipo) === normalize(tipo))?.codigo).filter(Boolean);
+      const codes = explicitLinks[item]
+        .map(
+          (tipo) =>
+            catalog.conteiner.find((container) => normalize(container.tipo) === normalize(tipo))
+              ?.codigo,
+        )
+        .filter(Boolean);
       if (codes.length) entry.conteineres = codes.join(", ");
     }
     changed = true;
   }
   catalog.explicitBudgetContainerLinksVersion = 1;
   const budgetCodes = new Set(catalog.orcamento.map((entry) => entry.codigo).filter(Boolean));
-  let nextBudget = Number.isSafeInteger(data.nextBudgetCode) && data.nextBudgetCode > 0 ? data.nextBudgetCode : 1;
+  let nextBudget =
+    Number.isSafeInteger(data.nextBudgetCode) && data.nextBudgetCode > 0 ? data.nextBudgetCode : 1;
   for (const code of budgetCodes) {
     const match = /^ORC-(\d+)$/i.exec(code);
     if (match) nextBudget = Math.max(nextBudget, Number(match[1]) + 1);
@@ -442,7 +574,14 @@ export function readDatabaseCatalog() {
   catalog.nextBudgetCode = nextBudget;
   if (changed && globalThis.localStorage) writeStorage(DATABASE_CATALOG_KEY, catalog);
   for (const container of catalog.conteiner) {
-    container.cargas = catalog.carga.filter((cargo) => String(cargo.conteineres || "").split(",").some((code) => normalize(code) === normalize(container.codigo))).map((cargo) => cargo.codigo).join(", ");
+    container.cargas = catalog.carga
+      .filter((cargo) =>
+        String(cargo.conteineres || "")
+          .split(",")
+          .some((code) => normalize(code) === normalize(container.codigo)),
+      )
+      .map((cargo) => cargo.codigo)
+      .join(", ");
   }
   return catalog;
 }
@@ -455,59 +594,124 @@ export function readDatabaseEntries(categoryId) {
 export function findDatabaseEntry(categoryId, field, value) {
   const sought = normalize(value);
   if (!sought) return null;
-  return readDatabaseEntries(categoryId).find((entry) => normalize(entry[field]) === sought) || null;
+  return (
+    readDatabaseEntries(categoryId).find((entry) => normalize(entry[field]) === sought) || null
+  );
 }
 
 export function saveDatabaseEntry(categoryId, values, id = "") {
   const category = categoryById.get(categoryId);
   if (!category) throw new Error("Categoria do Banco de dados inválida.");
   const record = Object.fromEntries(category.fields.map(({ name }) => [name, values[name] ?? ""]));
-  if (!String(record[category.lookupField] ?? "").trim()) throw new Error(`Preencha ${category.fields.find(({ name }) => name === category.lookupField)?.label || "o tipo ou nome"} para salvar o registro.`);
+  if (!String(record[category.lookupField] ?? "").trim())
+    throw new Error(
+      `Preencha ${category.fields.find(({ name }) => name === category.lookupField)?.label || "o tipo ou nome"} para salvar o registro.`,
+    );
   for (const field of category.fields) {
-    if (field.required && !String(record[field.name] ?? "").trim()) throw new Error(`O campo “${field.label}” é obrigatório.`);
-    if (field.type === "number" && record[field.name] !== "" && !Number.isFinite(Number(record[field.name]))) throw new Error(`O campo “${field.label}” deve ser numérico.`);
-    if (field.type === "number" && record[field.name] !== "") record[field.name] = Number(record[field.name]);
+    if (field.required && !String(record[field.name] ?? "").trim())
+      throw new Error(`O campo “${field.label}” é obrigatório.`);
+    if (
+      field.type === "number" &&
+      record[field.name] !== "" &&
+      !Number.isFinite(Number(record[field.name]))
+    )
+      throw new Error(`O campo “${field.label}” deve ser numérico.`);
+    if (field.type === "number" && record[field.name] !== "")
+      record[field.name] = Number(record[field.name]);
   }
-  if (categoryId === "orcamento" && record.valorEstimado !== "" && record.valorEstimado < 0) throw new Error("O valor estimado não pode ser negativo.");
+  if (categoryId === "orcamento" && record.valorEstimado !== "" && record.valorEstimado < 0)
+    throw new Error("O valor estimado não pode ser negativo.");
   if (categoryId === "orcamento") parseTarifas(record.tarifas);
   const catalog = readDatabaseCatalog();
   const entries = catalog[categoryId];
   let linkedCargoCodes = null;
   if (categoryId === "conteiner") {
-    linkedCargoCodes = [...new Set(String(record.cargas || "").split(",").map((code) => code.trim().toUpperCase()).filter(Boolean))];
-    const invalid = linkedCargoCodes.find((code) => !catalog.carga.some((cargo) => normalize(cargo.codigo) === normalize(code)));
+    linkedCargoCodes = [
+      ...new Set(
+        String(record.cargas || "")
+          .split(",")
+          .map((code) => code.trim().toUpperCase())
+          .filter(Boolean),
+      ),
+    ];
+    const invalid = linkedCargoCodes.find(
+      (code) => !catalog.carga.some((cargo) => normalize(cargo.codigo) === normalize(code)),
+    );
     if (invalid) throw new Error(`ID de carga não encontrado: ${invalid}.`);
     delete record.cargas;
   }
   if (categoryId === "carga") {
-    for (const [field, linkedCategory] of [["conteineres", "conteiner"], ["servicos", "servico"]]) {
-      const codes = String(record[field] || "").split(",").map((code) => code.trim().toUpperCase()).filter(Boolean);
-      const invalid = codes.find((code) => !catalog[linkedCategory].some((entry) => normalize(entry.codigo) === normalize(code)));
-      if (invalid) throw new Error(`ID de ${getDatabaseCategory(linkedCategory).label.toLowerCase()} não encontrado: ${invalid}.`);
+    for (const [field, linkedCategory] of [
+      ["conteineres", "conteiner"],
+      ["servicos", "servico"],
+    ]) {
+      const codes = String(record[field] || "")
+        .split(",")
+        .map((code) => code.trim().toUpperCase())
+        .filter(Boolean);
+      const invalid = codes.find(
+        (code) =>
+          !catalog[linkedCategory].some((entry) => normalize(entry.codigo) === normalize(code)),
+      );
+      if (invalid)
+        throw new Error(
+          `ID de ${getDatabaseCategory(linkedCategory).label.toLowerCase()} não encontrado: ${invalid}.`,
+        );
       record[field] = [...new Set(codes)].join(", ");
     }
   }
   if (["operacao", "orcamento", "solicitacao"].includes(categoryId)) {
-    const links = categoryId !== "operacao"
-      ? [["servicos", "servico"], ["cargas", "carga"], ["conteineres", "conteiner"], ["operacoes", "operacao"], ...(categoryId === "solicitacao" ? [["orcamentos", "orcamento"]] : [])]
-      : [["cargas", "carga"], ["conteineres", "conteiner"]];
+    const links =
+      categoryId !== "operacao"
+        ? [
+            ["servicos", "servico"],
+            ["cargas", "carga"],
+            ["conteineres", "conteiner"],
+            ["operacoes", "operacao"],
+            ...(categoryId === "solicitacao" ? [["orcamentos", "orcamento"]] : []),
+          ]
+        : [
+            ["cargas", "carga"],
+            ["conteineres", "conteiner"],
+          ];
     for (const [field, linkedCategory] of links) {
-      const codes = String(record[field] || "").split(",").map((code) => code.trim().toUpperCase()).filter(Boolean);
-      const invalid = codes.find((code) => !catalog[linkedCategory].some((entry) => normalize(entry.codigo) === normalize(code)));
-      if (invalid) throw new Error(`ID de ${getDatabaseCategory(linkedCategory).label.toLowerCase()} não encontrado: ${invalid}.`);
+      const codes = String(record[field] || "")
+        .split(",")
+        .map((code) => code.trim().toUpperCase())
+        .filter(Boolean);
+      const invalid = codes.find(
+        (code) =>
+          !catalog[linkedCategory].some((entry) => normalize(entry.codigo) === normalize(code)),
+      );
+      if (invalid)
+        throw new Error(
+          `ID de ${getDatabaseCategory(linkedCategory).label.toLowerCase()} não encontrado: ${invalid}.`,
+        );
       record[field] = [...new Set(codes)].join(", ");
     }
   }
-  if (entries.some((entry) => String(entry.id) !== String(id) && normalize(entry[category.lookupField]) === normalize(record[category.lookupField]))) {
-    throw new Error(`Já existe um registro para “${record[category.lookupField]}” nesta categoria.`);
+  if (
+    entries.some(
+      (entry) =>
+        String(entry.id) !== String(id) &&
+        normalize(entry[category.lookupField]) === normalize(record[category.lookupField]),
+    )
+  ) {
+    throw new Error(
+      `Já existe um registro para “${record[category.lookupField]}” nesta categoria.`,
+    );
   }
   if (id) {
     const index = entries.findIndex((entry) => String(entry.id) === String(id));
-    if (index < 0) throw new Error("O registro não foi encontrado. Atualize o Banco de dados e tente novamente.");
+    if (index < 0)
+      throw new Error(
+        "O registro não foi encontrado. Atualize o Banco de dados e tente novamente.",
+      );
     const previous = entries[index];
     if (categoryId === "servico") {
       record.codigo = previous.codigo;
-      record.valorAtualizadoEm = record.valor !== previous.valor ? new Date().toISOString() : previous.valorAtualizadoEm;
+      record.valorAtualizadoEm =
+        record.valor !== previous.valor ? new Date().toISOString() : previous.valorAtualizadoEm;
     }
     if (categoryId === "conteiner") record.codigo = previous.codigo;
     if (categoryId === "carga") record.codigo = previous.codigo;
@@ -517,7 +721,10 @@ export function saveDatabaseEntry(categoryId, values, id = "") {
       record.codigo = previous.codigo;
       record.historico = previous.historico;
       record.fonte = previous.fonte;
-      record.valorAtualizadoEm = record.valorEstimado !== previous.valorEstimado ? new Date().toISOString() : previous.valorAtualizadoEm;
+      record.valorAtualizadoEm =
+        record.valorEstimado !== previous.valorEstimado
+          ? new Date().toISOString()
+          : previous.valorAtualizadoEm;
     }
     entries[index] = { ...record, id };
   } else {
@@ -528,7 +735,8 @@ export function saveDatabaseEntry(categoryId, values, id = "") {
     if (categoryId === "conteiner") record.codigo = containerCode(catalog.nextContainerCode++);
     if (categoryId === "carga") record.codigo = cargoCode(catalog.nextCargoCode++);
     if (categoryId === "operacao") record.codigo = operationCode(catalog.nextOperationCode++);
-    if (categoryId === "solicitacao") record.codigo = solicitationCode(catalog.nextSolicitationCode++);
+    if (categoryId === "solicitacao")
+      record.codigo = solicitationCode(catalog.nextSolicitationCode++);
     if (categoryId === "orcamento") {
       record.codigo = budgetCode(catalog.nextBudgetCode++);
       if (record.valorEstimado !== "") record.valorAtualizadoEm = new Date().toISOString();
@@ -537,10 +745,15 @@ export function saveDatabaseEntry(categoryId, values, id = "") {
   }
   catalog[categoryId] = entries;
   if (linkedCargoCodes) {
-    const container = entries.find((entry) => id ? String(entry.id) === String(id) : normalize(entry.tipo) === normalize(record.tipo));
+    const container = entries.find((entry) =>
+      id ? String(entry.id) === String(id) : normalize(entry.tipo) === normalize(record.tipo),
+    );
     if (container) {
       for (const cargo of catalog.carga) {
-        const codes = String(cargo.conteineres || "").split(",").map((code) => code.trim()).filter((code) => code && normalize(code) !== normalize(container.codigo));
+        const codes = String(cargo.conteineres || "")
+          .split(",")
+          .map((code) => code.trim())
+          .filter((code) => code && normalize(code) !== normalize(container.codigo));
         if (linkedCargoCodes.includes(cargo.codigo.toUpperCase())) codes.push(container.codigo);
         cargo.conteineres = [...new Set(codes)].join(", ");
       }
@@ -555,38 +768,90 @@ export function deleteDatabaseEntry(categoryId, id) {
   if (!categoryById.has(categoryId)) throw new Error("Categoria do Banco de dados inválida.");
   const catalog = readDatabaseCatalog();
   const entries = catalog[categoryId];
-  if (!entries.some((entry) => String(entry.id) === String(id))) throw new Error("O registro não foi encontrado. Atualize o Banco de dados e tente novamente.");
+  if (!entries.some((entry) => String(entry.id) === String(id)))
+    throw new Error("O registro não foi encontrado. Atualize o Banco de dados e tente novamente.");
   if (categoryId === "conteiner") {
     const code = entries.find((entry) => String(entry.id) === String(id)).codigo;
-    if (catalog.carga.some((entry) => String(entry.conteineres || "").split(",").some((value) => normalize(value) === normalize(code)))) {
-      throw new Error("Este contêiner está vinculado a cargas. Remova os vínculos nas referências de carga antes de excluí-lo.");
+    if (
+      catalog.carga.some((entry) =>
+        String(entry.conteineres || "")
+          .split(",")
+          .some((value) => normalize(value) === normalize(code)),
+      )
+    ) {
+      throw new Error(
+        "Este contêiner está vinculado a cargas. Remova os vínculos nas referências de carga antes de excluí-lo.",
+      );
     }
   }
   if (categoryId === "servico") {
     const code = entries.find((entry) => String(entry.id) === String(id)).codigo;
-    if (catalog.carga.some((entry) => String(entry.servicos || "").split(",").some((value) => normalize(value) === normalize(code)))) {
-      throw new Error("Este serviço está vinculado a cargas. Remova os vínculos nas referências de carga antes de excluí-lo.");
+    if (
+      catalog.carga.some((entry) =>
+        String(entry.servicos || "")
+          .split(",")
+          .some((value) => normalize(value) === normalize(code)),
+      )
+    ) {
+      throw new Error(
+        "Este serviço está vinculado a cargas. Remova os vínculos nas referências de carga antes de excluí-lo.",
+      );
     }
   }
   if (categoryId === "carga" || categoryId === "conteiner") {
     const code = entries.find((entry) => String(entry.id) === String(id)).codigo;
     const field = categoryId === "carga" ? "cargas" : "conteineres";
-    if (catalog.operacao.some((entry) => String(entry[field] || "").split(",").some((value) => normalize(value) === normalize(code)))) {
-      throw new Error("Esta referência está vinculada a operações. Remova os vínculos nas referências de operação antes de excluí-la.");
+    if (
+      catalog.operacao.some((entry) =>
+        String(entry[field] || "")
+          .split(",")
+          .some((value) => normalize(value) === normalize(code)),
+      )
+    ) {
+      throw new Error(
+        "Esta referência está vinculada a operações. Remova os vínculos nas referências de operação antes de excluí-la.",
+      );
     }
   }
-  const solicitationLinkFields = { servico: "servicos", carga: "cargas", conteiner: "conteineres", operacao: "operacoes", orcamento: "orcamentos" };
+  const solicitationLinkFields = {
+    servico: "servicos",
+    carga: "cargas",
+    conteiner: "conteineres",
+    operacao: "operacoes",
+    orcamento: "orcamentos",
+  };
   if (solicitationLinkFields[categoryId]) {
     const code = entries.find((entry) => String(entry.id) === String(id)).codigo;
-    if (catalog.solicitacao.some((entry) => String(entry[solicitationLinkFields[categoryId]] || "").split(",").some((value) => normalize(value) === normalize(code)))) {
-      throw new Error("Esta referência está vinculada a solicitações. Remova os vínculos nas referências de solicitação antes de excluí-la.");
+    if (
+      catalog.solicitacao.some((entry) =>
+        String(entry[solicitationLinkFields[categoryId]] || "")
+          .split(",")
+          .some((value) => normalize(value) === normalize(code)),
+      )
+    ) {
+      throw new Error(
+        "Esta referência está vinculada a solicitações. Remova os vínculos nas referências de solicitação antes de excluí-la.",
+      );
     }
   }
-  const budgetLinkFields = { servico: "servicos", carga: "cargas", conteiner: "conteineres", operacao: "operacoes" };
+  const budgetLinkFields = {
+    servico: "servicos",
+    carga: "cargas",
+    conteiner: "conteineres",
+    operacao: "operacoes",
+  };
   if (budgetLinkFields[categoryId]) {
     const code = entries.find((entry) => String(entry.id) === String(id)).codigo;
-    if (catalog.orcamento.some((entry) => String(entry[budgetLinkFields[categoryId]] || "").split(",").some((value) => normalize(value) === normalize(code)))) {
-      throw new Error("Esta referência está vinculada a orçamentos. Remova os vínculos nas referências de orçamento antes de excluí-la.");
+    if (
+      catalog.orcamento.some((entry) =>
+        String(entry[budgetLinkFields[categoryId]] || "")
+          .split(",")
+          .some((value) => normalize(value) === normalize(code)),
+      )
+    ) {
+      throw new Error(
+        "Esta referência está vinculada a orçamentos. Remova os vínculos nas referências de orçamento antes de excluí-la.",
+      );
     }
   }
   catalog[categoryId] = entries.filter((entry) => String(entry.id) !== String(id));
@@ -607,7 +872,8 @@ export function readSolicitationStates() {
 }
 
 export function saveSolicitationState(id, patch) {
-  if (id == null || String(id).trim() === "") throw new Error("Identificador de solicitação inválido.");
+  if (id == null || String(id).trim() === "")
+    throw new Error("Identificador de solicitação inválido.");
   const states = readSolicitationStates();
   states[id] = { ...(states[id] || {}), ...patch };
   writeStorage(DATABASE_SOLICITATION_KEY, states);
@@ -627,7 +893,8 @@ export function readResourceDetails() {
 }
 
 export function saveResourceDetails(categoryId, id, details) {
-  if (!["carga", "conteiner", "operacao"].includes(categoryId) || id == null || !String(id).trim()) throw new Error("Identificador de registro inválido.");
+  if (!["carga", "conteiner", "operacao"].includes(categoryId) || id == null || !String(id).trim())
+    throw new Error("Identificador de registro inválido.");
   const data = readResourceDetails();
   const key = `${categoryId}:${id}`;
   if (details === null) delete data[key];
@@ -648,7 +915,8 @@ export function readBudgetMetadata() {
 }
 
 export function saveBudgetMetadata(id, patch) {
-  if (id == null || String(id).trim() === "") throw new Error("Identificador de orçamento inválido.");
+  if (id == null || String(id).trim() === "")
+    throw new Error("Identificador de orçamento inválido.");
   const metadata = readBudgetMetadata();
   metadata[id] = { ...(metadata[id] || {}), ...patch };
   writeStorage(DATABASE_BUDGET_KEY, metadata);
@@ -669,13 +937,17 @@ export function readServiceValues() {
 
 export function saveServiceValue(id, value) {
   if (id == null || String(id).trim() === "") throw new Error("Identificador de serviço inválido.");
-  if (value !== "" && (!Number.isFinite(Number(value)) || Number(value) < 0)) throw new Error("Informe um valor de serviço válido.");
+  if (value !== "" && (!Number.isFinite(Number(value)) || Number(value) < 0))
+    throw new Error("Informe um valor de serviço válido.");
   const values = readServiceValues();
   if (value === "") delete values[id];
   else {
     const numeric = Number(value);
     const previous = values[id];
-    values[id] = { valor: numeric, atualizadoEm: previous?.valor === numeric ? previous.atualizadoEm : new Date().toISOString() };
+    values[id] = {
+      valor: numeric,
+      atualizadoEm: previous?.valor === numeric ? previous.atualizadoEm : new Date().toISOString(),
+    };
   }
   writeStorage(DATABASE_SERVICE_VALUES_KEY, values);
 }

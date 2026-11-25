@@ -83,15 +83,18 @@ export async function apiRequest(path, options = {}, { authenticated = true } = 
           ? await response.json().catch(() => null)
           : await response.text().catch(() => "");
         if (!response.ok) {
-          const message = payload && typeof payload === "object" && (payload.message || payload.detail || payload.title)
-            ? payload.message || payload.detail || payload.title
-            : typeof payload === "string" && payload.trim()
-              ? payload
-              : response.status === 401 && path === "/admin/login"
-                ? "A API recusou o login (HTTP 401). Confira o e-mail e a senha e confirme se o administrador já foi configurado."
-              : response.status === 401 && path === "/admin/me"
-                ? "Login aceito, mas o servidor recusou a sessão. Tente entrar novamente; se persistir, verifique se as instâncias da API usam o mesmo APP_AUTH_SECRET."
-                : `Não foi possível concluir a operação (HTTP ${response.status}).`;
+          const message =
+            payload &&
+            typeof payload === "object" &&
+            (payload.message || payload.detail || payload.title)
+              ? payload.message || payload.detail || payload.title
+              : typeof payload === "string" && payload.trim()
+                ? payload
+                : response.status === 401 && path === "/admin/login"
+                  ? "A API recusou o login (HTTP 401). Confira o e-mail e a senha e confirme se o administrador já foi configurado."
+                  : response.status === 401 && path === "/admin/me"
+                    ? "Login aceito, mas o servidor recusou a sessão. Tente entrar novamente; se persistir, verifique se as instâncias da API usam o mesmo APP_AUTH_SECRET."
+                    : `Não foi possível concluir a operação (HTTP ${response.status}).`;
           throw new ApiError(message, response.status, payload?.code || "");
         }
         return payload;
@@ -104,7 +107,11 @@ export async function apiRequest(path, options = {}, { authenticated = true } = 
     const guidance = import.meta.env?.DEV
       ? "Confirme o Spring Boot em localhost:8080 e o proxy /api do Vite."
       : "Verifique VITE_API_URL, a disponibilidade do serviço e o CORS.";
-    throw new ApiError(`Não foi possível conectar à API (${API_BASE_URL}). ${guidance}`, 0, "SEM_CONEXAO");
+    throw new ApiError(
+      `Não foi possível conectar à API (${API_BASE_URL}). ${guidance}`,
+      0,
+      "SEM_CONEXAO",
+    );
   } finally {
     clearTimeout(timeoutId);
     callerSignal?.removeEventListener("abort", abortFromCaller);
@@ -124,19 +131,27 @@ export function post(path, data) {
 }
 
 export function postPublic(path, data) {
-  return apiRequest(path, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  }, { authenticated: false });
+  return apiRequest(
+    path,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    },
+    { authenticated: false },
+  );
 }
 
 export function postWithHeaders(path, data, headers = {}, { authenticated = true } = {}) {
-  return apiRequest(path, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...headers },
-    body: JSON.stringify(data),
-  }, { authenticated });
+  return apiRequest(
+    path,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...headers },
+      body: JSON.stringify(data),
+    },
+    { authenticated },
+  );
 }
 
 export function put(path, data) {

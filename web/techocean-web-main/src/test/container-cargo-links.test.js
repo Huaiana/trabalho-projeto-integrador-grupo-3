@@ -1,11 +1,17 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { DATABASE_CATALOG_KEY, readDatabaseEntries, saveDatabaseEntry } from "../legacy/database-catalog.js";
+import {
+  DATABASE_CATALOG_KEY,
+  readDatabaseEntries,
+  saveDatabaseEntry,
+} from "../legacy/database-catalog.js";
 
 describe("container cargo associations", () => {
   beforeEach(() => localStorage.clear());
 
   it("links a container to selected cargo types and preserves its ID", () => {
-    const container = readDatabaseEntries("conteiner").find((entry) => entry.tipo === "Flat Rack 20'");
+    const container = readDatabaseEntries("conteiner").find(
+      (entry) => entry.tipo === "Flat Rack 20'",
+    );
     const cargos = readDatabaseEntries("carga");
     saveDatabaseEntry("conteiner", { ...container, cargas: cargos[1].codigo }, container.id);
     const saved = readDatabaseEntries("conteiner").find((entry) => entry.id === container.id);
@@ -36,7 +42,9 @@ describe("container cargo associations", () => {
     localStorage.setItem(DATABASE_CATALOG_KEY, JSON.stringify(stored));
 
     const migratedCargos = readDatabaseEntries("carga");
-    expect(migratedCargos.find((entry) => entry.tipoCarga === "Granéis Sólidos").conteineres).toBeTruthy();
+    expect(
+      migratedCargos.find((entry) => entry.tipoCarga === "Granéis Sólidos").conteineres,
+    ).toBeTruthy();
   });
 
   it("reflects cargo-side edits on the container side", () => {
@@ -48,7 +56,9 @@ describe("container cargo associations", () => {
 
   it("rejects nonexistent cargo IDs without modifying existing links", () => {
     const container = readDatabaseEntries("conteiner")[0];
-    expect(() => saveDatabaseEntry("conteiner", { ...container, cargas: "CRG-999999" }, container.id)).toThrow("ID de carga não encontrado");
+    expect(() =>
+      saveDatabaseEntry("conteiner", { ...container, cargas: "CRG-999999" }, container.id),
+    ).toThrow("ID de carga não encontrado");
     expect(readDatabaseEntries("conteiner")[0].cargas).toBe(container.cargas);
   });
 });

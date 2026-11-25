@@ -15,7 +15,14 @@ export function TechoceanSite() {
       <div className="brasilia-clock" hidden>
         <div className="brasilia-clock-inner">
           <span className="brasilia-clock-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.7"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <circle cx="12" cy="12" r="8.5" />
               <path d="M12 7.5v4.8l3.1 1.8" />
             </svg>
