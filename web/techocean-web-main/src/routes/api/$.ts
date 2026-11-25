@@ -1,7 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 // Same-origin relay to the Techocean API, so the browser never hits its CORS allow-list.
-const UPSTREAM = "https://techocean-api.huaydarc.workers.dev";
+// O upstream respeita VITE_API_URL (produção/build) e, em desenvolvimento local,
+// aponta para o Spring Boot rodando em http://localhost:8080.
+const UPSTREAM =
+  import.meta.env?.VITE_API_URL
+    ? String(import.meta.env.VITE_API_URL).replace(/\/$/, "")
+    : "http://localhost:8080";
 
 async function relay({ request }: { request: Request }) {
   const url = new URL(request.url);
