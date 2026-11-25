@@ -1,7 +1,7 @@
 export const LOCAL_API_URL = "/api";
 // Production deployments must provide VITE_API_URL at build time.
 export const PRODUCTION_API_URL = "https://techocean-api.huaydarc.workers.dev";
-export const API_REQUEST_TIMEOUT_MS = 15_000;
+export const API_REQUEST_TIMEOUT_MS = 60_000;
 const ACCESS_TOKEN_STORAGE_KEY = "techocean.accessToken";
 
 export function resolveApiBaseUrl(_env = import.meta.env) {
