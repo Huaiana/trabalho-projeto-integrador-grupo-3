@@ -651,4 +651,4 @@ SELECT
   sdc.criado_em AS detalhe_criado_em,
 
   ref_srv.id AS ref_servico_id,
-  ref_srv.nome AS ref_servico_
+  ref_srv.nome AS ref_servico_id,
