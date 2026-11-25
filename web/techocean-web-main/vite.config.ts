@@ -14,10 +14,8 @@ export default defineConfig({
     // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
     // nitro/vite builds from this
     server: { entry: "server" },
-    // Prerender quebra com o preset cloudflare-pages (nitro gera _worker.js/index.js,
-    // o plugin procura index.mjs). Sem prerender, o modo SPA não gera o _shell.html,
-    // então os dois saem juntos e o app roda como SSR puro no _worker.js.
-    prerender: { enabled: false },
+    spa: {
+      enabled: true,
+    },
   },
 });
-
