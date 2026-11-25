@@ -35,3 +35,6 @@ build/
 ### VS Code ###
 .vscode/
 techocean-api-v2/
+
+### Wrangler / Cloudflare ###
+.wrangler/
